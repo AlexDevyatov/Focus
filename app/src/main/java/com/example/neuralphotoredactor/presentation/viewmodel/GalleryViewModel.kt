@@ -45,24 +45,33 @@ class GalleryViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             
-            getAllImagesUseCase()
-                .catch { exception ->
-                    _state.update { 
-                        it.copy(
-                            isLoading = false,
-                            error = exception.message ?: "Failed to load images"
-                        )
+            try {
+                getAllImagesUseCase()
+                    .catch { exception ->
+                        _state.update { 
+                            it.copy(
+                                isLoading = false,
+                                error = exception.message ?: "Failed to load images"
+                            )
+                        }
                     }
-                }
-                .collect { images ->
-                    _state.update { 
-                        it.copy(
-                            images = images,
-                            isLoading = false,
-                            error = null
-                        )
+                    .collect { images ->
+                        _state.update { 
+                            it.copy(
+                                images = images,
+                                isLoading = false,
+                                error = null
+                            )
+                        }
                     }
+            } catch (e: Exception) {
+                _state.update { 
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Failed to load images"
+                    )
                 }
+            }
         }
     }
 
