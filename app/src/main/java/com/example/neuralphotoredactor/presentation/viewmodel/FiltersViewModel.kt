@@ -43,7 +43,7 @@ class FiltersViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             
-            getAllFiltersUseCase()
+            getAllFiltersUseCase.getAllFilters()
                 .catch { exception ->
                     _state.update { 
                         it.copy(
@@ -81,7 +81,7 @@ class FiltersViewModel @Inject constructor(
     fun getFilterById(id: String) {
         viewModelScope.launch {
             try {
-                val filter = getFilterByIdUseCase(id)
+                val filter = getFilterByIdUseCase.getFilterById(id)
                 if (filter != null) {
                     _state.update { it.copy(selectedFilter = filter) }
                 } else {

@@ -22,7 +22,7 @@ class CaptureImageFromCameraUseCase @Inject constructor(
      * 
      * @return ImageData захваченного изображения или null, если захват был отменен
      */
-    suspend operator fun invoke(): ImageData? {
+    suspend fun captureImageFromCamera(): ImageData? {
         return imageRepository.captureImageFromCamera()
     }
 }

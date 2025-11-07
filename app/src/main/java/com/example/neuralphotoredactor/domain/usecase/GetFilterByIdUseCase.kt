@@ -23,7 +23,7 @@ class GetFilterByIdUseCase @Inject constructor(
      * @param id Идентификатор фильтра
      * @return FilterPreset или null, если фильтр не найден
      */
-    suspend operator fun invoke(id: String): FilterPreset? {
+    suspend fun getFilterById(id: String): FilterPreset? {
         return filterRepository.getFilterById(id)
     }
 }

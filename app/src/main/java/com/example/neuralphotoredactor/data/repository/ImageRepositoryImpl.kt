@@ -36,6 +36,7 @@ class ImageRepositoryImpl @Inject constructor(
         return flow {
             try {
                 val images = galleryDataSource.getAllImages()
+                // Эмитим данные сразу после получения
                 emit(images)
             } catch (e: Exception) {
                 // Эмитим пустой список при ошибке

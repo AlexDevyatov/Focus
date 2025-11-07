@@ -24,7 +24,7 @@ class ProcessImageUseCase @Inject constructor(
      * @param request Запрос на обработку, содержащий изображение и параметры фильтра
      * @return AIResult с результатом обработки
      */
-    suspend operator fun invoke(request: ProcessingRequest): AIResult {
+    suspend fun processImage(request: ProcessingRequest): AIResult {
         return processingRepository.processImage(request)
     }
 }

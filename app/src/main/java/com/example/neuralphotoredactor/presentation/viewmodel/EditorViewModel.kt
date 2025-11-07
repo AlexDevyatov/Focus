@@ -64,7 +64,7 @@ class EditorViewModel @Inject constructor(
                     parameters = parameters
                 )
                 
-                val result = processImageUseCase(request)
+                val result = processImageUseCase.processImage(request)
                 
                 if (result.processedImage != null) {
                     _state.update { 

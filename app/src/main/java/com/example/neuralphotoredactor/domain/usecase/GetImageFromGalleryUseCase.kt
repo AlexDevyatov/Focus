@@ -22,7 +22,7 @@ class GetImageFromGalleryUseCase @Inject constructor(
      * 
      * @return ImageData выбранного изображения или null, если выбор был отменен
      */
-    suspend operator fun invoke(): ImageData? {
+    suspend fun getImageFromGallery(): ImageData? {
         return imageRepository.getImageFromGallery()
     }
 }

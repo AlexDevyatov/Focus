@@ -21,7 +21,7 @@ class DeleteProcessingResultUseCase @Inject constructor(
      * 
      * @param id Идентификатор результата обработки для удаления
      */
-    suspend operator fun invoke(id: String) {
+    suspend fun deleteProcessingResult(id: String) {
         processingRepository.deleteProcessingResult(id)
     }
 }

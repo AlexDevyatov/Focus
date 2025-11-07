@@ -23,7 +23,7 @@ class GetAllFiltersUseCase @Inject constructor(
      * 
      * @return Flow со списком всех предустановок фильтров
      */
-    operator fun invoke(): Flow<List<FilterPreset>> {
+    fun getAllFilters(): Flow<List<FilterPreset>> {
         return filterRepository.getAllFilters()
     }
 }

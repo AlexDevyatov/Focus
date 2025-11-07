@@ -23,7 +23,7 @@ class GetAllImagesUseCase @Inject constructor(
      * 
      * @return Flow со списком всех изображений, обновляющийся при изменении галереи
      */
-    operator fun invoke(): Flow<List<ImageData>> {
+    fun getAllImages(): Flow<List<ImageData>> {
         return imageRepository.getAllImages()
     }
 }

@@ -23,7 +23,7 @@ class GetProcessingHistoryUseCase @Inject constructor(
      * 
      * @return Flow со списком всех результатов обработки, обновляющийся при изменении истории
      */
-    operator fun invoke(): Flow<List<AIResult>> {
+    fun getProcessingHistory(): Flow<List<AIResult>> {
         return processingRepository.getProcessingHistory()
     }
 }

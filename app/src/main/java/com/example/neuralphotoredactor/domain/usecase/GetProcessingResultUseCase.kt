@@ -23,7 +23,7 @@ class GetProcessingResultUseCase @Inject constructor(
      * @param id Идентификатор результата обработки
      * @return AIResult или null, если результат не найден
      */
-    suspend operator fun invoke(id: String): AIResult? {
+    suspend fun getProcessingResult(id: String): AIResult? {
         return processingRepository.getProcessingResult(id)
     }
 }

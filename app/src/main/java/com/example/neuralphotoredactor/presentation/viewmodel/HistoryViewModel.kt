@@ -46,7 +46,7 @@ class HistoryViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             
-            getProcessingHistoryUseCase()
+            getProcessingHistoryUseCase.getProcessingHistory()
                 .catch { exception ->
                     _state.update { 
                         it.copy(
@@ -84,7 +84,7 @@ class HistoryViewModel @Inject constructor(
     fun getResultById(id: String) {
         viewModelScope.launch {
             try {
-                val result = getProcessingResultUseCase(id)
+                val result = getProcessingResultUseCase.getProcessingResult(id)
                 if (result != null) {
                     _state.update { it.copy(selectedResult = result) }
                 } else {
@@ -106,7 +106,7 @@ class HistoryViewModel @Inject constructor(
     fun deleteResult(id: String) {
         viewModelScope.launch {
             try {
-                deleteProcessingResultUseCase(id)
+                deleteProcessingResultUseCase.deleteProcessingResult(id)
                 // История обновится автоматически через Flow
             } catch (e: Exception) {
                 _state.update { 

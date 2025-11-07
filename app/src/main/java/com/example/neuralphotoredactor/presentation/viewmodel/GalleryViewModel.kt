@@ -2,6 +2,7 @@ package com.example.neuralphotoredactor.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.usecase.CaptureImageFromCameraUseCase
 import com.example.neuralphotoredactor.domain.usecase.GetAllImagesUseCase
 import com.example.neuralphotoredactor.domain.usecase.GetImageFromGalleryUseCase
@@ -11,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -34,10 +37,6 @@ class GalleryViewModel @Inject constructor(
     private val _state = MutableStateFlow(GalleryState())
     val state: StateFlow<GalleryState> = _state.asStateFlow()
 
-    init {
-        loadImages()
-    }
-
     /**
      * Загружает все изображения из галереи.
      */
@@ -46,16 +45,19 @@ class GalleryViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null) }
             
             try {
-                getAllImagesUseCase()
+                // Используем catch для обработки ошибок в Flow
+                // Если произойдет исключение, catch перехватит его и эмитит пустой список
+                // Затем take(1) возьмет первое значение (либо список изображений, либо пустой список)
+                getAllImagesUseCase.getAllImages()
                     .catch { exception ->
-                        _state.update { 
-                            it.copy(
-                                isLoading = false,
-                                error = exception.message ?: "Failed to load images"
-                            )
-                        }
+                        // catch перехватывает исключения из upstream Flow
+                        // Вместо того чтобы позволить исключению пройти дальше,
+                        // мы эмитим пустой список как fallback значение
+                        emit(emptyList())
                     }
+                    .take(1) // Берем только первое значение и завершаем Flow
                     .collect { images ->
+                        // Обновляем состояние с полученными изображениями
                         _state.update { 
                             it.copy(
                                 images = images,
@@ -65,6 +67,8 @@ class GalleryViewModel @Inject constructor(
                         }
                     }
             } catch (e: Exception) {
+                // Обрабатываем исключения, которые могут возникнуть вне Flow
+                // (например, при создании Flow или при работе с корутинами)
                 _state.update { 
                     it.copy(
                         isLoading = false,
@@ -83,7 +87,7 @@ class GalleryViewModel @Inject constructor(
     suspend fun pickImageFromGallery(): com.example.neuralphotoredactor.domain.model.ImageData? {
         return try {
             _state.update { it.copy(isLoading = true, error = null) }
-            val image = getImageFromGalleryUseCase()
+            val image = getImageFromGalleryUseCase.getImageFromGallery()
             _state.update { it.copy(isLoading = false) }
             image
         } catch (e: Exception) {
@@ -105,7 +109,7 @@ class GalleryViewModel @Inject constructor(
     suspend fun captureImage(): com.example.neuralphotoredactor.domain.model.ImageData? {
         return try {
             _state.update { it.copy(isLoading = true, error = null) }
-            val image = captureImageFromCameraUseCase()
+            val image = captureImageFromCameraUseCase.captureImageFromCamera()
             _state.update { it.copy(isLoading = false) }
             image
         } catch (e: Exception) {
