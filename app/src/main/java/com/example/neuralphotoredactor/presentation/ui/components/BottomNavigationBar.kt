@@ -1,8 +1,6 @@
 package com.example.neuralphotoredactor.presentation.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -10,6 +8,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import com.example.neuralphotoredactor.presentation.navigation.Screen
 
 /**
@@ -29,13 +28,23 @@ fun BottomNavigationBar(
         NavigationBarItem(
             selected = currentRoute == Screen.Gallery.route,
             onClick = { onNavigate(Screen.Gallery.route) },
-            icon = { Icon(Icons.Default.Photo, contentDescription = "Gallery") },
+            icon = { 
+                Icon(
+                    painter = painterResource(android.R.drawable.ic_menu_gallery),
+                    contentDescription = "Gallery"
+                )
+            },
             label = { Text("Gallery") }
         )
         NavigationBarItem(
             selected = currentRoute == Screen.History.route,
             onClick = { onNavigate(Screen.History.route) },
-            icon = { Icon(Icons.Default.History, contentDescription = "History") },
+            icon = { 
+                Icon(
+                    painter = painterResource(android.R.drawable.ic_menu_recent_history),
+                    contentDescription = "History"
+                )
+            },
             label = { Text("History") }
         )
         NavigationBarItem(
