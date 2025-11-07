@@ -44,38 +44,27 @@ class GalleryViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             
-            try {
-                // Используем catch для обработки ошибок в Flow
-                // Если произойдет исключение, catch перехватит его и эмитит пустой список
-                // Затем take(1) возьмет первое значение (либо список изображений, либо пустой список)
-                getAllImagesUseCase.getAllImages()
-                    .catch { exception ->
-                        // catch перехватывает исключения из upstream Flow
-                        // Вместо того чтобы позволить исключению пройти дальше,
-                        // мы эмитим пустой список как fallback значение
-                        emit(emptyList())
-                    }
-                    .take(1) // Берем только первое значение и завершаем Flow
-                    .collect { images ->
-                        // Обновляем состояние с полученными изображениями
-                        _state.update { 
-                            it.copy(
-                                images = images,
-                                isLoading = false,
-                                error = null
-                            )
-                        }
-                    }
-            } catch (e: Exception) {
-                // Обрабатываем исключения, которые могут возникнуть вне Flow
-                // (например, при создании Flow или при работе с корутинами)
-                _state.update { 
-                    it.copy(
-                        isLoading = false,
-                        error = e.message ?: "Failed to load images"
-                    )
+            // Используем catch для обработки ошибок в Flow
+            // Если произойдет исключение, catch перехватит его и эмитит пустой список
+            // Затем take(1) возьмет первое значение (либо список изображений, либо пустой список)
+            getAllImagesUseCase.getAllImages()
+                .catch { exception ->
+                    // catch перехватывает исключения из upstream Flow
+                    // Вместо того чтобы позволить исключению пройти дальше,
+                    // мы эмитим пустой список как fallback значение
+                    emit(emptyList())
                 }
-            }
+                .take(1) // Берем только первое значение и завершаем Flow
+                .collect { images ->
+                    // Обновляем состояние с полученными изображениями
+                    _state.update { 
+                        it.copy(
+                            images = images,
+                            isLoading = false,
+                            error = null
+                        )
+                    }
+                }
         }
     }
 

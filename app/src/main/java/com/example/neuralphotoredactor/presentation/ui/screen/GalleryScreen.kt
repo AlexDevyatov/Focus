@@ -31,6 +31,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.presentation.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.presentation.ui.components.ImageItem
@@ -52,7 +53,7 @@ fun GalleryScreen(
     onImageSelected: (ImageData) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val state = viewModel.state.value
+    val state = viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Launcher для выбора изображения из галереи
@@ -168,16 +169,16 @@ fun GalleryScreen(
                 .padding(paddingValues)
         ) {
             when {
-                state.isLoading -> {
+                state.value.isLoading -> {
                     LoadingIndicator()
                 }
-                state.error != null -> {
+                state.value.error != null -> {
                     ErrorMessage(
-                        message = state.error,
+                        message = state.value.error ?: "",
                         onDismiss = { viewModel.clearError() }
                     )
                 }
-                state.images.isEmpty() -> {
+                state.value.images.isEmpty() -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -213,7 +214,7 @@ fun GalleryScreen(
                             .fillMaxSize()
                             .padding(4.dp)
                     ) {
-                        items(state.images) { image ->
+                        items(state.value.images) { image ->
                             ImageItem(
                                 imageUri = image.uri,
                                 onClick = { onImageSelected(image) }

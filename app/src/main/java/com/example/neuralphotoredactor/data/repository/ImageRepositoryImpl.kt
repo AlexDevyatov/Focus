@@ -34,14 +34,9 @@ class ImageRepositoryImpl @Inject constructor(
 
     override fun getAllImages(): Flow<List<ImageData>> {
         return flow {
-            try {
-                val images = galleryDataSource.getAllImages()
-                // Эмитим данные сразу после получения
-                emit(images)
-            } catch (e: Exception) {
-                // Эмитим пустой список при ошибке
-                emit(emptyList())
-            }
+            val images = galleryDataSource.getAllImages()
+            // Эмитим данные сразу после получения
+            emit(images)
         }
     }
 }
