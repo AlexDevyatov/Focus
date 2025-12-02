@@ -5,24 +5,17 @@ import com.example.neuralphotoredactor.domain.repository.ImageRepository
 import javax.inject.Inject
 
 /**
- * Use case для получения изображения из галереи устройства.
- * 
- * Инкапсулирует бизнес-логику выбора изображения из галереи.
- * Используется в ViewModel для открытия диалога выбора изображения.
- * 
- * @param imageRepository Репозиторий для работы с изображениями
- * 
- * @see com.example.neuralphotoredactor.domain.repository.ImageRepository
+ * Use case для получения изображения из галереи.
  */
 class GetImageFromGalleryUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
     /**
-     * Получает изображение из галереи устройства.
+     * Выполнить получение изображения из галереи.
      * 
-     * @return ImageData выбранного изображения или null, если выбор был отменен
+     * @return ImageData или null
      */
-    suspend fun getImageFromGallery(): ImageData? {
+    suspend operator fun invoke(): ImageData? {
         return imageRepository.getImageFromGallery()
     }
 }

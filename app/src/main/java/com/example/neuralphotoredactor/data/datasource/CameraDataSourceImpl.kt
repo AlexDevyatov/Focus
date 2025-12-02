@@ -4,21 +4,15 @@ import com.example.neuralphotoredactor.domain.model.ImageData
 import javax.inject.Inject
 
 /**
- * Реализация источника данных для работы с камерой устройства.
+ * Реализация источника данных для работы с камерой.
  * 
- * Использует CameraX для захвата изображений с камеры. Внедряется через Hilt
- * и используется в ImageRepository для получения изображений с камеры.
- * 
- * @see com.example.neuralphotoredactor.data.datasource.CameraDataSource
+ * Захват изображения происходит через CameraX в UI слое,
+ * здесь возвращаем null, так как результат приходит через Activity Result.
  */
 class CameraDataSourceImpl @Inject constructor() : CameraDataSource {
-    /**
-     * Захватывает изображение с камеры устройства используя CameraX.
-     * 
-     * @return ImageData захваченного изображения или null, если захват был отменен
-     */
+    
     override suspend fun captureImage(): ImageData? {
-        // TODO: Implement camera capture using CameraX
+        // Реализация захвата через CameraX будет в UI слое
         return null
     }
 }

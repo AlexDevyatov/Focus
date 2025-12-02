@@ -7,23 +7,16 @@ import javax.inject.Inject
 
 /**
  * Use case для получения всех изображений из галереи.
- * 
- * Инкапсулирует бизнес-логику получения списка всех доступных изображений.
- * Используется в ViewModel для отображения галереи изображений в UI.
- * 
- * @param imageRepository Репозиторий для работы с изображениями
- * 
- * @see com.example.neuralphotoredactor.domain.repository.ImageRepository
  */
 class GetAllImagesUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
     /**
-     * Получает поток всех доступных изображений из галереи.
+     * Выполнить получение всех изображений.
      * 
-     * @return Flow со списком всех изображений, обновляющийся при изменении галереи
+     * @return Flow со списком изображений
      */
-    fun getAllImages(): Flow<List<ImageData>> {
+    operator fun invoke(): Flow<List<ImageData>> {
         return imageRepository.getAllImages()
     }
 }

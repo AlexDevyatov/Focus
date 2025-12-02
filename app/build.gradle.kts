@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -64,18 +65,6 @@ dependencies {
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     
-    // Networking
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.gson)
-    implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
-    implementation(libs.gson)
-    
-    // Database
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    kapt(libs.room.compiler)
-    
     // Camera
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
@@ -88,7 +77,7 @@ dependencies {
     // AI/ML
     implementation(libs.tensorflow.lite)
     implementation(libs.tensorflow.lite.gpu)
-    implementation(libs.mlkit.image.labeling)
+    implementation(libs.tensorflow.lite.support)
     
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

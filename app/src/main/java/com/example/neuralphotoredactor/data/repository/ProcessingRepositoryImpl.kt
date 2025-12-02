@@ -1,186 +1,88 @@
 package com.example.neuralphotoredactor.data.repository
 
-import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
-import com.example.neuralphotoredactor.data.mapper.FilterTypeMapper
-import com.example.neuralphotoredactor.data.mapper.ImageMapper
-import com.example.neuralphotoredactor.data.mapper.ProcessingHistoryMapper
-import com.example.neuralphotoredactor.data.remote.api.AIServiceApi
-import com.example.neuralphotoredactor.data.remote.dto.ProcessingRequestDto
-import com.example.neuralphotoredactor.data.util.ImageProcessor
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import com.example.neuralphotoredactor.data.storage.ImageStorage
 import com.example.neuralphotoredactor.domain.enums.FilterType
-import com.example.neuralphotoredactor.domain.enums.ProcessingStatus
-import com.example.neuralphotoredactor.domain.model.AIResult
 import com.example.neuralphotoredactor.domain.model.ImageData
-import com.example.neuralphotoredactor.domain.model.ProcessingRequest
+import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
+import com.example.neuralphotoredactor.ml.interpreter.ImageProcessor
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import java.util.UUID
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import java.io.FileNotFoundException
 import javax.inject.Inject
 
 /**
- * Реализация репозитория для обработки изображений AI алгоритмами.
- * 
- * Координирует обработку изображений, используя как локальные TensorFlow Lite модели
- * (для on-device фильтров), так и облачные API (для cloud-based фильтров).
- * Сохраняет историю обработок в Room базу данных.
- * 
- * Внедряется через Hilt и предоставляет единый интерфейс для domain слоя.
- * 
- * @param processingHistoryDao DAO для работы с историей обработок
- * @param aiServiceApi API для облачной обработки изображений
- * 
- * @see com.example.neuralphotoredactor.domain.repository.ProcessingRepository
+ * Реализация репозитория для обработки изображений.
  */
 class ProcessingRepositoryImpl @Inject constructor(
-    private val processingHistoryDao: ProcessingHistoryDao,
-    private val aiServiceApi: AIServiceApi
+    @ApplicationContext private val context: Context,
+    private val imageProcessor: ImageProcessor,
+    private val imageStorage: ImageStorage
 ) : ProcessingRepository {
     
-    override suspend fun processImage(request: ProcessingRequest): AIResult {
-        val resultId = UUID.randomUUID().toString()
-        val startTime = System.currentTimeMillis()
-        
-        // Создаем начальный результат со статусом PROCESSING
-        val initialResult = AIResult(
-            id = resultId,
-            originalImage = request.imageData,
-            processedImage = null,
-            status = ProcessingStatus.PROCESSING,
-            error = null,
-            processingTime = 0L
-        )
-        
-        // Сохраняем в базу данных
-        val entity = ProcessingHistoryMapper.toEntity(initialResult).copy(
-            filterType = FilterTypeMapper.toString(request.filterType)
-        )
-        processingHistoryDao.insert(entity)
-        
-        return try {
-            val processedImage: ImageData?
-            val status: ProcessingStatus
-            val error: String?
+    private val processingHistory = MutableStateFlow<List<ProcessingResult>>(emptyList())
+    
+    override suspend fun processImage(
+        imageData: ImageData,
+        filterType: FilterType
+    ): ProcessingResult? = withContext(Dispatchers.IO) {
+        try {
+            // Загружаем Bitmap из URI
+            val bitmap = loadBitmapFromUri(imageData.uri) ?: return@withContext null
             
-            // Определяем способ обработки
-            if (ImageProcessor.isOnDeviceFilter(request.filterType)) {
-                // On-device обработка через TensorFlow Lite
-                processedImage = processOnDevice(request)
-                status = if (processedImage != null) ProcessingStatus.COMPLETED else ProcessingStatus.FAILED
-                error = if (processedImage == null) "On-device processing failed" else null
-            } else {
-                // Cloud-based обработка через API
-                val apiResult = processViaAPI(request)
-                processedImage = apiResult.processedImage
-                status = apiResult.status
-                error = apiResult.error
-            }
+            // Обрабатываем изображение через ML модель
+            val processedBitmap = imageProcessor.processImage(bitmap, filterType)
+                ?: return@withContext null
             
-            val processingTime = System.currentTimeMillis() - startTime
+            // Сохраняем обработанное изображение
+            val fileName = "processed_${System.currentTimeMillis()}_${filterType.name}.jpg"
+            val processedUri = imageStorage.saveBitmap(processedBitmap, fileName)
+                ?: return@withContext null
             
-            val finalResult = AIResult(
-                id = resultId,
-                originalImage = request.imageData,
-                processedImage = processedImage,
-                status = status,
-                error = error,
-                processingTime = processingTime
+            val result = ProcessingResult(
+                originalUri = imageData.uri,
+                processedUri = processedUri,
+                filterType = filterType.name
             )
             
-            // Обновляем в базе данных
-            val updatedEntity = ProcessingHistoryMapper.toEntity(finalResult).copy(
-                filterType = FilterTypeMapper.toString(request.filterType)
-            )
-            processingHistoryDao.insert(updatedEntity)
+            // Добавляем в историю
+            val currentHistory = processingHistory.value.toMutableList()
+            currentHistory.add(0, result)
+            processingHistory.value = currentHistory
             
-            finalResult
+            result
         } catch (e: Exception) {
-            val processingTime = System.currentTimeMillis() - startTime
-            val errorResult = AIResult(
-                id = resultId,
-                originalImage = request.imageData,
-                processedImage = null,
-                status = ProcessingStatus.FAILED,
-                error = e.message ?: "Unknown error occurred",
-                processingTime = processingTime
-            )
-            
-            // Обновляем в базе данных
-            val errorEntity = ProcessingHistoryMapper.toEntity(errorResult).copy(
-                filterType = FilterTypeMapper.toString(request.filterType)
-            )
-            processingHistoryDao.insert(errorEntity)
-            
-            errorResult
-        }
-    }
-
-    /**
-     * Обрабатывает изображение локально на устройстве через TensorFlow Lite.
-     * 
-     * @param request Запрос на обработку
-     * @return Обработанное изображение или null
-     */
-    private suspend fun processOnDevice(request: ProcessingRequest): ImageData? {
-        // TODO: Реализовать обработку через TensorFlow Lite
-        // Это требует загрузки моделей из assets и работы с Bitmap
-        return null
-    }
-
-    /**
-     * Обрабатывает изображение через облачный API.
-     * 
-     * @param request Запрос на обработку
-     * @return Результат обработки
-     */
-    private suspend fun processViaAPI(request: ProcessingRequest): AIResult {
-        val imageBase64 = ImageMapper.toBase64(request.imageData)
-        
-        val apiRequest = ProcessingRequestDto(
-            imageBase64 = imageBase64,
-            filterType = FilterTypeMapper.toString(request.filterType),
-            parameters = request.parameters
-        )
-        
-        val apiResponse = aiServiceApi.processImage(apiRequest)
-        
-        val processedImage = apiResponse.processedImageBase64?.let { base64 ->
-            // TODO: Преобразовать Base64 обратно в ImageData
-            // Это требует сохранения изображения и создания URI
             null
         }
-        
-        val status = when (apiResponse.status.lowercase()) {
-            "completed" -> ProcessingStatus.COMPLETED
-            "processing" -> ProcessingStatus.PROCESSING
-            "failed" -> ProcessingStatus.FAILED
-            else -> ProcessingStatus.FAILED
-        }
-        
-        return AIResult(
-            id = apiResponse.id,
-            originalImage = request.imageData,
-            processedImage = processedImage,
-            status = status,
-            error = apiResponse.error,
-            processingTime = apiResponse.processingTime
-        )
     }
-
-    override fun getProcessingHistory(): Flow<List<AIResult>> {
-        return processingHistoryDao.getAll()
-            .map { entities ->
-                ProcessingHistoryMapper.toDomainList(entities)
+    
+    override fun getProcessingHistory(): Flow<List<ProcessingResult>> {
+        return processingHistory.asStateFlow()
+    }
+    
+    override suspend fun deleteProcessingResult(result: ProcessingResult) = withContext(Dispatchers.IO) {
+        imageStorage.deleteFile(result.processedUri)
+        val currentHistory = processingHistory.value.toMutableList()
+        currentHistory.remove(result)
+        processingHistory.value = currentHistory
+    }
+    
+    private fun loadBitmapFromUri(uri: android.net.Uri): Bitmap? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            inputStream?.use {
+                BitmapFactory.decodeStream(it)
             }
-    }
-
-    override suspend fun getProcessingResult(id: String): AIResult? {
-        val entity = processingHistoryDao.getById(id)
-        return entity?.let { ProcessingHistoryMapper.toDomain(it) }
-    }
-
-    override suspend fun deleteProcessingResult(id: String) {
-        processingHistoryDao.deleteById(id)
+        } catch (e: FileNotFoundException) {
+            null
+        }
     }
 }
 

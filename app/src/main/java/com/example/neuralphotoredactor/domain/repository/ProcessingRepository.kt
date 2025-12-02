@@ -1,47 +1,41 @@
 package com.example.neuralphotoredactor.domain.repository
 
-import com.example.neuralphotoredactor.domain.model.AIResult
-import com.example.neuralphotoredactor.domain.model.ProcessingRequest
+import com.example.neuralphotoredactor.domain.enums.FilterType
+import com.example.neuralphotoredactor.domain.model.ImageData
+import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Интерфейс репозитория для обработки изображений AI алгоритмами.
+ * Интерфейс репозитория для обработки изображений.
  * 
- * Определяет методы для запуска обработки изображений, получения истории обработок
- * и управления результатами. Реализация находится в data слое и может использовать
- * как локальные TensorFlow Lite модели, так и облачные API.
- * 
- * @see com.example.neuralphotoredactor.data.repository.ProcessingRepositoryImpl
+ * Предоставляет методы для применения фильтров и эффектов к изображениям
+ * с использованием TensorFlow Lite моделей.
  */
 interface ProcessingRepository {
     /**
-     * Обрабатывает изображение с использованием указанного AI фильтра.
+     * Обработать изображение с применением указанного фильтра.
      * 
-     * @param request Запрос на обработку, содержащий изображение и параметры фильтра
-     * @return AIResult с результатом обработки (может быть в статусе PROCESSING, COMPLETED или FAILED)
+     * @param imageData Исходное изображение
+     * @param filterType Тип фильтра для применения
+     * @return Результат обработки или null в случае ошибки
      */
-    suspend fun processImage(request: ProcessingRequest): AIResult
+    suspend fun processImage(
+        imageData: ImageData,
+        filterType: FilterType
+    ): ProcessingResult?
     
     /**
-     * Получает поток истории всех обработок изображений.
+     * Получить историю обработок.
      * 
-     * @return Flow со списком всех результатов обработки, отсортированных по времени
+     * @return Flow со списком результатов обработки
      */
-    fun getProcessingHistory(): Flow<List<AIResult>>
+    fun getProcessingHistory(): Flow<List<ProcessingResult>>
     
     /**
-     * Получает конкретный результат обработки по идентификатору.
+     * Удалить результат обработки.
      * 
-     * @param id Идентификатор результата обработки
-     * @return AIResult или null, если результат не найден
+     * @param result Результат для удаления
      */
-    suspend fun getProcessingResult(id: String): AIResult?
-    
-    /**
-     * Удаляет результат обработки из истории.
-     * 
-     * @param id Идентификатор результата обработки для удаления
-     */
-    suspend fun deleteProcessingResult(id: String)
+    suspend fun deleteProcessingResult(result: ProcessingResult)
 }
 

@@ -3,18 +3,13 @@ package com.example.neuralphotoredactor.data.datasource
 import com.example.neuralphotoredactor.domain.model.ImageData
 
 /**
- * Интерфейс источника данных для работы с камерой устройства.
- * 
- * Определяет методы для захвата изображений с камеры. Реализация использует
- * CameraX для работы с камерой Android устройства.
- * 
- * @see com.example.neuralphotoredactor.data.datasource.CameraDataSourceImpl
+ * Интерфейс источника данных для работы с камерой.
  */
 interface CameraDataSource {
     /**
-     * Захватывает изображение с камеры устройства.
+     * Захватить изображение с камеры.
      * 
-     * @return ImageData захваченного изображения или null, если захват был отменен
+     * @return ImageData или null
      */
     suspend fun captureImage(): ImageData?
 }
