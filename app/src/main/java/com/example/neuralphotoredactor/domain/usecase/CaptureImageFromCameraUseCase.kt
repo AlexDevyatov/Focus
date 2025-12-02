@@ -11,11 +11,11 @@ class CaptureImageFromCameraUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
     /**
-     * Выполнить захват изображения с камеры.
+     * Захватить изображение с камеры.
      * 
      * @return ImageData или null
      */
-    suspend operator fun invoke(): ImageData? {
+    suspend fun invoke(): ImageData? {
         return imageRepository.captureImageFromCamera()
     }
 }

@@ -12,12 +12,11 @@ class GetProcessingHistoryUseCase @Inject constructor(
     private val processingRepository: ProcessingRepository
 ) {
     /**
-     * Выполнить получение истории обработок.
+     * Получить историю обработок.
      * 
      * @return Flow со списком результатов обработки
      */
-    operator fun invoke(): Flow<List<ProcessingResult>> {
-        return processingRepository.getProcessingHistory()
-    }
+    val invoke: Flow<List<ProcessingResult>>
+        get() = processingRepository.getProcessingHistory()
 }
 

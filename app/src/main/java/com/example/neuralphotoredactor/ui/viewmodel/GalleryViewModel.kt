@@ -30,7 +30,7 @@ class GalleryViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                getAllImagesUseCase().collect { images ->
+                getAllImagesUseCase.invoke.collect { images ->
                     _uiState.value = _uiState.value.copy(
                         images = images,
                         isLoading = false

@@ -30,7 +30,7 @@ class HistoryViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                getProcessingHistoryUseCase().collect { history ->
+                getProcessingHistoryUseCase.invoke.collect { history ->
                     _uiState.value = _uiState.value.copy(
                         history = history,
                         isLoading = false

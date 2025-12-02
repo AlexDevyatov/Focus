@@ -43,7 +43,7 @@ class EditorViewModel @Inject constructor(
             )
             
             try {
-                val result = processImageUseCase(currentImage, filterType)
+                val result = processImageUseCase.invoke(currentImage, filterType)
                 _uiState.value = _uiState.value.copy(
                     processedResult = result,
                     isLoading = false

@@ -12,12 +12,11 @@ class GetAllImagesUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
     /**
-     * Выполнить получение всех изображений.
+     * Получить все изображения.
      * 
      * @return Flow со списком изображений
      */
-    operator fun invoke(): Flow<List<ImageData>> {
-        return imageRepository.getAllImages()
-    }
+    val invoke: Flow<List<ImageData>>
+        get() = imageRepository.getAllImages()
 }
 

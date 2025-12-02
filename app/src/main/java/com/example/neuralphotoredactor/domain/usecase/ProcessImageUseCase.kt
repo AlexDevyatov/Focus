@@ -13,13 +13,13 @@ class ProcessImageUseCase @Inject constructor(
     private val processingRepository: ProcessingRepository
 ) {
     /**
-     * Выполнить обработку изображения.
+     * Обработать изображение.
      * 
      * @param imageData Исходное изображение
      * @param filterType Тип фильтра
      * @return Результат обработки или null
      */
-    suspend operator fun invoke(
+    suspend fun invoke(
         imageData: ImageData,
         filterType: FilterType
     ): ProcessingResult? {

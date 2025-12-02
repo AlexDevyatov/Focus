@@ -11,11 +11,11 @@ class GetImageFromGalleryUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
     /**
-     * Выполнить получение изображения из галереи.
+ре     * Получить изображение из галереи.
      * 
      * @return ImageData или null
      */
-    suspend operator fun invoke(): ImageData? {
+    suspend fun invoke(): ImageData? {
         return imageRepository.getImageFromGallery()
     }
 }
