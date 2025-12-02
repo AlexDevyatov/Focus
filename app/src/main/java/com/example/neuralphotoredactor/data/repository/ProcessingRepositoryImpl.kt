@@ -3,6 +3,8 @@ package com.example.neuralphotoredactor.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
+import com.example.neuralphotoredactor.data.mapper.ProcessingHistoryMapper
 import com.example.neuralphotoredactor.data.storage.ImageStorage
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
@@ -12,22 +14,23 @@ import com.example.neuralphotoredactor.ml.interpreter.ImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import javax.inject.Inject
 
 /**
  * Реализация репозитория для обработки изображений.
+ * 
+ * Использует Room Database для хранения истории обработок.
+ * Вся работа с БД происходит через DAO, обеспечивая изоляцию слоев.
  */
 class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val imageProcessor: ImageProcessor,
-    private val imageStorage: ImageStorage
+    private val imageStorage: ImageStorage,
+    private val processingHistoryDao: ProcessingHistoryDao
 ) : ProcessingRepository {
-    
-    private val processingHistory = MutableStateFlow<List<ProcessingResult>>(emptyList())
     
     override suspend fun processImage(
         imageData: ImageData,
@@ -52,10 +55,9 @@ class ProcessingRepositoryImpl @Inject constructor(
                 filterType = filterType.name
             )
             
-            // Добавляем в историю
-            val currentHistory = processingHistory.value.toMutableList()
-            currentHistory.add(0, result)
-            processingHistory.value = currentHistory
+            // Сохраняем в базу данных
+            val entity = ProcessingHistoryMapper.toEntity(result)
+            processingHistoryDao.insert(entity)
             
             result
         } catch (e: Exception) {
@@ -64,14 +66,24 @@ class ProcessingRepositoryImpl @Inject constructor(
     }
     
     override fun getProcessingHistory(): Flow<List<ProcessingResult>> {
-        return processingHistory.asStateFlow()
+        return processingHistoryDao.getAllHistory()
+            .map { entities ->
+                ProcessingHistoryMapper.toDomainList(entities)
+            }
     }
     
     override suspend fun deleteProcessingResult(result: ProcessingResult) = withContext(Dispatchers.IO) {
+        // Удаляем файл изображения
         imageStorage.deleteFile(result.processedUri)
-        val currentHistory = processingHistory.value.toMutableList()
-        currentHistory.remove(result)
-        processingHistory.value = currentHistory
+        
+        // Находим и удаляем запись из БД по processedUri и timestamp
+        val entityToDelete = processingHistoryDao.findByUriAndTimestamp(
+            processedUri = result.processedUri.toString(),
+            timestamp = result.timestamp
+        )
+        if (entityToDelete != null) {
+            processingHistoryDao.delete(entityToDelete)
+        }
     }
     
     private fun loadBitmapFromUri(uri: android.net.Uri): Bitmap? {
