@@ -19,12 +19,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Size
 import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
@@ -150,6 +154,19 @@ fun GalleryScreen(
                 }
             }
             else -> {
+                val configuration = LocalConfiguration.current
+                val density = LocalDensity.current
+                
+                // Вычисляем оптимальный размер превью на основе размера экрана
+                // Для grid с 3 колонками и отступами (4.dp между элементами)
+                val itemSize = remember(configuration.screenWidthDp, density) {
+                    // Приблизительный расчет: ширина экрана / 3, минус отступы
+                    val screenWidthPx = configuration.screenWidthDp * density.density
+                    val spacingPx = 4.dp.value * 2 * density.density // Отступы между элементами
+                    val itemWidthPx = (screenWidthPx - spacingPx) / 3
+                    itemWidthPx.toInt()
+                }
+                
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     contentPadding = paddingValues,
@@ -157,22 +174,59 @@ fun GalleryScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(images) { image ->
-                        Card(
-                            onClick = { onImageClick(image) },
-                            modifier = Modifier
-                                .aspectRatio(1f)
-                        ) {
-                            AsyncImage(
-                                model = image.uri,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
+                    items(
+                        items = images,
+                        key = { image -> image.uri.toString() } // Стабильные ключи для переиспользования
+                    ) { image ->
+                        GalleryImageItem(
+                            image = image,
+                            itemSize = itemSize,
+                            onClick = { onImageClick(image) }
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Оптимизированный элемент изображения в галерее.
+ * 
+ * Использует remember для оптимизации перекомпозиций и правильный размер превью.
+ */
+@Composable
+private fun GalleryImageItem(
+    image: com.example.neuralphotoredactor.domain.model.ImageData,
+    itemSize: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    
+    // Запоминаем ImageRequest для избежания пересоздания
+    val imageRequest = remember(image.uri, itemSize) {
+        ImageRequest.Builder(context)
+            .data(image.uri)
+            .size(Size(itemSize, itemSize)) // Оптимизированный размер для превью
+            .crossfade(200) // Плавное появление (уменьшено для быстрой загрузки)
+            .allowHardware(true) // Использование hardware bitmap для лучшей производительности
+            .build()
+    }
+    
+    Card(
+        onClick = onClick,
+        modifier = modifier
+            .aspectRatio(1f)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Показываем индикатор загрузки поверх изображения (Coil сам управляет видимостью)
         }
     }
 }
