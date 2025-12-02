@@ -15,7 +15,7 @@ import com.example.neuralphotoredactor.ui.navigation.AppNavigation
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
-import com.example.neuralphotoredactor.ui.theme.NeuralPhotoRedactorTheme
+import com.example.neuralphotoredactor.ui.theme.AppTheme
 import com.example.neuralphotoredactor.ui.viewmodel.EditorViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.GalleryViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.HistoryViewModel
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            NeuralPhotoRedactorTheme {
+            AppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
