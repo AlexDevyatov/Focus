@@ -78,6 +78,19 @@ rules:
       - "Domain — чистый, без Android зависимостей."
 
   # -----------------------------------------------------------
+  # 5.1. ViewModel Rules
+  # -----------------------------------------------------------
+  - name: viewmodel
+    patterns:
+      - "app/src/main/java/**/viewmodel/**/*.kt"
+    behavior:
+      - "ViewModel НЕ должна содержать Context в любом виде (@ApplicationContext, Activity, Fragment и т.д.)."
+      - "ViewModel НЕ должна содержать других Android-зависимостей (Resources, PackageManager и т.д.)."
+      - "ViewModel работает только с domain-моделями и UseCase."
+      - "Строковые ресурсы получаются в UI слое через stringResource(), не в ViewModel."
+      - "Если нужно показать сообщение об ошибке, ViewModel передает e.message или null, UI слой добавляет дефолтное сообщение."
+
+  # -----------------------------------------------------------
   # 6. Dependency Injection (Hilt)
   # -----------------------------------------------------------
   - name: di
@@ -123,6 +136,34 @@ rules:
       - "UI не должен вызывать DAO."
       - "Вся работа с Room идёт через Repository."
       - "Запрещено хранить Bitmap в БД — только пути/URI, размеры и метаданные."
+
+  # -----------------------------------------------------------
+  # 10. String Resources Rules
+  # -----------------------------------------------------------
+  - name: string_resources
+    patterns:
+      - "app/src/main/java/**/ui/**/*.kt"
+      - "app/src/main/java/**/viewmodel/**/*.kt"
+    behavior:
+      - "ВСЕ строковые константы должны быть вынесены в strings.xml."
+      - "В Compose UI используй stringResource(R.string.xxx) вместо строковых литералов."
+      - "В ViewModel используй context.getString(R.string.xxx) через @ApplicationContext."
+      - "Запрещено использовать хардкод строк в UI и ViewModel слоях."
+      - "Исключения: технические строки (пути, ключи), логи, отладочные сообщения."
+      - "При добавлении новых строк добавляй их в strings.xml с осмысленными именами."
+
+  # -----------------------------------------------------------
+  # 11. Material Icons Rules
+  # -----------------------------------------------------------
+  - name: material_icons
+    patterns:
+      - "app/src/main/java/**/ui/**/*.kt"
+    behavior:
+      - "Используй ТОЛЬКО иконки из Material Icons (androidx.compose.material.icons.Icons)."
+      - "Запрещено использовать эмодзи или другие не-Material иконки в UI."
+      - "Используй Icon() компонент из Material 3 с imageVector из Icons.Filled, Icons.Outlined, Icons.Rounded или Icons.TwoTone."
+      - "Для добавления новых иконок используй зависимость 'androidx.compose.material:material-icons-extended'."
+      - "Всегда указывай contentDescription для иконок (для accessibility)."
 
 # ============================================================
 #                   AGENT BEHAVIOR

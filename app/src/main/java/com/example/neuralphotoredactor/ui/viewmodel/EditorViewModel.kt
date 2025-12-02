@@ -51,7 +51,7 @@ class EditorViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Ошибка обработки изображения"
+                    error = e.message
                 )
             }
         }

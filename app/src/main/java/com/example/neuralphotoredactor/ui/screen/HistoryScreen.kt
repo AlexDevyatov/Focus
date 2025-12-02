@@ -7,8 +7,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 
@@ -27,7 +29,7 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("История") }
+                title = { Text(stringResource(R.string.screen_history)) }
             )
         },
         modifier = modifier
@@ -43,7 +45,7 @@ fun HistoryScreen(
                         .padding(paddingValues),
                     contentAlignment = androidx.compose.ui.Alignment.Center
                 ) {
-                    ErrorMessage(error)
+                    ErrorMessage(error, defaultMessageId = R.string.error_load_history)
                 }
             }
             history.isEmpty() -> {
@@ -53,7 +55,7 @@ fun HistoryScreen(
                         .padding(paddingValues),
                     contentAlignment = androidx.compose.ui.Alignment.Center
                 ) {
-                    Text("История пуста")
+                    Text(stringResource(R.string.history_empty))
                 }
             }
             else -> {

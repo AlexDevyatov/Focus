@@ -7,9 +7,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
@@ -32,11 +36,14 @@ fun EditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Редактор") },
+                title = { Text(stringResource(R.string.screen_editor)) },
                 actions = {
                     if (processedImageUri != null) {
-                        TextButton(onClick = onSaveClick) {
-                            Text("Сохранить")
+                        IconButton(onClick = onSaveClick) {
+                            Icon(
+                                imageVector = Icons.Filled.Save,
+                                contentDescription = stringResource(R.string.editor_save_button)
+                            )
                         }
                     }
                 }
@@ -58,11 +65,11 @@ fun EditorScreen(
             ) {
                 when {
                     isLoading -> LoadingIndicator()
-                    error != null -> ErrorMessage(error)
+                    error != null -> ErrorMessage(error, defaultMessageId = R.string.error_process_image)
                     processedImageUri != null -> {
                         AsyncImage(
                             model = processedImageUri,
-                            contentDescription = "Обработанное изображение",
+                            contentDescription = stringResource(R.string.editor_processed_image),
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -70,7 +77,7 @@ fun EditorScreen(
                     imageUri != null -> {
                         AsyncImage(
                             model = imageUri,
-                            contentDescription = "Исходное изображение",
+                            contentDescription = stringResource(R.string.editor_original_image),
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize()
                         )

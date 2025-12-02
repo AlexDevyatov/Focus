@@ -20,8 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 
@@ -89,12 +93,15 @@ fun GalleryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Галерея") }
+                title = { Text(stringResource(R.string.screen_gallery)) }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onCameraClick) {
-                Text("📷")
+                Icon(
+                    imageVector = Icons.Filled.CameraAlt,
+                    contentDescription = stringResource(R.string.gallery_camera_button)
+                )
             }
         },
         modifier = modifier
@@ -114,17 +121,17 @@ fun GalleryScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Необходимо разрешение на доступ к галерее",
+                            text = stringResource(R.string.gallery_permission_title),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Для отображения изображений из галереи требуется разрешение на доступ к медиафайлам",
+                            text = stringResource(R.string.gallery_permission_message),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Button(
                             onClick = { permissionLauncher.launch(permission) }
                         ) {
-                            Text("Предоставить разрешение")
+                            Text(stringResource(R.string.gallery_permission_button))
                         }
                     }
                 }
@@ -139,7 +146,7 @@ fun GalleryScreen(
                         .padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    ErrorMessage(error)
+                    ErrorMessage(error, defaultMessageId = R.string.error_load_images)
                 }
             }
             else -> {

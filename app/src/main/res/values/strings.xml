@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">Neural Photo Redactor</string>
+    
+    <!-- Screen Titles -->
+    <string name="screen_gallery">Галерея</string>
+    <string name="screen_editor">Редактор</string>
+    <string name="screen_history">История</string>
+    
+    <!-- Gallery Screen -->
+    <string name="gallery_permission_title">Необходимо разрешение на доступ к галерее</string>
+    <string name="gallery_permission_message">Для отображения изображений из галереи требуется разрешение на доступ к медиафайлам</string>
+    <string name="gallery_permission_button">Предоставить разрешение</string>
+    <string name="gallery_camera_button">Камера</string>
+    <string name="error_load_images">Ошибка загрузки изображений</string>
+    
+    <!-- Editor Screen -->
+    <string name="editor_save_button">Сохранить</string>
+    <string name="editor_processed_image">Обработанное изображение</string>
+    <string name="editor_original_image">Исходное изображение</string>
+    <string name="error_process_image">Ошибка обработки изображения</string>
+    
+    <!-- History Screen -->
+    <string name="history_empty">История пуста</string>
+    <string name="error_load_history">Ошибка загрузки истории</string>
 </resources>
