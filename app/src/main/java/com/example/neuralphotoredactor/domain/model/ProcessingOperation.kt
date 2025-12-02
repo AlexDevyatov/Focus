@@ -1,0 +1,45 @@
+package com.example.neuralphotoredactor.domain.model
+
+import android.net.Uri
+
+/**
+ * Domain модель операции обработки изображения.
+ * 
+ * Фиксирует каждое отдельное действие, выполненное пользователем
+ * в рамках сессии редактирования.
+ * 
+ * @param id Уникальный идентификатор операции
+ * @param sessionId ID сессии редактирования
+ * @param modelId ID использованной нейросетевой модели (может быть null)
+ * @param operationType Тип операции
+ * @param parameters Параметры выполнения операции
+ * @param inputImageUri URI входного изображения
+ * @param outputImageUri URI выходного изображения
+ * @param processingTimeMs Время обработки в миллисекундах
+ * @param sequenceNumber Порядковый номер операции в истории изменений
+ */
+data class ProcessingOperation(
+    val id: Long = 0,
+    val sessionId: Long,
+    val modelId: Long?,
+    val operationType: String,
+    val parameters: OperationParameters,
+    val inputImageUri: Uri,
+    val outputImageUri: Uri,
+    val processingTimeMs: Long,
+    val sequenceNumber: Int
+)
+
+/**
+ * Параметры операции обработки.
+ * 
+ * @param filterType Тип фильтра (если применимо)
+ * @param intensity Интенсивность эффекта (0.0 - 1.0)
+ * @param additionalParams Дополнительные параметры в формате Map
+ */
+data class OperationParameters(
+    val filterType: String? = null,
+    val intensity: Float = 1.0f,
+    val additionalParams: Map<String, Any> = emptyMap()
+)
+

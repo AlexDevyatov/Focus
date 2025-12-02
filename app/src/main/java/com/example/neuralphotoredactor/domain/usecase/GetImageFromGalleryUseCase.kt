@@ -11,7 +11,7 @@ class GetImageFromGalleryUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
     /**
-ре     * Получить изображение из галереи.
+     * Получить изображение из галереи.
      * 
      * @return ImageData или null
      */

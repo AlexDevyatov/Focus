@@ -4,9 +4,15 @@ import com.example.neuralphotoredactor.data.datasource.CameraDataSource
 import com.example.neuralphotoredactor.data.datasource.CameraDataSourceImpl
 import com.example.neuralphotoredactor.data.datasource.GalleryDataSource
 import com.example.neuralphotoredactor.data.datasource.GalleryDataSourceImpl
+import com.example.neuralphotoredactor.data.repository.EditingSessionRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.ImageRepositoryImpl
+import com.example.neuralphotoredactor.data.repository.NeuralModelRepositoryImpl
+import com.example.neuralphotoredactor.data.repository.ProcessingOperationRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.ProcessingRepositoryImpl
+import com.example.neuralphotoredactor.domain.repository.EditingSessionRepository
 import com.example.neuralphotoredactor.domain.repository.ImageRepository
+import com.example.neuralphotoredactor.domain.repository.NeuralModelRepository
+import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
 import dagger.Binds
 import dagger.Module
@@ -32,6 +38,24 @@ abstract class RepositoryModule {
     abstract fun bindProcessingRepository(
         processingRepositoryImpl: ProcessingRepositoryImpl
     ): ProcessingRepository
+    
+    @Binds
+    @Singleton
+    abstract fun bindEditingSessionRepository(
+        editingSessionRepositoryImpl: EditingSessionRepositoryImpl
+    ): EditingSessionRepository
+    
+    @Binds
+    @Singleton
+    abstract fun bindProcessingOperationRepository(
+        processingOperationRepositoryImpl: ProcessingOperationRepositoryImpl
+    ): ProcessingOperationRepository
+    
+    @Binds
+    @Singleton
+    abstract fun bindNeuralModelRepository(
+        neuralModelRepositoryImpl: NeuralModelRepositoryImpl
+    ): NeuralModelRepository
     
     @Binds
     abstract fun bindGalleryDataSource(
