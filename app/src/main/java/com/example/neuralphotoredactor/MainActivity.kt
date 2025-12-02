@@ -7,6 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.neuralphotoredactor.ui.navigation.AppNavigation
@@ -39,29 +41,36 @@ class MainActivity : ComponentActivity() {
                     val editorViewModel: EditorViewModel = viewModel()
                     val historyViewModel: HistoryViewModel = viewModel()
                     
+                    // Используем collectAsState() для реактивного обновления UI
+                    val galleryUiState by galleryViewModel.uiState.collectAsState()
+                    val editorUiState by editorViewModel.uiState.collectAsState()
+                    val historyUiState by historyViewModel.uiState.collectAsState()
+                    
                     AppNavigation(
                         navController = navController,
                         galleryScreen = {
                             GalleryScreen(
-                                images = galleryViewModel.uiState.value.images,
-                                isLoading = galleryViewModel.uiState.value.isLoading,
-                                error = galleryViewModel.uiState.value.error,
+                                images = galleryUiState.images,
+                                isLoading = galleryUiState.isLoading,
+                                error = galleryUiState.error,
                                 onImageClick = { image ->
                                     editorViewModel.setImage(image)
                                     navController.navigate("editor")
                                 },
                                 onCameraClick = {
                                     // TODO: Реализовать открытие камеры
+                                },
+                                onPermissionGranted = {
+                                    galleryViewModel.loadImages()
                                 }
                             )
                         },
                         editorScreen = {
-                            val state = editorViewModel.uiState.value
                             EditorScreen(
-                                imageUri = state.imageData?.uri,
-                                processedImageUri = state.processedResult?.processedUri,
-                                isLoading = state.isLoading,
-                                error = state.error,
+                                imageUri = editorUiState.imageData?.uri,
+                                processedImageUri = editorUiState.processedResult?.processedUri,
+                                isLoading = editorUiState.isLoading,
+                                error = editorUiState.error,
                                 filters = editorViewModel.availableFilters,
                                 onFilterClick = { filter ->
                                     editorViewModel.applyFilter(filter)
@@ -73,9 +82,9 @@ class MainActivity : ComponentActivity() {
                         },
                         historyScreen = {
                             HistoryScreen(
-                                history = historyViewModel.uiState.value.history,
-                                isLoading = historyViewModel.uiState.value.isLoading,
-                                error = historyViewModel.uiState.value.error,
+                                history = historyUiState.history,
+                                isLoading = historyUiState.isLoading,
+                                error = historyUiState.error,
                                 onItemClick = { result ->
                                     editorViewModel.setImage(
                                         com.example.neuralphotoredactor.domain.model.ImageData(
