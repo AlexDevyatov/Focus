@@ -19,6 +19,22 @@ import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 
 /**
+ * Получить локализованное название фильтра.
+ */
+@Composable
+private fun getFilterName(filterType: FilterType): String {
+    return when (filterType) {
+        FilterType.GAUSSIAN_BLUR -> stringResource(R.string.filter_gaussian_blur)
+        FilterType.NOISE_REDUCTION -> stringResource(R.string.filter_noise_reduction)
+        FilterType.SHARPEN -> stringResource(R.string.filter_sharpen)
+        FilterType.VIGNETTE -> stringResource(R.string.filter_vignette)
+        FilterType.GRAYSCALE -> stringResource(R.string.filter_grayscale)
+        FilterType.SEPIA -> stringResource(R.string.filter_sepia)
+        else -> filterType.name // Для старых фильтров используем имя enum
+    }
+}
+
+/**
  * Экран редактора изображений.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,7 +111,7 @@ fun EditorScreen(
                     FilterChip(
                         selected = false,
                         onClick = { onFilterClick(filter) },
-                        label = { Text(filter.name) }
+                        label = { Text(getFilterName(filter)) }
                     )
                 }
             }

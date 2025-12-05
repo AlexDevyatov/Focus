@@ -19,6 +19,14 @@
     <string name="editor_original_image">Исходное изображение</string>
     <string name="error_process_image">Ошибка обработки изображения</string>
     
+    <!-- Image Filters -->
+    <string name="filter_gaussian_blur">Размытие</string>
+    <string name="filter_noise_reduction">Удаление шумов</string>
+    <string name="filter_sharpen">Резкость</string>
+    <string name="filter_vignette">Виньетка</string>
+    <string name="filter_grayscale">Чёрно-белое</string>
+    <string name="filter_sepia">Сепия</string>
+    
     <!-- History Screen -->
     <string name="history_empty">История пуста</string>
     <string name="error_load_history">Ошибка загрузки истории</string>

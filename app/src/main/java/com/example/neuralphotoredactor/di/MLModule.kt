@@ -1,6 +1,8 @@
 package com.example.neuralphotoredactor.di
 
 import android.content.Context
+import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
+import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessorImpl
 import com.example.neuralphotoredactor.ml.interpreter.ImageProcessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessorImpl
@@ -32,6 +34,11 @@ abstract class MLModule {
     abstract fun bindImagePostprocessor(
         imagePostprocessorImpl: ImagePostprocessorImpl
     ): ImagePostprocessor
+    
+    @Binds
+    abstract fun bindImageFilterProcessor(
+        imageFilterProcessorImpl: ImageFilterProcessorImpl
+    ): ImageFilterProcessor
     
     companion object {
         @Provides

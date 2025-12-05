@@ -10,6 +10,7 @@ import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
+import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.interpreter.ImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,7 @@ import javax.inject.Inject
 class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val imageProcessor: ImageProcessor,
+    private val imageFilterProcessor: ImageFilterProcessor,
     private val imageStorage: ImageStorage,
     private val processingHistoryDao: ProcessingHistoryDao
 ) : ProcessingRepository {
@@ -40,9 +42,22 @@ class ProcessingRepositoryImpl @Inject constructor(
             // Загружаем Bitmap из URI
             val bitmap = loadBitmapFromUri(imageData.uri) ?: return@withContext null
             
-            // Обрабатываем изображение через ML модель
-            val processedBitmap = imageProcessor.processImage(bitmap, filterType)
-                ?: return@withContext null
+            // Определяем, какой процессор использовать
+            val processedBitmap = when (filterType) {
+                FilterType.GAUSSIAN_BLUR,
+                FilterType.NOISE_REDUCTION,
+                FilterType.SHARPEN,
+                FilterType.VIGNETTE,
+                FilterType.GRAYSCALE,
+                FilterType.SEPIA -> {
+                    // Используем ImageFilterProcessor для новых фильтров
+                    imageFilterProcessor.applyFilter(bitmap, filterType)
+                }
+                else -> {
+                    // Используем ImageProcessor для ML-фильтров (требуют TFLite модели)
+                    imageProcessor.processImage(bitmap, filterType)
+                }
+            } ?: return@withContext null
             
             // Сохраняем обработанное изображение
             val fileName = "processed_${System.currentTimeMillis()}_${filterType.name}.jpg"
