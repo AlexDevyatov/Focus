@@ -29,5 +29,16 @@ interface ImageFilterProcessor {
      * @return Обработанное изображение или null в случае ошибки
      */
     fun applyFilter(bitmap: Bitmap, filterType: FilterType, intensity: Float? = null, isPreview: Boolean = false): Bitmap?
+    
+    /**
+     * Применить несколько фильтров последовательно к изображению.
+     * Оптимизировано для быстрой обработки.
+     * 
+     * @param bitmap Исходное изображение
+     * @param filters Список фильтров с их интенсивностями (применяются в порядке списка)
+     * @param isPreview Если true, используется меньший размер для быстрого предпросмотра
+     * @return Обработанное изображение или null в случае ошибки
+     */
+    fun applyFilters(bitmap: Bitmap, filters: List<Pair<FilterType, Float?>>, isPreview: Boolean = false): Bitmap?
 }
 

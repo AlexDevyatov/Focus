@@ -30,4 +30,8 @@ class ImageRepositoryImpl @Inject constructor(
             emit(images)
         }
     }
+    
+    override suspend fun invalidateCache() {
+        galleryDataSource.invalidateCache()
+    }
 }

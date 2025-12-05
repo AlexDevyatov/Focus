@@ -147,6 +147,105 @@ class ProcessingRepositoryImpl @Inject constructor(
         }
     }
     
+    override suspend fun previewFilters(
+        bitmap: Bitmap,
+        filters: List<Pair<FilterType, Float?>>
+    ): Bitmap? = withContext(Dispatchers.Default) {
+        try {
+            if (bitmap.isRecycled) {
+                android.util.Log.e("ProcessingRepository", "Bitmap переработан, невозможно применить фильтры")
+                return@withContext null
+            }
+            
+            if (filters.isEmpty()) {
+                return@withContext bitmap
+            }
+            
+            android.util.Log.d("ProcessingRepository", "Применяем ${filters.size} фильтров к Bitmap ${bitmap.width}x${bitmap.height}")
+            
+            // Используем оптимизированный метод для множественных фильтров
+            val result = imageFilterProcessor.applyFilters(bitmap, filters, isPreview = true)
+            
+            if (result != null) {
+                android.util.Log.d("ProcessingRepository", "Фильтры применены успешно: ${result.width}x${result.height}")
+            } else {
+                android.util.Log.e("ProcessingRepository", "Применение фильтров вернуло null")
+            }
+            
+            result
+        } catch (e: Exception) {
+            android.util.Log.e("ProcessingRepository", "Ошибка применения фильтров: ${e.message}", e)
+            null
+        }
+    }
+    
+    override suspend fun processImageWithFilters(
+        imageData: ImageData,
+        filters: List<Pair<FilterType, Float?>>
+    ): ProcessingResult? = withContext(Dispatchers.IO) {
+        var bitmap: android.graphics.Bitmap? = null
+        var processedBitmap: android.graphics.Bitmap? = null
+        
+        try {
+            if (filters.isEmpty()) {
+                android.util.Log.w("ProcessingRepository", "Список фильтров пуст")
+                return@withContext null
+            }
+            
+            android.util.Log.d("ProcessingRepository", "Обработка изображения с ${filters.size} фильтрами")
+            
+            // Загружаем Bitmap из URI
+            bitmap = loadBitmapFromUriSync(imageData.uri) ?: return@withContext null
+            
+            // Применяем фильтры (isPreview = false для финального результата)
+            processedBitmap = imageFilterProcessor.applyFilters(bitmap, filters, isPreview = false)
+                ?: return@withContext null
+            
+            // Освобождаем исходный bitmap после обработки
+            if (bitmap != processedBitmap && !bitmap.isRecycled) {
+                bitmap.recycle()
+            }
+            bitmap = null // Помечаем как освобожденный
+            
+            // Сохраняем обработанное изображение в отдельный файл
+            val filterNames = filters.joinToString("_") { it.first.name }
+            val timestamp = System.currentTimeMillis()
+            val fileName = "processed_${timestamp}_${filterNames}.jpg"
+            
+            android.util.Log.d("ProcessingRepository", "Сохранение обработанного изображения: $fileName")
+            val processedUri = imageStorage.saveBitmap(processedBitmap, fileName)
+                ?: return@withContext null
+            
+            android.util.Log.d("ProcessingRepository", "Изображение сохранено: $processedUri")
+            
+            val result = ProcessingResult(
+                originalUri = imageData.uri,
+                processedUri = processedUri,
+                filterType = filterNames // Сохраняем все примененные фильтры
+            )
+            
+            // Сохраняем в базу данных
+            val entity = ProcessingHistoryMapper.toEntity(result)
+            processingHistoryDao.insert(entity)
+            
+            android.util.Log.d("ProcessingRepository", "Результат сохранен в базу данных")
+            
+            result
+        } catch (e: OutOfMemoryError) {
+            android.util.Log.e("ProcessingRepository", "OutOfMemoryError при обработке: ${e.message}", e)
+            // Освобождаем память при ошибке
+            processedBitmap?.let { if (!it.isRecycled) it.recycle() }
+            bitmap?.let { if (!it.isRecycled) it.recycle() }
+            null
+        } catch (e: Exception) {
+            android.util.Log.e("ProcessingRepository", "Ошибка обработки с множественными фильтрами: ${e.message}", e)
+            // Освобождаем память при ошибке
+            processedBitmap?.let { if (!it.isRecycled) it.recycle() }
+            bitmap?.let { if (!it.isRecycled) it.recycle() }
+            null
+        }
+    }
+    
     override suspend fun loadBitmapFromUri(uri: android.net.Uri): Bitmap? = withContext(Dispatchers.IO) {
         try {
             val inputStream = context.contentResolver.openInputStream(uri)

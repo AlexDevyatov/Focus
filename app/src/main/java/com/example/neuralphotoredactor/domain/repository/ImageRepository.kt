@@ -29,5 +29,11 @@ interface ImageRepository {
      * @return Flow со списком всех изображений
      */
     fun getAllImages(): Flow<List<ImageData>>
+    
+    /**
+     * Инвалидировать кэш изображений.
+     * Используется для принудительного обновления списка изображений.
+     */
+    suspend fun invalidateCache()
 }
 

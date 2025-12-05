@@ -34,6 +34,9 @@ class EditorViewModel @Inject constructor(
     private var currentPreviewJob: Job? = null // Для отмены предыдущих предпросмотров
     private var cachedOriginalBitmap: Bitmap? = null // Кэш исходного изображения
     
+    // Callback для обновления галереи после сохранения
+    var onImageSaved: (() -> Unit)? = null
+    
     val availableFilters = FilterType.entries
     
     fun setImage(imageData: ImageData) {
@@ -41,8 +44,8 @@ class EditorViewModel @Inject constructor(
             imageData = imageData,
             processedResult = null,
             previewBitmap = null,
-            selectedFilter = null,
-            filterIntensity = 0.5f
+            selectedFilters = emptyList(),
+            currentFilterIntensity = 0.5f
         )
         // Очищаем кэш при смене изображения
         cachedOriginalBitmap = null
@@ -55,33 +58,59 @@ class EditorViewModel @Inject constructor(
         }
     }
     
-    fun selectFilter(filterType: FilterType) {
-        _uiState.value = _uiState.value.copy(
-            selectedFilter = filterType,
-            filterIntensity = 0.5f // Сброс интенсивности при выборе нового фильтра
-        )
-        // Используем быстрый предпросмотр для начального отображения
-        previewFilter(filterType, 0.5f)
+    fun toggleFilter(filterType: FilterType) {
+        val currentFilters = _uiState.value.selectedFilters.toMutableList()
+        val existingIndex = currentFilters.indexOfFirst { it.first == filterType }
+        
+        if (existingIndex >= 0) {
+            // Удаляем фильтр, если он уже выбран
+            currentFilters.removeAt(existingIndex)
+        } else {
+            // Добавляем фильтр с интенсивностью по умолчанию
+            currentFilters.add(Pair(filterType, 0.5f))
+        }
+        
+        _uiState.value = _uiState.value.copy(selectedFilters = currentFilters)
+        // Обновляем предпросмотр
+        previewFilters(currentFilters)
     }
     
-    fun updateFilterIntensity(intensity: Float) {
-        val selectedFilter = _uiState.value.selectedFilter ?: return
-        _uiState.value = _uiState.value.copy(filterIntensity = intensity)
-        // Используем быстрый предпросмотр для реального времени
-        previewFilter(selectedFilter, intensity)
+    fun updateFilterIntensity(filterType: FilterType, intensity: Float) {
+        val currentFilters = _uiState.value.selectedFilters.toMutableList()
+        val existingIndex = currentFilters.indexOfFirst { it.first == filterType }
+        
+        if (existingIndex >= 0) {
+            // Обновляем интенсивность существующего фильтра
+            currentFilters[existingIndex] = Pair(filterType, intensity)
+        } else {
+            // Добавляем новый фильтр с указанной интенсивностью
+            currentFilters.add(Pair(filterType, intensity))
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            selectedFilters = currentFilters,
+            currentFilterIntensity = intensity
+        )
+        // Обновляем предпросмотр
+        previewFilters(currentFilters)
     }
     
     /**
-     * Быстрый предпросмотр фильтра без сохранения в файл.
-     * Используется для отображения результата в реальном времени при перемещении слайдера.
+     * Быстрый предпросмотр множественных фильтров без сохранения в файл.
+     * Используется для отображения результата в реальном времени.
      */
-    private fun previewFilter(filterType: FilterType, intensity: Float) {
+    private fun previewFilters(filters: List<Pair<FilterType, Float>>) {
         // Отменяем предыдущий предпросмотр
         currentPreviewJob?.cancel()
         
+        if (filters.isEmpty()) {
+            _uiState.value = _uiState.value.copy(previewBitmap = null)
+            return
+        }
+        
         currentPreviewJob = viewModelScope.launch {
-            // Небольшая задержка для debounce (чтобы не обрабатывать каждое микро-изменение)
-            delay(100) // 100ms debounce для лучшей производительности
+            // Небольшая задержка для debounce
+            delay(100)
             
             val originalBitmap = getOrLoadOriginalBitmap()
             if (originalBitmap == null) {
@@ -105,35 +134,29 @@ class EditorViewModel @Inject constructor(
                 }
             }
             
-            val currentSelectedFilter = _uiState.value.selectedFilter ?: filterType
-            
             try {
-                android.util.Log.d("EditorViewModel", "Применяем фильтр $filterType с интенсивностью $intensity")
-                val previewBitmap = processingRepository.previewFilter(
+                android.util.Log.d("EditorViewModel", "Применяем ${filters.size} фильтров для предпросмотра")
+                val previewBitmap = processingRepository.previewFilters(
                     originalBitmap,
-                    filterType,
-                    intensity
+                    filters.map { it.first to it.second }
                 )
                 
                 if (isActive) {
                     if (previewBitmap != null) {
                         android.util.Log.d("EditorViewModel", "Предпросмотр создан: ${previewBitmap.width}x${previewBitmap.height}")
-                        _uiState.value = _uiState.value.copy(
-                            previewBitmap = previewBitmap,
-                            selectedFilter = currentSelectedFilter
-                        )
+                        _uiState.value = _uiState.value.copy(previewBitmap = previewBitmap)
                     } else {
                         android.util.Log.e("EditorViewModel", "Предпросмотр вернул null")
                         _uiState.value = _uiState.value.copy(
-                            error = "Не удалось применить фильтр"
+                            error = "Не удалось применить фильтры"
                         )
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("EditorViewModel", "Ошибка при применении фильтра: ${e.message}", e)
+                android.util.Log.e("EditorViewModel", "Ошибка при применении фильтров: ${e.message}", e)
                 if (isActive) {
                     _uiState.value = _uiState.value.copy(
-                        error = e.message ?: "Ошибка применения фильтра"
+                        error = e.message ?: "Ошибка применения фильтров"
                     )
                 }
             }
@@ -141,44 +164,50 @@ class EditorViewModel @Inject constructor(
     }
     
     /**
-     * Применить фильтр с сохранением в файл (для финального результата).
+     * Применить выбранные фильтры с сохранением в файл (для финального результата).
      */
-    fun applyFilter(filterType: FilterType, intensity: Float? = null) {
+    fun applyFilters() {
         val currentImage = _uiState.value.imageData ?: return
-        val filterIntensity = intensity ?: _uiState.value.filterIntensity
-        val currentSelectedFilter = _uiState.value.selectedFilter
+        val selectedFilters = _uiState.value.selectedFilters
+        
+        if (selectedFilters.isEmpty()) {
+            android.util.Log.w("EditorViewModel", "Нет выбранных фильтров для применения")
+            return
+        }
         
         // Отменяем предыдущий запрос, если он еще выполняется
         currentFilterJob?.cancel()
         currentPreviewJob?.cancel()
         
         currentFilterJob = viewModelScope.launch {
-            // Сохраняем выбранный фильтр перед началом обработки
-            val savedSelectedFilter = currentSelectedFilter ?: filterType
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
-                error = null,
-                selectedFilter = savedSelectedFilter // Явно сохраняем выбранный фильтр
+                error = null
             )
             
             try {
-                val result = processImageUseCase.invoke(currentImage, filterType, filterIntensity)
+                val result = processingRepository.processImageWithFilters(
+                    currentImage,
+                    selectedFilters.map { it.first to it.second }
+                )
+                
                 // Проверяем, что корутина не была отменена
                 if (isActive) {
                     _uiState.value = _uiState.value.copy(
                         processedResult = result,
                         previewBitmap = null, // Очищаем предпросмотр после сохранения
-                        isLoading = false,
-                        selectedFilter = savedSelectedFilter // Сохраняем выбранный фильтр
+                        isLoading = false
                     )
+                    
+                    // Обновляем галерею после успешного сохранения
+                    onImageSaved?.invoke()
                 }
             } catch (e: Exception) {
                 // Проверяем, что корутина не была отменена
                 if (isActive) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.message,
-                        selectedFilter = savedSelectedFilter // Сохраняем выбранный фильтр даже при ошибке
+                        error = e.message
                     )
                 }
             }
@@ -214,14 +243,14 @@ class EditorViewModel @Inject constructor(
         }
     }
     
-    fun clearFilter() {
+    fun clearFilters() {
         currentPreviewJob?.cancel()
         currentFilterJob?.cancel()
         _uiState.value = _uiState.value.copy(
             processedResult = null,
             previewBitmap = null,
-            selectedFilter = null,
-            filterIntensity = 0.5f
+            selectedFilters = emptyList(),
+            currentFilterIntensity = 0.5f
         )
     }
     
@@ -239,6 +268,6 @@ data class EditorUiState(
     val previewBitmap: Bitmap? = null, // Быстрый предпросмотр без сохранения
     val isLoading: Boolean = false,
     val error: String? = null,
-    val selectedFilter: FilterType? = null,
-    val filterIntensity: Float = 0.5f // Значение по умолчанию
+    val selectedFilters: List<Pair<FilterType, Float>> = emptyList(), // Список выбранных фильтров с интенсивностями
+    val currentFilterIntensity: Float = 0.5f // Интенсивность для текущего редактируемого фильтра
 )

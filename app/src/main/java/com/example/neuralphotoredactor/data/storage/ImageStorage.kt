@@ -62,5 +62,37 @@ class ImageStorage @Inject constructor(
             // Игнорируем ошибки удаления
         }
     }
+    
+    /**
+     * Получить список всех обработанных изображений из папки processed.
+     * 
+     * @return Список URI обработанных изображений, отсортированных по дате создания (новые первыми)
+     */
+    suspend fun getProcessedImages(): List<Uri> = withContext(Dispatchers.IO) {
+        try {
+            val imagesDir = File(
+                context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+                "processed"
+            )
+            
+            if (!imagesDir.exists() || !imagesDir.isDirectory) {
+                return@withContext emptyList()
+            }
+            
+            val imageFiles = imagesDir.listFiles { file ->
+                file.isFile && (file.name.endsWith(".jpg", ignoreCase = true) || 
+                               file.name.endsWith(".jpeg", ignoreCase = true) ||
+                               file.name.endsWith(".png", ignoreCase = true))
+            } ?: return@withContext emptyList()
+            
+            // Сортируем по дате изменения (новые первыми)
+            val sortedFiles = imageFiles.sortedByDescending { it.lastModified() }
+            
+            sortedFiles.map { Uri.fromFile(it) }
+        } catch (e: Exception) {
+            android.util.Log.e("ImageStorage", "Ошибка получения обработанных изображений: ${e.message}", e)
+            emptyList()
+        }
+    }
 }
 

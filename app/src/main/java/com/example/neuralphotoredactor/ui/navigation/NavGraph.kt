@@ -16,7 +16,8 @@ fun AppNavigation(
     navController: NavHostController,
     galleryScreen: @Composable () -> Unit,
     editorScreen: @Composable () -> Unit,
-    historyScreen: @Composable () -> Unit
+    historyScreen: @Composable () -> Unit,
+    processedImagesScreen: @Composable () -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -30,6 +31,9 @@ fun AppNavigation(
         }
         composable("history") {
             historyScreen()
+        }
+        composable("processed") {
+            processedImagesScreen()
         }
     }
 }

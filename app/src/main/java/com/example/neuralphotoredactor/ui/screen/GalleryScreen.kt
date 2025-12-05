@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.*
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,9 +45,11 @@ import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 fun GalleryScreen(
     images: List<com.example.neuralphotoredactor.domain.model.ImageData>,
     isLoading: Boolean,
+    isRefreshing: Boolean,
     error: String?,
     onImageClick: (com.example.neuralphotoredactor.domain.model.ImageData) -> Unit,
     onCameraClick: () -> Unit,
+    onRefresh: () -> Unit,
     onPermissionGranted: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -157,6 +161,9 @@ fun GalleryScreen(
                 val configuration = LocalConfiguration.current
                 val density = LocalDensity.current
                 
+                // Pull to refresh state
+                val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
+                
                 // Вычисляем оптимальный размер превью на основе размера экрана
                 // Для grid с 3 колонками и отступами (4.dp между элементами)
                 val itemSize = remember(configuration.screenWidthDp, density) {
@@ -167,22 +174,30 @@ fun GalleryScreen(
                     itemWidthPx.toInt()
                 }
                 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    contentPadding = paddingValues,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxSize()
+                SwipeRefresh(
+                    state = swipeRefreshState,
+                    onRefresh = onRefresh,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
                 ) {
-                    items(
-                        items = images,
-                        key = { image -> image.uri.toString() } // Стабильные ключи для переиспользования
-                    ) { image ->
-                        GalleryImageItem(
-                            image = image,
-                            itemSize = itemSize,
-                            onClick = { onImageClick(image) }
-                        )
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        contentPadding = PaddingValues(0.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(
+                            items = images,
+                            key = { image -> image.uri.toString() } // Стабильные ключи для переиспользования
+                        ) { image ->
+                            GalleryImageItem(
+                                image = image,
+                                itemSize = itemSize,
+                                onClick = { onImageClick(image) }
+                            )
+                        }
                     }
                 }
             }

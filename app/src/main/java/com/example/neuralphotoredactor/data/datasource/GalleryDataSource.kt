@@ -36,5 +36,11 @@ interface GalleryDataSource {
      * @return Количество изображений
      */
     suspend fun getImageCount(): Int
+    
+    /**
+     * Инвалидировать кэш изображений.
+     * Используется для принудительного обновления списка изображений.
+     */
+    suspend fun invalidateCache()
 }
 

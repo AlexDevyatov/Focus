@@ -56,6 +56,30 @@ interface ProcessingRepository {
     ): android.graphics.Bitmap?
     
     /**
+     * Быстрый предпросмотр множественных фильтров без сохранения в файл.
+     * 
+     * @param bitmap Исходное изображение (Bitmap)
+     * @param filters Список фильтров с их интенсивностями
+     * @return Обработанное изображение (Bitmap) или null в случае ошибки
+     */
+    suspend fun previewFilters(
+        bitmap: android.graphics.Bitmap,
+        filters: List<Pair<FilterType, Float?>>
+    ): android.graphics.Bitmap?
+    
+    /**
+     * Обработать изображение с применением нескольких фильтров последовательно.
+     * 
+     * @param imageData Исходное изображение
+     * @param filters Список фильтров с их интенсивностями
+     * @return Результат обработки или null в случае ошибки
+     */
+    suspend fun processImageWithFilters(
+        imageData: ImageData,
+        filters: List<Pair<FilterType, Float?>>
+    ): ProcessingResult?
+    
+    /**
      * Загрузить Bitmap из URI.
      * Используется для кэширования исходного изображения.
      * 

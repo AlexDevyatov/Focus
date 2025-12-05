@@ -68,6 +68,97 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
     }
     
     /**
+     * Применить несколько фильтров последовательно к изображению.
+     * Оптимизировано для быстрой обработки - уменьшает изображение один раз для предпросмотра.
+     */
+    override fun applyFilters(bitmap: Bitmap, filters: List<Pair<FilterType, Float?>>, isPreview: Boolean): Bitmap? {
+        if (filters.isEmpty()) return bitmap
+        
+        return try {
+            val startTime = System.currentTimeMillis()
+            android.util.Log.d("ImageFilterProcessor", "Применяем ${filters.size} фильтров, preview=$isPreview")
+            
+            // Оптимизация: сортируем фильтры для лучшей производительности
+            // Быстрые фильтры (ColorMatrix) применяем первыми, медленные (convolution) - последними
+            val sortedFilters = filters.sortedBy { (filterType, _) ->
+                when (filterType) {
+                    FilterType.GRAYSCALE, FilterType.SEPIA -> 0 // Самые быстрые (ColorMatrix)
+                    FilterType.VIGNETTE -> 1 // Средняя скорость
+                    FilterType.SHARPEN, FilterType.GAUSSIAN_BLUR, FilterType.NOISE_REDUCTION -> 2 // Медленные (convolution)
+                    else -> 3
+                }
+            }
+            
+            // Для предпросмотра уменьшаем изображение один раз в начале
+            val originalBitmap = bitmap
+            var workingBitmap = if (isPreview) {
+                scaleBitmapForPreview(bitmap)
+            } else {
+                bitmap
+            }
+            
+            var needsRecycle = workingBitmap != originalBitmap
+            
+            // Применяем фильтры последовательно
+            for (indexedFilter in sortedFilters.withIndex()) {
+                val index = indexedFilter.index
+                val filterPair = indexedFilter.value
+                val filterType = filterPair.first
+                val intensity = filterPair.second
+                
+                val previousBitmap = workingBitmap
+                val previousNeedsRecycle = needsRecycle
+                
+                val filteredResult = applyFilter(previousBitmap, filterType, intensity, isPreview = false) // isPreview=false, т.к. уже уменьшили
+                
+                if (filteredResult == null) {
+                    android.util.Log.e("ImageFilterProcessor", "Фильтр $filterType (${index + 1}/${sortedFilters.size}) вернул null")
+                    // Освобождаем предыдущий bitmap при ошибке
+                    if (previousNeedsRecycle && previousBitmap != originalBitmap && !previousBitmap.isRecycled) {
+                        previousBitmap.recycle()
+                    }
+                    return null
+                }
+                
+                workingBitmap = filteredResult
+                
+                // Освобождаем предыдущий bitmap (кроме исходного)
+                if (previousNeedsRecycle && previousBitmap != originalBitmap && previousBitmap != workingBitmap) {
+                    if (!previousBitmap.isRecycled) {
+                        previousBitmap.recycle()
+                    }
+                }
+                
+                // Новый bitmap нужно освободить, если он не исходный
+                needsRecycle = workingBitmap != originalBitmap
+            }
+            
+            // Если изображение было уменьшено, увеличиваем результат обратно
+            val finalResult = if (isPreview && workingBitmap != originalBitmap && workingBitmap.width != originalBitmap.width) {
+                android.util.Log.d("ImageFilterProcessor", "Увеличиваем результат обратно до исходного размера")
+                val scaled = Bitmap.createScaledBitmap(workingBitmap, originalBitmap.width, originalBitmap.height, true)
+                if (needsRecycle && !workingBitmap.isRecycled) {
+                    workingBitmap.recycle()
+                }
+                scaled
+            } else {
+                workingBitmap
+            }
+            
+            val duration = System.currentTimeMillis() - startTime
+            android.util.Log.d("ImageFilterProcessor", "Все ${sortedFilters.size} фильтров применены успешно за ${duration}ms")
+            finalResult
+        } catch (e: OutOfMemoryError) {
+            android.util.Log.e("ImageFilterProcessor", "OutOfMemoryError при применении фильтров: ${e.message}", e)
+            null
+        } catch (e: Exception) {
+            android.util.Log.e("ImageFilterProcessor", "Ошибка применения множественных фильтров: ${e.message}", e)
+            e.printStackTrace()
+            null
+        }
+    }
+    
+    /**
      * Fallback метод для применения фильтров (алгоритмические методы).
      */
     private fun applyFilterFallback(bitmap: Bitmap, filterType: FilterType, intensity: Float?, isPreview: Boolean): Bitmap? {

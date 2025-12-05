@@ -10,15 +10,21 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.neuralphotoredactor.ui.navigation.AppNavigation
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import com.example.neuralphotoredactor.ui.navigation.BottomNavigationBar
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
+import com.example.neuralphotoredactor.ui.screen.ProcessedImagesScreen
 import com.example.neuralphotoredactor.ui.theme.AppTheme
 import com.example.neuralphotoredactor.ui.viewmodel.EditorViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.GalleryViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.HistoryViewModel
+import com.example.neuralphotoredactor.ui.viewmodel.ProcessedImagesViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -40,18 +46,32 @@ class MainActivity : ComponentActivity() {
                     val galleryViewModel: GalleryViewModel = viewModel()
                     val editorViewModel: EditorViewModel = viewModel()
                     val historyViewModel: HistoryViewModel = viewModel()
+                    val processedImagesViewModel: ProcessedImagesViewModel = viewModel()
+                    
+                    // Настраиваем callback для обновления галереи и обработанных изображений после сохранения
+                    editorViewModel.onImageSaved = {
+                        galleryViewModel.refreshImages()
+                        processedImagesViewModel.refreshImages()
+                    }
                     
                     // Используем collectAsState() для реактивного обновления UI
                     val galleryUiState by galleryViewModel.uiState.collectAsState()
                     val editorUiState by editorViewModel.uiState.collectAsState()
                     val historyUiState by historyViewModel.uiState.collectAsState()
+                    val processedImagesUiState by processedImagesViewModel.uiState.collectAsState()
                     
-                    AppNavigation(
-                        navController = navController,
-                        galleryScreen = {
+                    Scaffold(
+                        bottomBar = {
+                            BottomNavigationBar(navController = navController)
+                        }
+                    ) { paddingValues ->
+                        AppNavigation(
+                            navController = navController,
+                            galleryScreen = {
                             GalleryScreen(
                                 images = galleryUiState.images,
                                 isLoading = galleryUiState.isLoading,
+                                isRefreshing = galleryUiState.isRefreshing,
                                 error = galleryUiState.error,
                                 onImageClick = { image ->
                                     editorViewModel.setImage(image)
@@ -59,6 +79,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onCameraClick = {
                                     // TODO: Реализовать открытие камеры
+                                },
+                                onRefresh = {
+                                    galleryViewModel.refreshImages()
                                 },
                                 onPermissionGranted = {
                                     galleryViewModel.loadImages()
@@ -73,22 +96,20 @@ class MainActivity : ComponentActivity() {
                                 isLoading = editorUiState.isLoading,
                                 error = editorUiState.error,
                                 filters = editorViewModel.availableFilters,
-                                selectedFilter = editorUiState.selectedFilter,
-                                filterIntensity = editorUiState.filterIntensity,
-                                onFilterClick = { filter ->
-                                    editorViewModel.selectFilter(filter)
+                                selectedFilters = editorUiState.selectedFilters,
+                                currentFilterIntensity = editorUiState.currentFilterIntensity,
+                                onFilterToggle = { filter ->
+                                    editorViewModel.toggleFilter(filter)
                                 },
-                                onIntensityChange = { intensity ->
-                                    editorViewModel.updateFilterIntensity(intensity)
+                                onIntensityChange = { filter, intensity ->
+                                    editorViewModel.updateFilterIntensity(filter, intensity)
                                 },
-                                onClearFilter = {
-                                    editorViewModel.clearFilter()
+                                onClearFilters = {
+                                    editorViewModel.clearFilters()
                                 },
                                 onSaveClick = {
-                                    // Применяем фильтр с сохранением в файл
-                                    editorUiState.selectedFilter?.let { filter ->
-                                        editorViewModel.applyFilter(filter, editorUiState.filterIntensity)
-                                    }
+                                    // Применяем все выбранные фильтры с сохранением в файл
+                                    editorViewModel.applyFilters()
                                 }
                             )
                         },
@@ -106,8 +127,24 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("editor")
                                 }
                             )
+                        },
+                        processedImagesScreen = {
+                            ProcessedImagesScreen(
+                                images = processedImagesUiState.images,
+                                isLoading = processedImagesUiState.isLoading,
+                                isRefreshing = processedImagesUiState.isRefreshing,
+                                error = processedImagesUiState.error,
+                                onImageClick = { imageData ->
+                                    editorViewModel.setImage(imageData)
+                                    navController.navigate("editor")
+                                },
+                                onRefresh = {
+                                    processedImagesViewModel.refreshImages()
+                                }
+                            )
                         }
                     )
+                    }
                 }
             }
         }

@@ -34,6 +34,12 @@ class GalleryDataSourceImpl @Inject constructor(
     private var cacheTimestamp: Long = 0
     private val cacheValidityMs = 5 * 60 * 1000L // 5 минут
     
+    override suspend fun invalidateCache() {
+        cachedImages = null
+        cacheTimestamp = 0
+        Log.d(TAG, "Cache invalidated")
+    }
+    
     override suspend fun pickImage(): ImageData? {
         // Реализация выбора изображения через Intent будет в UI слое
         // Здесь возвращаем null, так как выбор происходит через Activity Result

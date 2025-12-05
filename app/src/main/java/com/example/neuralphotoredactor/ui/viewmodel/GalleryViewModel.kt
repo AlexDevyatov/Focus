@@ -52,6 +52,35 @@ class GalleryViewModel @Inject constructor(
     }
     
     /**
+     * Обновить список изображений (pull to refresh).
+     * Инвалидирует кэш и перезагружает изображения.
+     */
+    fun refreshImages() {
+        // Отменяем предыдущую загрузку, если она есть
+        loadJob?.cancel()
+        
+        loadJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+            try {
+                // Инвалидируем кэш перед загрузкой
+                getAllImagesUseCase.invalidateCache()
+                
+                // Используем first() для одноразового Flow
+                val imageList = getAllImagesUseCase.invoke.first()
+                _uiState.value = _uiState.value.copy(
+                    images = imageList,
+                    isRefreshing = false
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isRefreshing = false,
+                    error = e.message
+                )
+            }
+        }
+    }
+    
+    /**
      * Остановить загрузку изображений.
      */
     fun stopLoading() {
@@ -67,6 +96,7 @@ class GalleryViewModel @Inject constructor(
 data class GalleryUiState(
     val images: List<ImageData> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false, // Для pull to refresh
     val error: String? = null
 )
 

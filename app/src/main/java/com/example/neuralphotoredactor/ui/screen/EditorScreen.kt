@@ -50,11 +50,11 @@ fun EditorScreen(
     isLoading: Boolean,
     error: String?,
     filters: List<FilterType>,
-    selectedFilter: FilterType?,
-    filterIntensity: Float,
-    onFilterClick: (FilterType) -> Unit,
-    onIntensityChange: (Float) -> Unit,
-    onClearFilter: () -> Unit,
+    selectedFilters: List<Pair<FilterType, Float>>,
+    currentFilterIntensity: Float,
+    onFilterToggle: (FilterType) -> Unit,
+    onIntensityChange: (FilterType, Float) -> Unit,
+    onClearFilters: () -> Unit,
     onSaveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -63,15 +63,15 @@ fun EditorScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_editor)) },
                 actions = {
-                    if (selectedFilter != null) {
-                        IconButton(onClick = onClearFilter) {
+                    if (selectedFilters.isNotEmpty()) {
+                        IconButton(onClick = onClearFilters) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
                                 contentDescription = stringResource(R.string.editor_clear_filter)
                             )
                         }
                     }
-                    if (processedImageUri != null) {
+                    if (selectedFilters.isNotEmpty() || processedImageUri != null) {
                         IconButton(onClick = onSaveClick) {
                             Icon(
                                 imageVector = Icons.Filled.Save,
@@ -134,52 +134,49 @@ fun EditorScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 items(filters) { filter ->
+                    val isSelected = selectedFilters.any { it.first == filter }
                     FilterChip(
-                        selected = filter == selectedFilter,
-                        onClick = { onFilterClick(filter) },
+                        selected = isSelected,
+                        onClick = { onFilterToggle(filter) },
                         label = { Text(getFilterName(filter)) }
                     )
                 }
             }
             
-            // Слайдер интенсивности (показывается только при выбранном фильтре)
-            if (selectedFilter != null) {
+            // Список выбранных фильтров с их слайдерами
+            if (selectedFilters.isNotEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = stringResource(R.string.editor_filter_intensity),
+                        text = "Выбранные фильтры: ${selectedFilters.size}",
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    Slider(
-                        value = filterIntensity,
-                        onValueChange = onIntensityChange,
-                        valueRange = 0f..1f,
-                        steps = 99, // 100 шагов (0.0 до 1.0 с шагом 0.01)
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "0%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "${(filterIntensity * 100).toInt()}%",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "100%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    
+                    // Слайдеры для каждого выбранного фильтра
+                    selectedFilters.forEach { (filterType, intensity) ->
+                        val currentIntensity = intensity ?: currentFilterIntensity
+                        Column(
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "${getFilterName(filterType)}: ${(currentIntensity * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Slider(
+                                value = currentIntensity,
+                                onValueChange = { newIntensity ->
+                                    onIntensityChange(filterType, newIntensity)
+                                },
+                                valueRange = 0f..1f,
+                                steps = 99,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }

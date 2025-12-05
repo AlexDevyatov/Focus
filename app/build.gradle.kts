@@ -85,6 +85,9 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     
+    // Pull to refresh
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.34.0")
+    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

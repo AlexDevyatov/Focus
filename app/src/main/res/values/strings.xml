@@ -5,6 +5,7 @@
     <string name="screen_gallery">Галерея</string>
     <string name="screen_editor">Редактор</string>
     <string name="screen_history">История</string>
+    <string name="screen_processed_images">Обработанные</string>
     
     <!-- Gallery Screen -->
     <string name="gallery_permission_title">Необходимо разрешение на доступ к галерее</string>
@@ -32,4 +33,7 @@
     <!-- History Screen -->
     <string name="history_empty">История пуста</string>
     <string name="error_load_history">Ошибка загрузки истории</string>
+    
+    <!-- Processed Images Screen -->
+    <string name="processed_images_empty">Нет обработанных изображений</string>
 </resources>

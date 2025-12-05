@@ -18,5 +18,13 @@ class GetAllImagesUseCase @Inject constructor(
      */
     val invoke: Flow<List<ImageData>>
         get() = imageRepository.getAllImages()
+    
+    /**
+     * Инвалидировать кэш изображений.
+     * Используется для принудительного обновления списка изображений.
+     */
+    suspend fun invalidateCache() {
+        imageRepository.invalidateCache()
+    }
 }
 
