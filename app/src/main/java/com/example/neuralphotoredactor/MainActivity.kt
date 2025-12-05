@@ -69,14 +69,26 @@ class MainActivity : ComponentActivity() {
                             EditorScreen(
                                 imageUri = editorUiState.imageData?.uri,
                                 processedImageUri = editorUiState.processedResult?.processedUri,
+                                previewBitmap = editorUiState.previewBitmap,
                                 isLoading = editorUiState.isLoading,
                                 error = editorUiState.error,
                                 filters = editorViewModel.availableFilters,
+                                selectedFilter = editorUiState.selectedFilter,
+                                filterIntensity = editorUiState.filterIntensity,
                                 onFilterClick = { filter ->
-                                    editorViewModel.applyFilter(filter)
+                                    editorViewModel.selectFilter(filter)
+                                },
+                                onIntensityChange = { intensity ->
+                                    editorViewModel.updateFilterIntensity(intensity)
+                                },
+                                onClearFilter = {
+                                    editorViewModel.clearFilter()
                                 },
                                 onSaveClick = {
-                                    // TODO: Реализовать сохранение
+                                    // Применяем фильтр с сохранением в файл
+                                    editorUiState.selectedFilter?.let { filter ->
+                                        editorViewModel.applyFilter(filter, editorUiState.filterIntensity)
+                                    }
                                 }
                             )
                         },

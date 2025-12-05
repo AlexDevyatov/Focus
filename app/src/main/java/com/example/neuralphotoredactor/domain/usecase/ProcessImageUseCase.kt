@@ -17,13 +17,15 @@ class ProcessImageUseCase @Inject constructor(
      * 
      * @param imageData Исходное изображение
      * @param filterType Тип фильтра
+     * @param intensity Интенсивность фильтра (0.0 - 1.0), null для значения по умолчанию
      * @return Результат обработки или null
      */
     suspend fun invoke(
         imageData: ImageData,
-        filterType: FilterType
+        filterType: FilterType,
+        intensity: Float? = null
     ): ProcessingResult? {
-        return processingRepository.processImage(imageData, filterType)
+        return processingRepository.processImage(imageData, filterType, intensity)
     }
 }
 

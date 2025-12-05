@@ -17,11 +17,13 @@ interface ProcessingRepository {
      * 
      * @param imageData Исходное изображение
      * @param filterType Тип фильтра для применения
+     * @param intensity Интенсивность фильтра (0.0 - 1.0), null для значения по умолчанию
      * @return Результат обработки или null в случае ошибки
      */
     suspend fun processImage(
         imageData: ImageData,
-        filterType: FilterType
+        filterType: FilterType,
+        intensity: Float? = null
     ): ProcessingResult?
     
     /**
@@ -37,5 +39,29 @@ interface ProcessingRepository {
      * @param result Результат для удаления
      */
     suspend fun deleteProcessingResult(result: ProcessingResult)
+    
+    /**
+     * Быстрый предпросмотр фильтра без сохранения в файл.
+     * Используется для отображения результата в реальном времени.
+     * 
+     * @param bitmap Исходное изображение (Bitmap)
+     * @param filterType Тип фильтра для применения
+     * @param intensity Интенсивность фильтра (0.0 - 1.0), null для значения по умолчанию
+     * @return Обработанное изображение (Bitmap) или null в случае ошибки
+     */
+    suspend fun previewFilter(
+        bitmap: android.graphics.Bitmap,
+        filterType: FilterType,
+        intensity: Float? = null
+    ): android.graphics.Bitmap?
+    
+    /**
+     * Загрузить Bitmap из URI.
+     * Используется для кэширования исходного изображения.
+     * 
+     * @param uri URI изображения
+     * @return Bitmap или null в случае ошибки
+     */
+    suspend fun loadBitmapFromUri(uri: android.net.Uri): android.graphics.Bitmap?
 }
 

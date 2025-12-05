@@ -36,11 +36,12 @@ class ProcessingRepositoryImpl @Inject constructor(
     
     override suspend fun processImage(
         imageData: ImageData,
-        filterType: FilterType
+        filterType: FilterType,
+        intensity: Float?
     ): ProcessingResult? = withContext(Dispatchers.IO) {
         try {
             // Загружаем Bitmap из URI
-            val bitmap = loadBitmapFromUri(imageData.uri) ?: return@withContext null
+            val bitmap = loadBitmapFromUriSync(imageData.uri) ?: return@withContext null
             
             // Определяем, какой процессор использовать
             val processedBitmap = when (filterType) {
@@ -51,7 +52,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                 FilterType.GRAYSCALE,
                 FilterType.SEPIA -> {
                     // Используем ImageFilterProcessor для новых фильтров
-                    imageFilterProcessor.applyFilter(bitmap, filterType)
+                    imageFilterProcessor.applyFilter(bitmap, filterType, intensity)
                 }
                 else -> {
                     // Используем ImageProcessor для ML-фильтров (требуют TFLite модели)
@@ -101,7 +102,77 @@ class ProcessingRepositoryImpl @Inject constructor(
         }
     }
     
-    private fun loadBitmapFromUri(uri: android.net.Uri): Bitmap? {
+    override suspend fun previewFilter(
+        bitmap: Bitmap,
+        filterType: FilterType,
+        intensity: Float?
+    ): Bitmap? = withContext(Dispatchers.Default) {
+        try {
+            // Проверяем, что Bitmap не переработан
+            if (bitmap.isRecycled) {
+                android.util.Log.e("ProcessingRepository", "Bitmap переработан, невозможно применить фильтр")
+                return@withContext null
+            }
+            
+            android.util.Log.d("ProcessingRepository", "Применяем фильтр $filterType к Bitmap ${bitmap.width}x${bitmap.height}")
+            
+            // Определяем, какой процессор использовать
+            val result = when (filterType) {
+                FilterType.GAUSSIAN_BLUR,
+                FilterType.NOISE_REDUCTION,
+                FilterType.SHARPEN,
+                FilterType.VIGNETTE,
+                FilterType.GRAYSCALE,
+                FilterType.SEPIA -> {
+                    // Используем ImageFilterProcessor для новых фильтров
+                    imageFilterProcessor.applyFilter(bitmap, filterType, intensity)
+                }
+                else -> {
+                    // Используем ImageProcessor для ML-фильтров (требуют TFLite модели)
+                    imageProcessor.processImage(bitmap, filterType)
+                }
+            }
+            
+            if (result != null) {
+                android.util.Log.d("ProcessingRepository", "Фильтр применен успешно: ${result.width}x${result.height}")
+            } else {
+                android.util.Log.e("ProcessingRepository", "Фильтр вернул null")
+            }
+            
+            result
+        } catch (e: Exception) {
+            android.util.Log.e("ProcessingRepository", "Ошибка применения фильтра: ${e.message}", e)
+            null
+        }
+    }
+    
+    override suspend fun loadBitmapFromUri(uri: android.net.Uri): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+                ?: run {
+                    android.util.Log.e("ProcessingRepository", "Не удалось открыть InputStream для URI: $uri")
+                    return@withContext null
+                }
+            
+            inputStream.use {
+                val bitmap = BitmapFactory.decodeStream(it)
+                if (bitmap == null) {
+                    android.util.Log.e("ProcessingRepository", "BitmapFactory.decodeStream вернул null для URI: $uri")
+                } else {
+                    android.util.Log.d("ProcessingRepository", "Bitmap загружен: ${bitmap.width}x${bitmap.height}")
+                }
+                bitmap
+            }
+        } catch (e: FileNotFoundException) {
+            android.util.Log.e("ProcessingRepository", "Файл не найден: $uri", e)
+            null
+        } catch (e: Exception) {
+            android.util.Log.e("ProcessingRepository", "Ошибка загрузки Bitmap: ${e.message}", e)
+            null
+        }
+    }
+    
+    private fun loadBitmapFromUriSync(uri: android.net.Uri): Bitmap? {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)
             inputStream?.use {

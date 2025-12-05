@@ -15,6 +15,8 @@
     
     <!-- Editor Screen -->
     <string name="editor_save_button">Сохранить</string>
+    <string name="editor_clear_filter">Отменить фильтр</string>
+    <string name="editor_filter_intensity">Интенсивность фильтра</string>
     <string name="editor_processed_image">Обработанное изображение</string>
     <string name="editor_original_image">Исходное изображение</string>
     <string name="error_process_image">Ошибка обработки изображения</string>
