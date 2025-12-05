@@ -81,7 +81,7 @@ class EditorViewModel @Inject constructor(
         
         currentPreviewJob = viewModelScope.launch {
             // Небольшая задержка для debounce (чтобы не обрабатывать каждое микро-изменение)
-            delay(50) // 50ms debounce
+            delay(100) // 100ms debounce для лучшей производительности
             
             val originalBitmap = getOrLoadOriginalBitmap()
             if (originalBitmap == null) {

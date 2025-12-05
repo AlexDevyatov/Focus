@@ -25,8 +25,9 @@ interface ImageFilterProcessor {
      * @param bitmap Исходное изображение
      * @param filterType Тип фильтра
      * @param intensity Интенсивность фильтра (0.0 - 1.0), null для значения по умолчанию
+     * @param isPreview Если true, используется меньший размер для быстрого предпросмотра
      * @return Обработанное изображение или null в случае ошибки
      */
-    fun applyFilter(bitmap: Bitmap, filterType: FilterType, intensity: Float? = null): Bitmap?
+    fun applyFilter(bitmap: Bitmap, filterType: FilterType, intensity: Float? = null, isPreview: Boolean = false): Bitmap?
 }
 

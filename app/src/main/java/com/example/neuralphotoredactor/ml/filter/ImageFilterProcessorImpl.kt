@@ -28,7 +28,7 @@ import javax.inject.Inject
  */
 class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
     
-    override fun applyFilter(bitmap: Bitmap, filterType: FilterType, intensity: Float?): Bitmap? {
+    override fun applyFilter(bitmap: Bitmap, filterType: FilterType, intensity: Float?, isPreview: Boolean): Bitmap? {
         return try {
             // AGSL/RenderEffect требует API 33+ для setRenderEffect на Paint
             // Для API 31-32 используем только алгоритмические методы
@@ -53,37 +53,77 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
                 // Если AGSL вернул null, используем fallback
                 result ?: run {
                     android.util.Log.w("ImageFilterProcessor", "AGSL вернул null для $filterType, используем fallback")
-                    applyFilterFallback(bitmap, filterType, intensity)
+                    applyFilterFallback(bitmap, filterType, intensity, false)
                 }
             } else {
                 // Используем алгоритмические методы (fallback)
-                applyFilterFallback(bitmap, filterType, intensity)
+                applyFilterFallback(bitmap, filterType, intensity, isPreview)
             }
         } catch (e: Exception) {
             android.util.Log.e("ImageFilterProcessor", "Ошибка применения фильтра ${filterType.name}: ${e.message}", e)
             e.printStackTrace()
             // Fallback на алгоритмические методы при ошибке
-            applyFilterFallback(bitmap, filterType, intensity)
+            applyFilterFallback(bitmap, filterType, intensity, isPreview)
         }
     }
     
     /**
      * Fallback метод для применения фильтров (алгоритмические методы).
      */
-    private fun applyFilterFallback(bitmap: Bitmap, filterType: FilterType, intensity: Float?): Bitmap? {
+    private fun applyFilterFallback(bitmap: Bitmap, filterType: FilterType, intensity: Float?, isPreview: Boolean): Bitmap? {
         return try {
-            when (filterType) {
-                FilterType.GAUSSIAN_BLUR -> applyGaussianBlurAlgorithmic(bitmap, intensity ?: 0.5f)
-                FilterType.NOISE_REDUCTION -> applyNoiseReduction(bitmap, intensity ?: 0.5f)
-                FilterType.SHARPEN -> applySharpen(bitmap, intensity ?: 0.5f)
-                FilterType.VIGNETTE -> applyVignetteAlgorithmic(bitmap, intensity ?: 0.5f)
-                FilterType.GRAYSCALE -> applyGrayscale(bitmap)
-                FilterType.SEPIA -> applySepia(bitmap, intensity ?: 1.0f)
+            // Для предпросмотра уменьшаем изображение для ускорения
+            val workingBitmap = if (isPreview) {
+                scaleBitmapForPreview(bitmap)
+            } else {
+                bitmap
+            }
+            
+            val result = when (filterType) {
+                FilterType.GAUSSIAN_BLUR -> applyGaussianBlurAlgorithmic(workingBitmap, intensity ?: 0.5f, isPreview)
+                FilterType.NOISE_REDUCTION -> applyNoiseReduction(workingBitmap, intensity ?: 0.5f, isPreview)
+                FilterType.SHARPEN -> applySharpen(workingBitmap, intensity ?: 0.5f, isPreview)
+                FilterType.VIGNETTE -> applyVignetteAlgorithmic(workingBitmap, intensity ?: 0.5f)
+                FilterType.GRAYSCALE -> applyGrayscale(workingBitmap)
+                FilterType.SEPIA -> applySepia(workingBitmap, intensity ?: 1.0f)
                 else -> null
+            }
+            
+            // Если изображение было уменьшено, увеличиваем результат обратно
+            if (isPreview && workingBitmap != bitmap && result != null) {
+                val finalResult = Bitmap.createScaledBitmap(result, bitmap.width, bitmap.height, true)
+                if (workingBitmap != bitmap) workingBitmap.recycle()
+                result.recycle()
+                finalResult
+            } else {
+                if (workingBitmap != bitmap && result != workingBitmap) {
+                    workingBitmap.recycle()
+                }
+                result
             }
         } catch (e: Exception) {
             android.util.Log.e("ImageFilterProcessor", "Ошибка fallback: ${e.message}", e)
             null
+        }
+    }
+    
+    /**
+     * Уменьшить изображение для быстрого предпросмотра.
+     */
+    private fun scaleBitmapForPreview(bitmap: Bitmap): Bitmap {
+        val maxPreviewSize = 600 // Уменьшено для ускорения предпросмотра
+        val maxDimension = maxOf(bitmap.width, bitmap.height)
+        
+        return if (maxDimension > maxPreviewSize) {
+            val scaleFactor = maxPreviewSize.toFloat() / maxDimension
+            Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scaleFactor).toInt(),
+                (bitmap.height * scaleFactor).toInt(),
+                true
+            )
+        } else {
+            bitmap
         }
     }
     
@@ -148,11 +188,11 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
             val result = applyAGSLShader(bitmap, shaderCode)
             result ?: run {
                 android.util.Log.w("ImageFilterProcessor", "Sharpen AGSL вернул null, используем fallback")
-                applySharpen(bitmap, intensity)
+                applySharpen(bitmap, intensity, false)
             }
         } catch (e: Exception) {
             android.util.Log.e("ImageFilterProcessor", "Ошибка применения Sharpen AGSL: ${e.message}", e)
-            applySharpen(bitmap, intensity) // Fallback
+            applySharpen(bitmap, intensity, false) // Fallback
         }
     }
     
@@ -165,11 +205,11 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
             val result = applyRenderEffectViaPaint(bitmap, blurEffect)
             result ?: run {
                 android.util.Log.w("ImageFilterProcessor", "Gaussian Blur RenderEffect вернул null, используем fallback")
-                applyGaussianBlurAlgorithmic(bitmap, intensity)
+                applyGaussianBlurAlgorithmic(bitmap, intensity, false)
             }
         } catch (e: Exception) {
             android.util.Log.e("ImageFilterProcessor", "Ошибка применения Gaussian Blur: ${e.message}", e)
-            applyGaussianBlurAlgorithmic(bitmap, intensity) // Fallback
+            applyGaussianBlurAlgorithmic(bitmap, intensity, false) // Fallback
         }
     }
     
@@ -182,11 +222,11 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
             val result = applyAGSLShader(bitmap, shaderCode)
             result ?: run {
                 android.util.Log.w("ImageFilterProcessor", "Noise Reduction AGSL вернул null, используем fallback")
-                applyNoiseReduction(bitmap, intensity)
+                applyNoiseReduction(bitmap, intensity, false)
             }
         } catch (e: Exception) {
             android.util.Log.e("ImageFilterProcessor", "Ошибка применения Noise Reduction AGSL: ${e.message}", e)
-            applyNoiseReduction(bitmap, intensity) // Fallback
+            applyNoiseReduction(bitmap, intensity, false) // Fallback
         }
     }
     
@@ -293,24 +333,164 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
     /**
      * Применить размытие по Гауссу (алгоритмический подход для fallback).
      */
-    private fun applyGaussianBlurAlgorithmic(bitmap: Bitmap, intensity: Float): Bitmap? {
-        // Упрощенная реализация размытия для старых версий Android
-        val radius = (intensity * 10f).toInt().coerceIn(1, 10)
-        return applyConvolutionFilter(bitmap, createGaussianKernel(radius))
+    private fun applyGaussianBlurAlgorithmic(bitmap: Bitmap, intensity: Float, isPreview: Boolean = false): Bitmap? {
+        return try {
+            val radius = (intensity * 10f).toInt().coerceIn(1, 10)
+            
+            android.util.Log.d("ImageFilterProcessor", "Применяем Gaussian Blur: радиус=$radius, размер=${bitmap.width}x${bitmap.height}, preview=$isPreview")
+            applyConvolutionFilter(bitmap, createGaussianKernel(radius))
+        } catch (e: Exception) {
+            android.util.Log.e("ImageFilterProcessor", "Ошибка Gaussian Blur: ${e.message}", e)
+            null
+        }
+    }
+    
+    /**
+     * Применить Box Blur (быстрый алгоритм размытия для предпросмотра).
+     * Работает значительно быстрее Gaussian Blur за счет упрощенного алгоритма.
+     */
+    private fun applyBoxBlur(bitmap: Bitmap, radius: Int): Bitmap? {
+        if (radius <= 0) return bitmap
+        
+        val adjustedRadius = radius.coerceIn(1, 10)
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val resultPixels = IntArray(pixels.size)
+        
+        // Box blur по горизонтали
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                var r = 0
+                var g = 0
+                var b = 0
+                var count = 0
+                
+                for (dx in -adjustedRadius..adjustedRadius) {
+                    val px = (x + dx).coerceIn(0, bitmap.width - 1)
+                    val idx = y * bitmap.width + px
+                    val pixel = pixels[idx]
+                    r += android.graphics.Color.red(pixel)
+                    g += android.graphics.Color.green(pixel)
+                    b += android.graphics.Color.blue(pixel)
+                    count++
+                }
+                
+                val idx = y * bitmap.width + x
+                val a = android.graphics.Color.alpha(pixels[idx])
+                resultPixels[idx] = android.graphics.Color.argb(
+                    a,
+                    r / count,
+                    g / count,
+                    b / count
+                )
+            }
+        }
+        
+        // Box blur по вертикали
+        val tempPixels = resultPixels.copyOf()
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                var r = 0
+                var g = 0
+                var b = 0
+                var count = 0
+                
+                for (dy in -adjustedRadius..adjustedRadius) {
+                    val py = (y + dy).coerceIn(0, bitmap.height - 1)
+                    val idx = py * bitmap.width + x
+                    val pixel = tempPixels[idx]
+                    r += android.graphics.Color.red(pixel)
+                    g += android.graphics.Color.green(pixel)
+                    b += android.graphics.Color.blue(pixel)
+                    count++
+                }
+                
+                val idx = y * bitmap.width + x
+                val a = android.graphics.Color.alpha(tempPixels[idx])
+                resultPixels[idx] = android.graphics.Color.argb(
+                    a,
+                    r / count,
+                    g / count,
+                    b / count
+                )
+            }
+        }
+        
+        result.setPixels(resultPixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        return result
     }
     
     /**
      * Применить удаление шумов.
      * 
-     * Использует медианный фильтр для удаления шумов.
+     * Использует упрощенный медианный фильтр для удаления шумов.
      * 
      * @param bitmap Исходное изображение
      * @param intensity Интенсивность (0.0 - 1.0)
+     * @param isPreview Если true, используется более быстрый алгоритм
      * @return Обработанное изображение
      */
-    private fun applyNoiseReduction(bitmap: Bitmap, intensity: Float): Bitmap? {
+    private fun applyNoiseReduction(bitmap: Bitmap, intensity: Float, isPreview: Boolean): Bitmap? {
         val kernelSize = (intensity * 5f).toInt().coerceIn(1, 5)
-        return applyMedianFilter(bitmap, kernelSize)
+        
+        // Для предпросмотра используем более быстрый алгоритм (box blur вместо медианы)
+        return if (isPreview) {
+            // Конвертируем kernelSize в radius для Box Blur
+            val radius = kernelSize / 2
+            applyBoxBlur(bitmap, radius.coerceAtLeast(1))
+        } else {
+            applyMedianFilterFast(bitmap, kernelSize)
+        }
+    }
+    
+    /**
+     * Оптимизированный медианный фильтр (использует частичную сортировку).
+     */
+    private fun applyMedianFilterFast(bitmap: Bitmap, kernelSize: Int): Bitmap? {
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val resultPixels = pixels.copyOf()
+        
+        val halfKernel = kernelSize / 2
+        
+        for (y in halfKernel until bitmap.height - halfKernel) {
+            for (x in halfKernel until bitmap.width - halfKernel) {
+                val rValues = IntArray(kernelSize * kernelSize)
+                val gValues = IntArray(kernelSize * kernelSize)
+                val bValues = IntArray(kernelSize * kernelSize)
+                var idx = 0
+                
+                for (ky in -halfKernel..halfKernel) {
+                    for (kx in -halfKernel..halfKernel) {
+                        val pixel = pixels[(y + ky) * bitmap.width + (x + kx)]
+                        rValues[idx] = android.graphics.Color.red(pixel)
+                        gValues[idx] = android.graphics.Color.green(pixel)
+                        bValues[idx] = android.graphics.Color.blue(pixel)
+                        idx++
+                    }
+                }
+                
+                // Используем частичную сортировку (только до медианы)
+                val medianIdx = rValues.size / 2
+                rValues.sort()
+                gValues.sort()
+                bValues.sort()
+                
+                val pixelIdx = y * bitmap.width + x
+                val a = android.graphics.Color.alpha(pixels[pixelIdx])
+                resultPixels[pixelIdx] = android.graphics.Color.argb(
+                    a,
+                    rValues[medianIdx],
+                    gValues[medianIdx],
+                    bValues[medianIdx]
+                )
+            }
+        }
+        
+        result.setPixels(resultPixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        return result
     }
     
     /**
@@ -318,18 +498,96 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
      * 
      * @param bitmap Исходное изображение
      * @param intensity Интенсивность резкости (0.0 - 1.0)
+     * @param isPreview Если true, используется упрощенный алгоритм
      * @return Обработанное изображение
      */
-    private fun applySharpen(bitmap: Bitmap, intensity: Float): Bitmap? {
+    private fun applySharpen(bitmap: Bitmap, intensity: Float, isPreview: Boolean): Bitmap? {
         return try {
             val strength = intensity * 2f // Максимальная сила 2.0
             val kernel = createSharpenKernel(strength)
-            android.util.Log.d("ImageFilterProcessor", "Применяем Sharpen: сила=$strength, размер=${bitmap.width}x${bitmap.height}")
-            applyConvolutionFilter(bitmap, kernel)
+            android.util.Log.d("ImageFilterProcessor", "Применяем Sharpen: сила=$strength, размер=${bitmap.width}x${bitmap.height}, preview=$isPreview")
+            
+            // Для предпросмотра используем оптимизированный convolution
+            if (isPreview) {
+                applyConvolutionFilterOptimized(bitmap, kernel)
+            } else {
+                applyConvolutionFilter(bitmap, kernel)
+            }
         } catch (e: Exception) {
             android.util.Log.e("ImageFilterProcessor", "Ошибка Sharpen: ${e.message}", e)
             null
         }
+    }
+    
+    /**
+     * Оптимизированный convolution для маленьких ядер (3x3).
+     */
+    private fun applyConvolutionFilterOptimized(bitmap: Bitmap, kernel: Array<FloatArray>): Bitmap? {
+        if (kernel.size != 3 || kernel[0].size != 3) {
+            return applyConvolutionFilter(bitmap, kernel)
+        }
+        
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val resultPixels = pixels.copyOf()
+        
+        for (y in 1 until bitmap.height - 1) {
+            for (x in 1 until bitmap.width - 1) {
+                var r = 0f
+                var g = 0f
+                var b = 0f
+                
+                // Оптимизированный цикл для 3x3 ядра
+                r += android.graphics.Color.red(pixels[(y - 1) * bitmap.width + (x - 1)]) * kernel[0][0]
+                g += android.graphics.Color.green(pixels[(y - 1) * bitmap.width + (x - 1)]) * kernel[0][0]
+                b += android.graphics.Color.blue(pixels[(y - 1) * bitmap.width + (x - 1)]) * kernel[0][0]
+                
+                r += android.graphics.Color.red(pixels[(y - 1) * bitmap.width + x]) * kernel[0][1]
+                g += android.graphics.Color.green(pixels[(y - 1) * bitmap.width + x]) * kernel[0][1]
+                b += android.graphics.Color.blue(pixels[(y - 1) * bitmap.width + x]) * kernel[0][1]
+                
+                r += android.graphics.Color.red(pixels[(y - 1) * bitmap.width + (x + 1)]) * kernel[0][2]
+                g += android.graphics.Color.green(pixels[(y - 1) * bitmap.width + (x + 1)]) * kernel[0][2]
+                b += android.graphics.Color.blue(pixels[(y - 1) * bitmap.width + (x + 1)]) * kernel[0][2]
+                
+                r += android.graphics.Color.red(pixels[y * bitmap.width + (x - 1)]) * kernel[1][0]
+                g += android.graphics.Color.green(pixels[y * bitmap.width + (x - 1)]) * kernel[1][0]
+                b += android.graphics.Color.blue(pixels[y * bitmap.width + (x - 1)]) * kernel[1][0]
+                
+                r += android.graphics.Color.red(pixels[y * bitmap.width + x]) * kernel[1][1]
+                g += android.graphics.Color.green(pixels[y * bitmap.width + x]) * kernel[1][1]
+                b += android.graphics.Color.blue(pixels[y * bitmap.width + x]) * kernel[1][1]
+                
+                r += android.graphics.Color.red(pixels[y * bitmap.width + (x + 1)]) * kernel[1][2]
+                g += android.graphics.Color.green(pixels[y * bitmap.width + (x + 1)]) * kernel[1][2]
+                b += android.graphics.Color.blue(pixels[y * bitmap.width + (x + 1)]) * kernel[1][2]
+                
+                r += android.graphics.Color.red(pixels[(y + 1) * bitmap.width + (x - 1)]) * kernel[2][0]
+                g += android.graphics.Color.green(pixels[(y + 1) * bitmap.width + (x - 1)]) * kernel[2][0]
+                b += android.graphics.Color.blue(pixels[(y + 1) * bitmap.width + (x - 1)]) * kernel[2][0]
+                
+                r += android.graphics.Color.red(pixels[(y + 1) * bitmap.width + x]) * kernel[2][1]
+                g += android.graphics.Color.green(pixels[(y + 1) * bitmap.width + x]) * kernel[2][1]
+                b += android.graphics.Color.blue(pixels[(y + 1) * bitmap.width + x]) * kernel[2][1]
+                
+                r += android.graphics.Color.red(pixels[(y + 1) * bitmap.width + (x + 1)]) * kernel[2][2]
+                g += android.graphics.Color.green(pixels[(y + 1) * bitmap.width + (x + 1)]) * kernel[2][2]
+                b += android.graphics.Color.blue(pixels[(y + 1) * bitmap.width + (x + 1)]) * kernel[2][2]
+                
+                val idx = y * bitmap.width + x
+                val a = android.graphics.Color.alpha(pixels[idx])
+                resultPixels[idx] = android.graphics.Color.argb(
+                    a,
+                    r.coerceIn(0f, 255f).toInt(),
+                    g.coerceIn(0f, 255f).toInt(),
+                    b.coerceIn(0f, 255f).toInt()
+                )
+            }
+        }
+        
+        result.setPixels(resultPixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        return result
     }
     
     /**
@@ -362,8 +620,11 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         
         val centerX: Float = bitmap.width / 2f
         val centerY: Float = bitmap.height / 2f
-        val maxRadius: Float = (kotlin.math.sqrt((bitmap.width * bitmap.width + bitmap.height * bitmap.height).toDouble()) / 2.0).toFloat()
-        val startRadius: Float = maxRadius * 0.3f // Начало виньетки на 30% от центра
+        // Предвычисляем квадрат максимального радиуса (избегаем sqrt)
+        val maxRadiusSquared: Float = ((bitmap.width * bitmap.width + bitmap.height * bitmap.height) / 4f)
+        val maxRadius: Float = kotlin.math.sqrt(maxRadiusSquared.toDouble()).toFloat()
+        val startRadiusSquared: Float = maxRadiusSquared * 0.09f // 0.3^2 = 0.09
+        val startRadius: Float = maxRadius * 0.3f
         
         for (y in 0 until bitmap.height) {
             for (x in 0 until bitmap.width) {
@@ -372,13 +633,15 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
                 
                 val dx = x - centerX
                 val dy = y - centerY
-                val dist = kotlin.math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                // Используем квадрат расстояния вместо sqrt для ускорения
+                val distSquared = dx * dx + dy * dy
                 
-                // Вычисляем фактор виньетки
+                // Вычисляем фактор виньетки без sqrt
                 val vignetteFactor: Float = when {
-                    dist < startRadius -> 1.0f
-                    dist > maxRadius -> (1.0f - intensity)
+                    distSquared < startRadiusSquared -> 1.0f
+                    distSquared > maxRadiusSquared -> (1.0f - intensity)
                     else -> {
+                        val dist = kotlin.math.sqrt(distSquared.toDouble()).toFloat()
                         val numerator: Float = dist - startRadius
                         val denominator: Float = maxRadius - startRadius
                         val t: Float = numerator / denominator
@@ -463,46 +726,6 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         return result
     }
     
-    /**
-     * Применить медианный фильтр для удаления шумов.
-     */
-    private fun applyMedianFilter(bitmap: Bitmap, kernelSize: Int): Bitmap? {
-        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-        val pixels = IntArray(bitmap.width * bitmap.height)
-        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        
-        val halfKernel = kernelSize / 2
-        val resultPixels = pixels.copyOf()
-        
-        for (y in halfKernel until bitmap.height - halfKernel) {
-            for (x in halfKernel until bitmap.width - halfKernel) {
-                val neighbors = mutableListOf<Int>()
-                
-                for (ky in -halfKernel..halfKernel) {
-                    for (kx in -halfKernel..halfKernel) {
-                        val idx = (y + ky) * bitmap.width + (x + kx)
-                        neighbors.add(pixels[idx])
-                    }
-                }
-                
-                // Медиана по каждому каналу
-                neighbors.sortBy { android.graphics.Color.red(it) }
-                val r = android.graphics.Color.red(neighbors[neighbors.size / 2])
-                
-                neighbors.sortBy { android.graphics.Color.green(it) }
-                val g = android.graphics.Color.green(neighbors[neighbors.size / 2])
-                
-                neighbors.sortBy { android.graphics.Color.blue(it) }
-                val b = android.graphics.Color.blue(neighbors[neighbors.size / 2])
-                
-                val a = android.graphics.Color.alpha(pixels[y * bitmap.width + x])
-                resultPixels[y * bitmap.width + x] = android.graphics.Color.argb(a, r, g, b)
-            }
-        }
-        
-        result.setPixels(resultPixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        return result
-    }
     
     /**
      * Применить свёрточный фильтр.
@@ -514,7 +737,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
             android.util.Log.d("ImageFilterProcessor", "Начало applyConvolutionFilter: ${bitmap.width}x${bitmap.height}, ядро: ${kernel.size}x${kernel.size}")
             
             // Для больших изображений уменьшаем размер для производительности
-            val maxDimension = 1500 // Максимальный размер для обработки
+            val maxDimension = 1200 // Уменьшено с 1500 для ускорения
             val scaleFactor = if (maxOf(bitmap.width, bitmap.height) > maxDimension) {
                 maxDimension.toFloat() / maxOf(bitmap.width, bitmap.height)
             } else {

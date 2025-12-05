@@ -52,7 +52,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                 FilterType.GRAYSCALE,
                 FilterType.SEPIA -> {
                     // Используем ImageFilterProcessor для новых фильтров
-                    imageFilterProcessor.applyFilter(bitmap, filterType, intensity)
+                    imageFilterProcessor.applyFilter(bitmap, filterType, intensity, isPreview = false)
                 }
                 else -> {
                     // Используем ImageProcessor для ML-фильтров (требуют TFLite модели)
@@ -125,7 +125,8 @@ class ProcessingRepositoryImpl @Inject constructor(
                 FilterType.GRAYSCALE,
                 FilterType.SEPIA -> {
                     // Используем ImageFilterProcessor для новых фильтров
-                    imageFilterProcessor.applyFilter(bitmap, filterType, intensity)
+                    // isPreview = true для быстрого предпросмотра
+                    imageFilterProcessor.applyFilter(bitmap, filterType, intensity, isPreview = true)
                 }
                 else -> {
                     // Используем ImageProcessor для ML-фильтров (требуют TFLite модели)
