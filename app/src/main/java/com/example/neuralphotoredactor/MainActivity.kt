@@ -101,9 +101,10 @@ class MainActivity : ComponentActivity() {
                                 previewBitmap = editorUiState.previewBitmap,
                                 isLoading = editorUiState.isLoading,
                                 error = editorUiState.error,
-                                filters = editorViewModel.availableFilters,
+                                filters = editorViewModel.getCurrentCategoryFilters(),
                                 selectedFilters = editorUiState.selectedFilters,
                                 currentFilterIntensity = editorUiState.currentFilterIntensity,
+                                showNeuralFilters = editorUiState.showNeuralFilters,
                                 onFilterToggle = { filter ->
                                     editorViewModel.toggleFilter(filter)
                                 },
@@ -116,6 +117,9 @@ class MainActivity : ComponentActivity() {
                                 onSaveClick = {
                                     // Применяем все выбранные фильтры с сохранением в файл
                                     editorViewModel.applyFilters()
+                                },
+                                onToggleFilterCategory = {
+                                    editorViewModel.toggleFilterCategory()
                                 }
                             )
                         },

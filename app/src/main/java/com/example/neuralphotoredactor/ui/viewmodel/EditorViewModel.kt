@@ -40,6 +40,25 @@ class EditorViewModel @Inject constructor(
     // Callback для навигации после успешного применения фильтров
     var onNavigateToProcessed: (() -> Unit)? = null
     
+    // Обычные фильтры (алгоритмические)
+    val regularFilters = listOf(
+        FilterType.GAUSSIAN_BLUR,
+        FilterType.NOISE_REDUCTION,
+        FilterType.SHARPEN,
+        FilterType.VIGNETTE,
+        FilterType.GRAYSCALE,
+        FilterType.SEPIA
+    )
+    
+    // Нейросетевые фильтры (требуют TFLite модели)
+    val neuralFilters = listOf(
+        FilterType.ENHANCE,
+        FilterType.STYLE_TRANSFER,
+        FilterType.DENOISE,
+        FilterType.UPSCALE,
+        FilterType.COLOR_CORRECTION
+    )
+    
     val availableFilters = FilterType.entries
     
     fun setImage(imageData: ImageData) {
@@ -269,6 +288,26 @@ class EditorViewModel @Inject constructor(
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
+    
+    /**
+     * Переключить категорию фильтров (обычные/нейросетевые).
+     */
+    fun toggleFilterCategory() {
+        _uiState.value = _uiState.value.copy(
+            showNeuralFilters = !_uiState.value.showNeuralFilters
+        )
+    }
+    
+    /**
+     * Получить список фильтров для текущей категории.
+     */
+    fun getCurrentCategoryFilters(): List<FilterType> {
+        return if (_uiState.value.showNeuralFilters) {
+            neuralFilters
+        } else {
+            regularFilters
+        }
+    }
 }
 
 /**
@@ -281,5 +320,6 @@ data class EditorUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedFilters: List<Pair<FilterType, Float>> = emptyList(), // Список выбранных фильтров с интенсивностями
-    val currentFilterIntensity: Float = 0.5f // Интенсивность для текущего редактируемого фильтра
+    val currentFilterIntensity: Float = 0.5f, // Интенсивность для текущего редактируемого фильтра
+    val showNeuralFilters: Boolean = false // Показывать нейросетевые фильтры (false = обычные)
 )

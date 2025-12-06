@@ -8,10 +8,12 @@ import com.example.neuralphotoredactor.data.repository.ImageRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.NeuralModelRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.ProcessingOperationRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.ProcessingRepositoryImpl
+import com.example.neuralphotoredactor.data.repository.TFLiteModelRepositoryImpl
 import com.example.neuralphotoredactor.domain.repository.ImageRepository
 import com.example.neuralphotoredactor.domain.repository.NeuralModelRepository
 import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
+import com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -48,6 +50,12 @@ abstract class RepositoryModule {
     abstract fun bindNeuralModelRepository(
         neuralModelRepositoryImpl: NeuralModelRepositoryImpl
     ): NeuralModelRepository
+    
+    @Binds
+    @Singleton
+    abstract fun bindTFLiteModelRepository(
+        tfliteModelRepositoryImpl: TFLiteModelRepositoryImpl
+    ): TFLiteModelRepository
     
     @Binds
     abstract fun bindGalleryDataSource(

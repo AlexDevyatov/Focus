@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -34,7 +35,12 @@ private fun getFilterName(filterType: FilterType): String {
         FilterType.VIGNETTE -> stringResource(R.string.filter_vignette)
         FilterType.GRAYSCALE -> stringResource(R.string.filter_grayscale)
         FilterType.SEPIA -> stringResource(R.string.filter_sepia)
-        else -> filterType.name // Для старых фильтров используем имя enum
+        FilterType.ENHANCE -> stringResource(R.string.filter_enhance)
+        FilterType.STYLE_TRANSFER -> stringResource(R.string.filter_style_transfer)
+        FilterType.DENOISE -> stringResource(R.string.filter_denoise)
+        FilterType.UPSCALE -> stringResource(R.string.filter_upscale)
+        FilterType.COLOR_CORRECTION -> stringResource(R.string.filter_color_correction)
+        else -> filterType.name
     }
 }
 
@@ -52,10 +58,12 @@ fun EditorScreen(
     filters: List<FilterType>,
     selectedFilters: List<Pair<FilterType, Float>>,
     currentFilterIntensity: Float,
+    showNeuralFilters: Boolean,
     onFilterToggle: (FilterType) -> Unit,
     onIntensityChange: (FilterType, Float) -> Unit,
     onClearFilters: () -> Unit,
     onSaveClick: () -> Unit,
+    onToggleFilterCategory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -127,7 +135,27 @@ fun EditorScreen(
                 }
             }
             
-            // Список фильтров
+            // Переключатель категорий фильтров
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    selected = !showNeuralFilters,
+                    onClick = onToggleFilterCategory,
+                    label = { Text(stringResource(R.string.filter_category_regular)) }
+                )
+                FilterChip(
+                    selected = showNeuralFilters,
+                    onClick = onToggleFilterCategory,
+                    label = { Text(stringResource(R.string.filter_category_neural)) }
+                )
+            }
+            
+            // Список фильтров текущей категории
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -151,7 +179,7 @@ fun EditorScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "Выбранные фильтры: ${selectedFilters.size}",
+                        text = stringResource(R.string.editor_selected_filters, selectedFilters.size),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )

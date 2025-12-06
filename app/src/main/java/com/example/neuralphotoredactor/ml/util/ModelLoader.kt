@@ -2,6 +2,7 @@ package com.example.neuralphotoredactor.ml.util
 
 import android.content.Context
 import org.tensorflow.lite.Interpreter
+import java.io.File
 import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
@@ -24,6 +25,19 @@ object ModelLoader {
         val startOffset = fileDescriptor.startOffset
         val declaredLength = fileDescriptor.declaredLength
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    }
+    
+    /**
+     * Загрузить TFLite модель из файла по пути.
+     * 
+     * @param filePath Путь к файлу модели
+     * @return MappedByteBuffer с моделью
+     */
+    fun loadModelFileFromPath(filePath: String): MappedByteBuffer {
+        val file = File(filePath)
+        val inputStream = FileInputStream(file)
+        val fileChannel = inputStream.channel
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, file.length())
     }
     
     /**

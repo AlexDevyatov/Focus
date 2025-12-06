@@ -30,6 +30,18 @@
     <string name="filter_grayscale">Чёрно-белое</string>
     <string name="filter_sepia">Сепия</string>
     
+    <!-- Neural Network Filters -->
+    <string name="filter_enhance">Улучшение</string>
+    <string name="filter_style_transfer">Стилизация</string>
+    <string name="filter_denoise">Удаление шумов (ML)</string>
+    <string name="filter_upscale">Увеличение разрешения</string>
+    <string name="filter_color_correction">Цветокоррекция</string>
+    
+    <!-- Filter Categories -->
+    <string name="filter_category_regular">Обычные фильтры</string>
+    <string name="filter_category_neural">Нейросетевые фильтры</string>
+    <string name="editor_selected_filters">Выбранные фильтры: %1$d</string>
+    
     <!-- History Screen -->
     <string name="history_empty">История пуста</string>
     <string name="error_load_history">Ошибка загрузки истории</string>
