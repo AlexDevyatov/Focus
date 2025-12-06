@@ -8,11 +8,10 @@ import androidx.room.PrimaryKey
 /**
  * Entity для хранения операций обработки изображений.
  * 
- * Фиксирует каждое отдельное действие, выполненное пользователем
- * в рамках сессии редактирования.
+ * Фиксирует каждое отдельное действие, выполненное пользователем.
  * 
  * @param id Уникальный идентификатор операции
- * @param sessionId Связь с сессией редактирования (Foreign Key)
+ * @param sessionId Идентификатор сессии (без Foreign Key)
  * @param modelId Ссылка на использованную нейросетевую модель (Foreign Key)
  * @param operationType Тип операции
  * @param parameters Параметры выполнения в формате JSON
@@ -24,12 +23,6 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "processing_operations",
     foreignKeys = [
-        ForeignKey(
-            entity = EditingSessionEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["sessionId"],
-            onDelete = ForeignKey.CASCADE
-        ),
         ForeignKey(
             entity = NeuralModelEntity::class,
             parentColumns = ["id"],

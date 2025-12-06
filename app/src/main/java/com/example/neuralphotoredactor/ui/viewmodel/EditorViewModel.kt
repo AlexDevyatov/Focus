@@ -37,6 +37,9 @@ class EditorViewModel @Inject constructor(
     // Callback для обновления галереи после сохранения
     var onImageSaved: (() -> Unit)? = null
     
+    // Callback для навигации после успешного применения фильтров
+    var onNavigateToProcessed: (() -> Unit)? = null
+    
     val availableFilters = FilterType.entries
     
     fun setImage(imageData: ImageData) {
@@ -191,8 +194,8 @@ class EditorViewModel @Inject constructor(
                     selectedFilters.map { it.first to it.second }
                 )
                 
-                // Проверяем, что корутина не была отменена
-                if (isActive) {
+                // Проверяем, что корутина не была отменена и результат успешен
+                if (isActive && result != null) {
                     _uiState.value = _uiState.value.copy(
                         processedResult = result,
                         previewBitmap = null, // Очищаем предпросмотр после сохранения
@@ -201,6 +204,15 @@ class EditorViewModel @Inject constructor(
                     
                     // Обновляем галерею после успешного сохранения
                     onImageSaved?.invoke()
+                    
+                    // Переходим на экран обработанных изображений
+                    onNavigateToProcessed?.invoke()
+                } else if (isActive && result == null) {
+                    // Если результат null, показываем ошибку
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Не удалось применить фильтры"
+                    )
                 }
             } catch (e: Exception) {
                 // Проверяем, что корутина не была отменена

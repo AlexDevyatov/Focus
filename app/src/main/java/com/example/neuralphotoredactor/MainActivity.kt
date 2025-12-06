@@ -54,6 +54,12 @@ class MainActivity : ComponentActivity() {
                         processedImagesViewModel.refreshImages()
                     }
                     
+                    // Настраиваем callback для навигации на экран обработанных изображений
+                    editorViewModel.onNavigateToProcessed = {
+                        processedImagesViewModel.refreshImages()
+                        navController.navigate("processed")
+                    }
+                    
                     // Используем collectAsState() для реактивного обновления UI
                     val galleryUiState by galleryViewModel.uiState.collectAsState()
                     val editorUiState by editorViewModel.uiState.collectAsState()

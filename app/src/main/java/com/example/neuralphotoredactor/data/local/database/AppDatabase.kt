@@ -2,11 +2,9 @@ package com.example.neuralphotoredactor.data.local.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.example.neuralphotoredactor.data.local.dao.EditingSessionDao
 import com.example.neuralphotoredactor.data.local.dao.NeuralModelDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingOperationDao
-import com.example.neuralphotoredactor.data.local.entity.EditingSessionEntity
 import com.example.neuralphotoredactor.data.local.entity.NeuralModelEntity
 import com.example.neuralphotoredactor.data.local.entity.ProcessingHistoryEntity
 import com.example.neuralphotoredactor.data.local.entity.ProcessingOperationEntity
@@ -14,8 +12,7 @@ import com.example.neuralphotoredactor.data.local.entity.ProcessingOperationEnti
 /**
  * База данных Room для приложения.
  * 
- * Версия 2 - добавлены новые сущности для работы с сессиями редактирования:
- * - EditingSessionEntity (сессии редактирования)
+ * Версия 2 - добавлены новые сущности:
  * - ProcessingOperationEntity (операции обработки)
  * - NeuralModelEntity (нейросетевые модели)
  * 
@@ -29,7 +26,6 @@ import com.example.neuralphotoredactor.data.local.entity.ProcessingOperationEnti
 @Database(
     entities = [
         ProcessingHistoryEntity::class, // Старая таблица для обратной совместимости
-        EditingSessionEntity::class,
         ProcessingOperationEntity::class,
         NeuralModelEntity::class
     ],
@@ -42,11 +38,6 @@ abstract class AppDatabase : RoomDatabase() {
      * Получить DAO для работы с историей обработок (старая таблица).
      */
     abstract fun processingHistoryDao(): ProcessingHistoryDao
-    
-    /**
-     * Получить DAO для работы с сессиями редактирования.
-     */
-    abstract fun editingSessionDao(): EditingSessionDao
     
     /**
      * Получить DAO для работы с операциями обработки.

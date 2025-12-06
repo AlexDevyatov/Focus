@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.example.neuralphotoredactor.data.local.dao.EditingSessionDao
 import com.example.neuralphotoredactor.data.local.dao.NeuralModelDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingOperationDao
@@ -22,12 +21,11 @@ import javax.inject.Singleton
  * Создает и предоставляет:
  * - AppDatabase через @Provides
  * - ProcessingHistoryDao через @Provides
- * - EditingSessionDao через @Provides
  * - ProcessingOperationDao через @Provides
  * - NeuralModelDao через @Provides
  * 
  * Миграции БД:
- * - Версия 2: Добавлены таблицы editing_sessions, processing_operations, neural_models
+ * - Версия 2: Добавлены таблицы processing_operations, neural_models
  * - Версия 1: Начальная схема с таблицей processing_history
  */
 @Module
@@ -36,22 +34,10 @@ object DatabaseModule {
     
     /**
      * Миграция с версии 1 на версию 2.
-     * Создает новые таблицы для сессий редактирования, операций обработки и моделей.
+     * Создает новые таблицы для операций обработки и моделей.
      */
     private val MIGRATION_1_2 = object : Migration(1, 2) {
         override fun migrate(database: SupportSQLiteDatabase) {
-            // Создание таблицы editing_sessions
-            database.execSQL("""
-                CREATE TABLE IF NOT EXISTS editing_sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    originalImageUri TEXT NOT NULL,
-                    currentImageUri TEXT NOT NULL,
-                    createdAt INTEGER NOT NULL,
-                    updatedAt INTEGER NOT NULL,
-                    metadata TEXT NOT NULL
-                )
-            """.trimIndent())
-            
             // Создание таблицы neural_models
             database.execSQL("""
                 CREATE TABLE IF NOT EXISTS neural_models (
@@ -78,7 +64,6 @@ object DatabaseModule {
                     outputImageUri TEXT NOT NULL,
                     processingTimeMs INTEGER NOT NULL,
                     sequenceNumber INTEGER NOT NULL,
-                    FOREIGN KEY(sessionId) REFERENCES editing_sessions(id) ON DELETE CASCADE,
                     FOREIGN KEY(modelId) REFERENCES neural_models(id) ON DELETE SET NULL
                 )
             """.trimIndent())
@@ -122,20 +107,6 @@ object DatabaseModule {
         database: AppDatabase
     ): ProcessingHistoryDao {
         return database.processingHistoryDao()
-    }
-    
-    /**
-     * Предоставить DAO для работы с сессиями редактирования.
-     * 
-     * @param database Экземпляр базы данных
-     * @return DAO для сессий редактирования
-     */
-    @Provides
-    @Singleton
-    fun provideEditingSessionDao(
-        database: AppDatabase
-    ): EditingSessionDao {
-        return database.editingSessionDao()
     }
     
     /**
