@@ -3,6 +3,8 @@ package com.example.neuralphotoredactor.ui.viewmodel
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.graphics.Rect
+import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
@@ -299,6 +301,45 @@ class EditorViewModel @Inject constructor(
     }
     
     /**
+     * Переключить режим (фильтры/редактирование).
+     */
+    fun toggleEditMode() {
+        _uiState.value = _uiState.value.copy(
+            showEditMode = !_uiState.value.showEditMode
+        )
+    }
+    
+    /**
+     * Обновить яркость.
+     */
+    fun updateBrightness(value: Float) {
+        _uiState.value = _uiState.value.copy(brightness = value)
+        recalculatePreview()
+    }
+    
+    /**
+     * Обновить контраст.
+     */
+    fun updateContrast(value: Float) {
+        _uiState.value = _uiState.value.copy(contrast = value)
+        recalculatePreview()
+    }
+    
+    /**
+     * Обновить цветовой баланс.
+     */
+    fun updateColorBalance(editType: EditType, value: Float) {
+        val newState = when (editType) {
+            EditType.COLOR_BALANCE_RED -> _uiState.value.copy(colorBalanceRed = value)
+            EditType.COLOR_BALANCE_GREEN -> _uiState.value.copy(colorBalanceGreen = value)
+            EditType.COLOR_BALANCE_BLUE -> _uiState.value.copy(colorBalanceBlue = value)
+            else -> _uiState.value
+        }
+        _uiState.value = newState
+        recalculatePreview()
+    }
+    
+    /**
      * Получить список фильтров для текущей категории.
      */
     fun getCurrentCategoryFilters(): List<FilterType> {
@@ -306,6 +347,244 @@ class EditorViewModel @Inject constructor(
             neuralFilters
         } else {
             regularFilters
+        }
+    }
+    
+    /**
+     * Применить редактирование к изображению.
+     * Для геометрических операций (повороты, отражения) накапливает изменения.
+     * Для цветовых корректировок применяет сразу.
+     */
+    fun applyEdit(editType: EditType, value: Float = 0f, cropRect: Rect? = null) {
+        currentPreviewJob?.cancel()
+        
+        // Для геометрических операций накапливаем изменения
+        val isGeometric = editType in listOf(
+            EditType.ROTATE_90, EditType.ROTATE_180, EditType.ROTATE_270,
+            EditType.FLIP_HORIZONTAL, EditType.FLIP_VERTICAL
+        )
+        
+        val newAppliedEdits = if (isGeometric) {
+            _uiState.value.appliedEdits + (editType to 0f)
+        } else {
+            _uiState.value.appliedEdits
+        }
+        
+        _uiState.value = _uiState.value.copy(appliedEdits = newAppliedEdits)
+        
+        // Пересчитываем предпросмотр со всеми накопленными изменениями
+        recalculatePreview()
+    }
+    
+    /**
+     * Пересчитать предпросмотр с учетом всех накопленных изменений.
+     */
+    private fun recalculatePreview() {
+        currentPreviewJob?.cancel()
+        
+        currentPreviewJob = viewModelScope.launch {
+            delay(100)
+            
+            val originalBitmap = getOrLoadOriginalBitmap()
+            if (originalBitmap == null || originalBitmap.isRecycled) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Не удалось загрузить изображение"
+                )
+                return@launch
+            }
+            
+            try {
+                // Применяем все накопленные изменения последовательно
+                var workingBitmap: Bitmap? = originalBitmap
+                val bitmapsToRecycle = mutableListOf<Bitmap>()
+                
+                // Сначала применяем все геометрические изменения
+                for ((geometricEditType, _) in _uiState.value.appliedEdits) {
+                    if (workingBitmap == null || workingBitmap.isRecycled) break
+                    val result = processingRepository.applyEdit(workingBitmap, geometricEditType, 0f, null)
+                    if (result != null && result != workingBitmap) {
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        workingBitmap = result
+                    }
+                }
+                
+                if (workingBitmap == null || workingBitmap.isRecycled) {
+                    _uiState.value = _uiState.value.copy(
+                        error = "Ошибка применения геометрических изменений"
+                    )
+                    return@launch
+                }
+                
+                // Затем применяем цветовые корректировки
+                if (_uiState.value.brightness != 0f) {
+                    val result = processingRepository.applyEdit(workingBitmap, EditType.BRIGHTNESS, _uiState.value.brightness, null)
+                    if (result != null && result != workingBitmap) {
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        workingBitmap = result
+                    }
+                }
+                
+                if (_uiState.value.contrast != 0f) {
+                    if (workingBitmap == null || workingBitmap.isRecycled) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Ошибка применения контраста"
+                        )
+                        return@launch
+                    }
+                    val result = processingRepository.applyEdit(workingBitmap, EditType.CONTRAST, _uiState.value.contrast, null)
+                    if (result != null && result != workingBitmap) {
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        workingBitmap = result
+                    }
+                }
+                
+                // Применяем цветовой баланс
+                if (_uiState.value.colorBalanceRed != 0f) {
+                    if (workingBitmap == null || workingBitmap.isRecycled) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Ошибка применения цветового баланса"
+                        )
+                        return@launch
+                    }
+                    val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_RED, _uiState.value.colorBalanceRed, null)
+                    if (result != null && result != workingBitmap) {
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        workingBitmap = result
+                    }
+                }
+                
+                if (_uiState.value.colorBalanceGreen != 0f) {
+                    if (workingBitmap == null || workingBitmap.isRecycled) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Ошибка применения цветового баланса"
+                        )
+                        return@launch
+                    }
+                    val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_GREEN, _uiState.value.colorBalanceGreen, null)
+                    if (result != null && result != workingBitmap) {
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        workingBitmap = result
+                    }
+                }
+                
+                if (_uiState.value.colorBalanceBlue != 0f) {
+                    if (workingBitmap == null || workingBitmap.isRecycled) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Ошибка применения цветового баланса"
+                        )
+                        return@launch
+                    }
+                    val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_BLUE, _uiState.value.colorBalanceBlue, null)
+                    if (result != null && result != workingBitmap) {
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        workingBitmap = result
+                    }
+                }
+                
+                if (isActive) {
+                    if (workingBitmap != null && !workingBitmap.isRecycled) {
+                        _uiState.value = _uiState.value.copy(
+                            previewBitmap = workingBitmap
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Не удалось применить редактирование"
+                        )
+                    }
+                }
+                
+                // Освобождаем промежуточные bitmaps
+                bitmapsToRecycle.forEach { bitmap ->
+                    if (!bitmap.isRecycled) {
+                        bitmap.recycle()
+                    }
+                }
+            } catch (e: Exception) {
+                if (isActive) {
+                    _uiState.value = _uiState.value.copy(
+                        error = e.message ?: "Ошибка применения редактирования"
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * Установить текущую категорию редактирования.
+     */
+    fun setEditCategory(category: EditCategory) {
+        _uiState.value = _uiState.value.copy(currentEditCategory = category)
+    }
+    
+    /**
+     * Очистить все примененные геометрические изменения.
+     */
+    fun clearGeometricEdits() {
+        _uiState.value = _uiState.value.copy(appliedEdits = emptyList())
+        // Пересчитываем предпросмотр
+        recalculatePreview()
+    }
+    
+    /**
+     * Сохранить отредактированное изображение в галерею.
+     */
+    fun saveEditedImageToGallery() {
+        val previewBitmap = _uiState.value.previewBitmap ?: return
+        
+        currentFilterJob?.cancel()
+        currentPreviewJob?.cancel()
+        
+        currentFilterJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null
+            )
+            
+            try {
+                val timestamp = System.currentTimeMillis()
+                val fileName = "edited_${timestamp}.jpg"
+                // Сохраняем и в галерею, и в папку processed
+                val uri = processingRepository.saveEditedImageToGallery(previewBitmap, fileName)
+                
+                if (isActive && uri != null) {
+                    _uiState.value = _uiState.value.copy(
+                        processedResult = ProcessingResult(
+                            originalUri = _uiState.value.imageData?.uri ?: uri,
+                            processedUri = uri,
+                            filterType = "edited"
+                        ),
+                        isLoading = false
+                    )
+                    
+                    // Обновляем галерею и обработанные изображения
+                    onImageSaved?.invoke()
+                    onNavigateToProcessed?.invoke()
+                } else if (isActive) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Не удалось сохранить изображение"
+                    )
+                }
+            } catch (e: Exception) {
+                if (isActive) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message
+                    )
+                }
+            }
         }
     }
 }
@@ -321,5 +600,23 @@ data class EditorUiState(
     val error: String? = null,
     val selectedFilters: List<Pair<FilterType, Float>> = emptyList(), // Список выбранных фильтров с интенсивностями
     val currentFilterIntensity: Float = 0.5f, // Интенсивность для текущего редактируемого фильтра
-    val showNeuralFilters: Boolean = false // Показывать нейросетевые фильтры (false = обычные)
+    val showNeuralFilters: Boolean = false, // Показывать нейросетевые фильтры (false = обычные)
+    val showEditMode: Boolean = false, // Показывать режим редактирования (false = фильтры)
+    val brightness: Float = 0f,
+    val contrast: Float = 0f,
+    val colorBalanceRed: Float = 0f,
+    val colorBalanceGreen: Float = 0f,
+    val colorBalanceBlue: Float = 0f,
+    val appliedEdits: List<Pair<EditType, Float>> = emptyList(), // Накопленные редактирования (повороты, отражения)
+    val currentEditCategory: EditCategory = EditCategory.BRIGHTNESS // Текущая категория редактирования
 )
+
+/**
+ * Категории редактирования изображений.
+ */
+enum class EditCategory {
+    BRIGHTNESS,
+    CONTRAST,
+    COLOR_BALANCE,
+    GEOMETRY
+}

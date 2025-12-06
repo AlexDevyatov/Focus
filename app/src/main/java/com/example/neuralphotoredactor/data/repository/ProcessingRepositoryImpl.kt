@@ -6,10 +6,12 @@ import android.graphics.BitmapFactory
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.mapper.ProcessingHistoryMapper
 import com.example.neuralphotoredactor.data.storage.ImageStorage
+import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
+import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.interpreter.ImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -30,6 +32,7 @@ class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val imageProcessor: ImageProcessor,
     private val imageFilterProcessor: ImageFilterProcessor,
+    private val imageEditProcessor: ImageEditProcessor,
     private val imageStorage: ImageStorage,
     private val processingHistoryDao: ProcessingHistoryDao
 ) : ProcessingRepository {
@@ -279,6 +282,85 @@ class ProcessingRepositoryImpl @Inject constructor(
                 BitmapFactory.decodeStream(it)
             }
         } catch (e: FileNotFoundException) {
+            null
+        }
+    }
+    
+    override suspend fun applyEdit(
+        bitmap: android.graphics.Bitmap,
+        editType: EditType,
+        value: Float,
+        cropRect: android.graphics.Rect?
+    ): android.graphics.Bitmap? = withContext(Dispatchers.Default) {
+        try {
+            if (bitmap.isRecycled) {
+                android.util.Log.e("ProcessingRepository", "Bitmap переработан, невозможно применить редактирование")
+                return@withContext null
+            }
+            
+            android.util.Log.d("ProcessingRepository", "Применяем редактирование $editType к Bitmap ${bitmap.width}x${bitmap.height}")
+            
+            val result = imageEditProcessor.applyEdit(bitmap, editType, value, cropRect)
+            
+            if (result != null) {
+                android.util.Log.d("ProcessingRepository", "Редактирование применено успешно: ${result.width}x${result.height}")
+            } else {
+                android.util.Log.e("ProcessingRepository", "Редактирование вернуло null")
+            }
+            
+            result
+        } catch (e: Exception) {
+            android.util.Log.e("ProcessingRepository", "Ошибка применения редактирования: ${e.message}", e)
+            null
+        }
+    }
+    
+    override suspend fun saveEditedImageToGallery(
+        bitmap: android.graphics.Bitmap,
+        fileName: String
+    ): android.net.Uri? = withContext(Dispatchers.IO) {
+        try {
+            val timestamp = System.currentTimeMillis()
+            val finalFileName = if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+                fileName
+            } else {
+                "${fileName}_${timestamp}.jpg"
+            }
+            
+            android.util.Log.d("ProcessingRepository", "Сохранение отредактированного изображения в галерею и processed: $finalFileName")
+            
+            // Сохраняем в галерею
+            val galleryUri = imageStorage.saveBitmapToGallery(bitmap, finalFileName)
+            
+            // Сохраняем в папку processed
+            val processedUri = imageStorage.saveBitmap(bitmap, finalFileName)
+            
+            if (galleryUri != null) {
+                android.util.Log.d("ProcessingRepository", "Изображение сохранено в галерею: $galleryUri")
+            } else {
+                android.util.Log.e("ProcessingRepository", "Не удалось сохранить изображение в галерею")
+            }
+            
+            if (processedUri != null) {
+                android.util.Log.d("ProcessingRepository", "Изображение сохранено в processed: $processedUri")
+                
+                // Сохраняем в базу данных для истории
+                val result = ProcessingResult(
+                    originalUri = android.net.Uri.EMPTY, // Для отредактированных изображений оригинал может быть неизвестен
+                    processedUri = processedUri,
+                    filterType = "edited"
+                )
+                val entity = ProcessingHistoryMapper.toEntity(result)
+                processingHistoryDao.insert(entity)
+                android.util.Log.d("ProcessingRepository", "Результат сохранен в базу данных")
+            } else {
+                android.util.Log.e("ProcessingRepository", "Не удалось сохранить изображение в processed")
+            }
+            
+            // Возвращаем URI из галереи, если он есть, иначе из processed
+            galleryUri ?: processedUri
+        } catch (e: Exception) {
+            android.util.Log.e("ProcessingRepository", "Ошибка сохранения: ${e.message}", e)
             null
         }
     }

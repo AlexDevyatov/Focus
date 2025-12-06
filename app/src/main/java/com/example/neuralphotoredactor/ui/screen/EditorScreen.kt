@@ -19,9 +19,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.neuralphotoredactor.R
+import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
+import com.example.neuralphotoredactor.ui.components.EditControls
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
+import com.example.neuralphotoredactor.ui.viewmodel.EditCategory
 
 /**
  * Получить локализованное название фильтра.
@@ -59,11 +62,27 @@ fun EditorScreen(
     selectedFilters: List<Pair<FilterType, Float>>,
     currentFilterIntensity: Float,
     showNeuralFilters: Boolean,
+    showEditMode: Boolean,
+    brightness: Float,
+    contrast: Float,
+    colorBalanceRed: Float,
+    colorBalanceGreen: Float,
+    colorBalanceBlue: Float,
+    currentEditCategory: EditCategory,
+    appliedEdits: List<Pair<EditType, Float>>,
     onFilterToggle: (FilterType) -> Unit,
     onIntensityChange: (FilterType, Float) -> Unit,
     onClearFilters: () -> Unit,
     onSaveClick: () -> Unit,
     onToggleFilterCategory: () -> Unit,
+    onToggleEditMode: () -> Unit,
+    onEditCategoryChange: (EditCategory) -> Unit,
+    onEditClick: (EditType) -> Unit,
+    onBrightnessChange: (Float) -> Unit,
+    onContrastChange: (Float) -> Unit,
+    onColorBalanceChange: (EditType, Float) -> Unit,
+    onClearGeometricEdits: () -> Unit,
+    onSaveToGallery: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -79,7 +98,14 @@ fun EditorScreen(
                             )
                         }
                     }
-                    if (selectedFilters.isNotEmpty() || processedImageUri != null) {
+                    if (showEditMode) {
+                        IconButton(onClick = onSaveToGallery) {
+                            Icon(
+                                imageVector = Icons.Filled.Save,
+                                contentDescription = stringResource(R.string.edit_save_to_gallery)
+                            )
+                        }
+                    } else if (selectedFilters.isNotEmpty() || processedImageUri != null) {
                         IconButton(onClick = onSaveClick) {
                             Icon(
                                 imageVector = Icons.Filled.Save,
@@ -135,7 +161,7 @@ fun EditorScreen(
                 }
             }
             
-            // Переключатель категорий фильтров
+            // Переключатель режимов (фильтры/редактирование)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -144,66 +170,108 @@ fun EditorScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 FilterChip(
-                    selected = !showNeuralFilters,
-                    onClick = onToggleFilterCategory,
-                    label = { Text(stringResource(R.string.filter_category_regular)) }
+                    selected = !showEditMode,
+                    onClick = onToggleEditMode,
+                    label = { Text(stringResource(R.string.edit_mode_filters)) }
                 )
                 FilterChip(
-                    selected = showNeuralFilters,
-                    onClick = onToggleFilterCategory,
-                    label = { Text(stringResource(R.string.filter_category_neural)) }
+                    selected = showEditMode,
+                    onClick = onToggleEditMode,
+                    label = { Text(stringResource(R.string.edit_mode_editing)) }
                 )
             }
             
-            // Список фильтров текущей категории
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(filters) { filter ->
-                    val isSelected = selectedFilters.any { it.first == filter }
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onFilterToggle(filter) },
-                        label = { Text(getFilterName(filter)) }
-                    )
-                }
-            }
-            
-            // Список выбранных фильтров с их слайдерами
-            if (selectedFilters.isNotEmpty()) {
-                Column(
+            if (showEditMode) {
+                // Режим редактирования - компактное меню
+                EditControls(
+                    currentCategory = currentEditCategory,
+                    onCategoryChange = onEditCategoryChange,
+                    onEditClick = onEditClick,
+                    onBrightnessChange = onBrightnessChange,
+                    onContrastChange = onContrastChange,
+                    onColorBalanceChange = onColorBalanceChange,
+                    brightness = brightness,
+                    contrast = contrast,
+                    colorBalanceRed = colorBalanceRed,
+                    colorBalanceGreen = colorBalanceGreen,
+                    colorBalanceBlue = colorBalanceBlue,
+                    appliedEdits = appliedEdits,
+                    onClearGeometricEdits = onClearGeometricEdits,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            } else {
+                // Режим фильтров
+                // Переключатель категорий фильтров
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = stringResource(R.string.editor_selected_filters, selectedFilters.size),
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                    FilterChip(
+                        selected = !showNeuralFilters,
+                        onClick = onToggleFilterCategory,
+                        label = { Text(stringResource(R.string.filter_category_regular)) }
                     )
-                    
-                    // Слайдеры для каждого выбранного фильтра
-                    selectedFilters.forEach { (filterType, intensity) ->
-                        val currentIntensity = intensity ?: currentFilterIntensity
-                        Column(
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "${getFilterName(filterType)}: ${(currentIntensity * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                            Slider(
-                                value = currentIntensity,
-                                onValueChange = { newIntensity ->
-                                    onIntensityChange(filterType, newIntensity)
-                                },
-                                valueRange = 0f..1f,
-                                steps = 99,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                    FilterChip(
+                        selected = showNeuralFilters,
+                        onClick = onToggleFilterCategory,
+                        label = { Text(stringResource(R.string.filter_category_neural)) }
+                    )
+                }
+                
+                // Список фильтров текущей категории
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(filters) { filter ->
+                        val isSelected = selectedFilters.any { it.first == filter }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onFilterToggle(filter) },
+                            label = { Text(getFilterName(filter)) }
+                        )
+                    }
+                }
+                
+                // Список выбранных фильтров с их слайдерами
+                if (selectedFilters.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.editor_selected_filters, selectedFilters.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // Слайдеры для каждого выбранного фильтра
+                        selectedFilters.forEach { (filterType, intensity) ->
+                            val currentIntensity = intensity ?: currentFilterIntensity
+                            Column(
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${getFilterName(filterType)}: ${(currentIntensity * 100).toInt()}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                Slider(
+                                    value = currentIntensity,
+                                    onValueChange = { newIntensity ->
+                                        onIntensityChange(filterType, newIntensity)
+                                    },
+                                    valueRange = 0f..1f,
+                                    steps = 99,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }

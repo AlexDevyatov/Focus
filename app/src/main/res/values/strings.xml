@@ -48,10 +48,33 @@
     <string name="filter_category_neural">Нейросетевые фильтры</string>
     <string name="editor_selected_filters">Выбранные фильтры: %1$d</string>
     
+    <!-- Edit Mode -->
+    <string name="edit_mode_filters">Фильтры</string>
+    <string name="edit_mode_editing">Редактирование</string>
+    
     <!-- History Screen -->
     <string name="history_empty">История пуста</string>
     <string name="error_load_history">Ошибка загрузки истории</string>
     
     <!-- Processed Images Screen -->
     <string name="processed_images_empty">Нет обработанных изображений</string>
+    
+    <!-- Image Editing -->
+    <string name="edit_crop">Кадрирование</string>
+    <string name="edit_rotate">Поворот</string>
+    <string name="edit_flip">Отражение</string>
+    <string name="edit_brightness">Яркость</string>
+    <string name="edit_contrast">Контраст</string>
+    <string name="edit_color_balance">Цветовой баланс</string>
+    <string name="edit_rotate_90">Поворот 90°</string>
+    <string name="edit_rotate_180">Поворот 180°</string>
+    <string name="edit_rotate_270">Поворот 270°</string>
+    <string name="edit_flip_horizontal">Отражение по горизонтали</string>
+    <string name="edit_flip_vertical">Отражение по вертикали</string>
+    <string name="edit_color_balance_red">Красный</string>
+    <string name="edit_color_balance_green">Зеленый</string>
+    <string name="edit_color_balance_blue">Синий</string>
+    <string name="edit_save_to_gallery">Сохранить в галерею</string>
+    <string name="edit_category_geometry">Геометрия</string>
+    <string name="edit_category_color">Цвет</string>
 </resources>

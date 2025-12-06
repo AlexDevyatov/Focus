@@ -191,6 +191,14 @@ class MainActivity : ComponentActivity() {
                                 selectedFilters = editorUiState.selectedFilters,
                                 currentFilterIntensity = editorUiState.currentFilterIntensity,
                                 showNeuralFilters = editorUiState.showNeuralFilters,
+                                showEditMode = editorUiState.showEditMode,
+                                brightness = editorUiState.brightness,
+                                contrast = editorUiState.contrast,
+                                colorBalanceRed = editorUiState.colorBalanceRed,
+                                colorBalanceGreen = editorUiState.colorBalanceGreen,
+                                colorBalanceBlue = editorUiState.colorBalanceBlue,
+                                currentEditCategory = editorUiState.currentEditCategory,
+                                appliedEdits = editorUiState.appliedEdits,
                                 onFilterToggle = { filter ->
                                     editorViewModel.toggleFilter(filter)
                                 },
@@ -206,6 +214,30 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onToggleFilterCategory = {
                                     editorViewModel.toggleFilterCategory()
+                                },
+                                onToggleEditMode = {
+                                    editorViewModel.toggleEditMode()
+                                },
+                                onEditCategoryChange = { category ->
+                                    editorViewModel.setEditCategory(category)
+                                },
+                                onEditClick = { editType ->
+                                    editorViewModel.applyEdit(editType)
+                                },
+                                onBrightnessChange = { value ->
+                                    editorViewModel.updateBrightness(value)
+                                },
+                                onContrastChange = { value ->
+                                    editorViewModel.updateContrast(value)
+                                },
+                                onColorBalanceChange = { editType, value ->
+                                    editorViewModel.updateColorBalance(editType, value)
+                                },
+                                onClearGeometricEdits = {
+                                    editorViewModel.clearGeometricEdits()
+                                },
+                                onSaveToGallery = {
+                                    editorViewModel.saveEditedImageToGallery()
                                 }
                             )
                         },

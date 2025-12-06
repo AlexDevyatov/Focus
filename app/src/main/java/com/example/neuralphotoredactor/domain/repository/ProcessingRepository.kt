@@ -1,5 +1,6 @@
 package com.example.neuralphotoredactor.domain.repository
 
+import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
@@ -87,5 +88,33 @@ interface ProcessingRepository {
      * @return Bitmap или null в случае ошибки
      */
     suspend fun loadBitmapFromUri(uri: android.net.Uri): android.graphics.Bitmap?
+    
+    /**
+     * Применить редактирование к изображению.
+     * 
+     * @param bitmap Исходное изображение
+     * @param editType Тип редактирования
+     * @param value Значение для редактирования (для яркости, контраста, цветового баланса)
+     * @param cropRect Прямоугольник кадрирования (left, top, right, bottom) в пикселях
+     * @return Обработанное изображение или null в случае ошибки
+     */
+    suspend fun applyEdit(
+        bitmap: android.graphics.Bitmap,
+        editType: EditType,
+        value: Float = 0f,
+        cropRect: android.graphics.Rect? = null
+    ): android.graphics.Bitmap?
+    
+    /**
+     * Сохранить отредактированное изображение в галерею.
+     * 
+     * @param bitmap Изображение для сохранения
+     * @param fileName Имя файла
+     * @return URI сохраненного файла или null в случае ошибки
+     */
+    suspend fun saveEditedImageToGallery(
+        bitmap: android.graphics.Bitmap,
+        fileName: String
+    ): android.net.Uri?
 }
 
