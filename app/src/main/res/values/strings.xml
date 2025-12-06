@@ -14,6 +14,12 @@
     <string name="gallery_camera_button">Камера</string>
     <string name="error_load_images">Ошибка загрузки изображений</string>
     
+    <!-- Camera -->
+    <string name="camera_permission_title">Необходимо разрешение на использование камеры</string>
+    <string name="camera_permission_message">Для съемки фотографий требуется разрешение на использование камеры</string>
+    <string name="camera_permission_button">Предоставить разрешение</string>
+    <string name="error_capture_image">Ошибка при съемке фотографии</string>
+    
     <!-- Editor Screen -->
     <string name="editor_save_button">Сохранить</string>
     <string name="editor_clear_filter">Отменить фильтр</string>

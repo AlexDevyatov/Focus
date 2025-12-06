@@ -104,101 +104,111 @@ fun GalleryScreen(
                 title = { Text(stringResource(R.string.screen_gallery)) }
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onCameraClick) {
-                Icon(
-                    imageVector = Icons.Filled.CameraAlt,
-                    contentDescription = stringResource(R.string.gallery_camera_button)
-                )
-            }
-        },
         modifier = modifier
     ) { paddingValues ->
-        when {
-            // Проверяем разрешения
-            !hasPermission -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.padding(16.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when {
+                // Проверяем разрешения
+                !hasPermission -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = stringResource(R.string.gallery_permission_title),
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = stringResource(R.string.gallery_permission_message),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Button(
-                            onClick = { permissionLauncher.launch(permission) }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.padding(16.dp)
                         ) {
-                            Text(stringResource(R.string.gallery_permission_button))
+                            Text(
+                                text = stringResource(R.string.gallery_permission_title),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.gallery_permission_message),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Button(
+                                onClick = { permissionLauncher.launch(permission) }
+                            ) {
+                                Text(stringResource(R.string.gallery_permission_button))
+                            }
                         }
                     }
                 }
-            }
-            isLoading -> {
-                LoadingIndicator(Modifier.padding(paddingValues))
-            }
-            error != null -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ErrorMessage(error, defaultMessageId = R.string.error_load_images)
+                isLoading -> {
+                    LoadingIndicator(Modifier.fillMaxSize())
                 }
-            }
-            else -> {
-                val configuration = LocalConfiguration.current
-                val density = LocalDensity.current
-                
-                // Pull to refresh state
-                val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
-                
-                // Вычисляем оптимальный размер превью на основе размера экрана
-                // Для grid с 3 колонками и отступами (4.dp между элементами)
-                val itemSize = remember(configuration.screenWidthDp, density) {
-                    // Приблизительный расчет: ширина экрана / 3, минус отступы
-                    val screenWidthPx = configuration.screenWidthDp * density.density
-                    val spacingPx = 4.dp.value * 2 * density.density // Отступы между элементами
-                    val itemWidthPx = (screenWidthPx - spacingPx) / 3
-                    itemWidthPx.toInt()
+                error != null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        ErrorMessage(error, defaultMessageId = R.string.error_load_images)
+                    }
                 }
-                
-                SwipeRefresh(
-                    state = swipeRefreshState,
-                    onRefresh = onRefresh,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        contentPadding = PaddingValues(0.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                else -> {
+                    val configuration = LocalConfiguration.current
+                    val density = LocalDensity.current
+                    
+                    // Pull to refresh state
+                    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
+                    
+                    // Вычисляем оптимальный размер превью на основе размера экрана
+                    // Для grid с 3 колонками и отступами (4.dp между элементами)
+                    val itemSize = remember(configuration.screenWidthDp, density) {
+                        // Приблизительный расчет: ширина экрана / 3, минус отступы
+                        val screenWidthPx = configuration.screenWidthDp * density.density
+                        val spacingPx = 4.dp.value * 2 * density.density // Отступы между элементами
+                        val itemWidthPx = (screenWidthPx - spacingPx) / 3
+                        itemWidthPx.toInt()
+                    }
+                    
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = onRefresh,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(
-                            items = images,
-                            key = { image -> image.uri.toString() } // Стабильные ключи для переиспользования
-                        ) { image ->
-                            GalleryImageItem(
-                                image = image,
-                                itemSize = itemSize,
-                                onClick = { onImageClick(image) }
-                            )
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            contentPadding = PaddingValues(bottom = 80.dp), // Отступ снизу для FAB
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(
+                                items = images,
+                                key = { image -> image.uri.toString() } // Стабильные ключи для переиспользования
+                            ) { image ->
+                                GalleryImageItem(
+                                    image = image,
+                                    itemSize = itemSize,
+                                    onClick = { onImageClick(image) }
+                                )
+                            }
                         }
                     }
+                }
+            }
+            
+            // FAB поверх контента для гарантии видимости (виден во всех состояниях, кроме loading)
+            // Размещаем FAB выше bottom navigation (стандартная высота ~80dp + отступ 16dp)
+            if (!isLoading) {
+                FloatingActionButton(
+                    onClick = onCameraClick,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 96.dp, end = 16.dp) // 80dp (высота navigation) + 16dp (отступ)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CameraAlt,
+                        contentDescription = stringResource(R.string.gallery_camera_button)
+                    )
                 }
             }
         }
