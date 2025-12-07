@@ -10,12 +10,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -63,35 +65,44 @@ fun CropOverlay(
             val (imgW, imgH, offX, offY) = if (bitmapAspect > displayAspect) {
                 // Изображение шире - масштабируется по ширине
                 val h = (displaySize.width / bitmapAspect).toInt()
-                Triple(displaySize.width, h, 0f, (displaySize.height - h) / 2f)
+                Quadruple(displaySize.width, h, 0f, (displaySize.height - h) / 2f)
             } else {
                 // Изображение выше - масштабируется по высоте
                 val w = (displaySize.height * bitmapAspect).toInt()
-                Triple(w, displaySize.height, (displaySize.width - w) / 2f, 0f)
+                Quadruple(w, displaySize.height, (displaySize.width - w) / 2f, 0f)
             }
             Quadruple(imgW, imgH, offX, offY)
         }
     }
     
-    // Начальная область обрезки (80% от размера изображения, по центру)
-    val initialCropRect = remember(imageDisplayWidth, imageDisplayHeight) {
+    // Начальная область обрезки (размером с изображение)
+    var cropRect by remember { mutableStateOf(Rect(0, 0, 0, 0)) }
+    
+    // Обновляем cropRect когда размеры изображения становятся доступными
+    LaunchedEffect(imageDisplayWidth, imageDisplayHeight, offsetX, offsetY) {
         if (imageDisplayWidth > 0 && imageDisplayHeight > 0) {
-            val marginX = imageDisplayWidth * 0.1f
-            val marginY = imageDisplayHeight * 0.1f
-            Rect(
-                (offsetX + marginX).toInt(),
-                (offsetY + marginY).toInt(),
-                (offsetX + imageDisplayWidth - marginX).toInt(),
-                (offsetY + imageDisplayHeight - marginY).toInt()
+            cropRect = Rect(
+                offsetX.toInt(),
+                offsetY.toInt(),
+                (offsetX + imageDisplayWidth).toInt(),
+                (offsetY + imageDisplayHeight).toInt()
             )
-        } else {
-            Rect(0, 0, 0, 0)
         }
     }
     
-    var cropRect by remember { mutableStateOf(initialCropRect) }
+    // Callback для обновления cropRect из pointerInput
+    val updateCropRect: (Rect) -> Unit = { newRect ->
+        cropRect = newRect
+    }
     var isDragging by remember { mutableStateOf(false) }
-    var dragHandle by remember { mutableStateOf<CropHandle?>(null) }
+    
+    // Используем rememberUpdatedState для правильного захвата значений в pointerInput
+    val currentCropRect = rememberUpdatedState(cropRect)
+    val currentOffsetX = rememberUpdatedState(offsetX)
+    val currentOffsetY = rememberUpdatedState(offsetY)
+    val currentImageDisplayWidth = rememberUpdatedState(imageDisplayWidth)
+    val currentImageDisplayHeight = rememberUpdatedState(imageDisplayHeight)
+    val updateCropRectState = rememberUpdatedState(updateCropRect)
     
     Box(
         modifier = modifier.fillMaxSize(),
@@ -121,68 +132,115 @@ fun CropOverlay(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
+                        var dragHandle: CropHandle? = null
+                        var dragStartRect = Rect(0, 0, 0, 0)
+                        var dragStartOffset = Offset.Zero
+                        
                         detectDragGestures(
                             onDragStart = { offset ->
-                                dragHandle = getCropHandle(offset, cropRect)
-                                isDragging = dragHandle != null
+                                val rect = currentCropRect.value
+                                dragHandle = getCropHandle(offset, rect)
+                                if (dragHandle != null) {
+                                    isDragging = true
+                                    dragStartRect = rect
+                                    dragStartOffset = offset
+                                }
                             },
                             onDrag = { change, _ ->
                                 dragHandle?.let { handle ->
+                                    val currentRect = dragStartRect
+                                    val deltaX = change.position.x - dragStartOffset.x
+                                    val deltaY = change.position.y - dragStartOffset.y
+                                    val offX = currentOffsetX.value
+                                    val offY = currentOffsetY.value
+                                    val imgW = currentImageDisplayWidth.value
+                                    val imgH = currentImageDisplayHeight.value
+                                    
                                     val newRect = when (handle) {
                                         CropHandle.TOP_LEFT -> {
-                                            val newLeft = (change.position.x - offsetX).coerceIn(0f, cropRect.right - offsetX - 20f)
-                                            val newTop = (change.position.y - offsetY).coerceIn(0f, cropRect.bottom - offsetY - 20f)
+                                            val newLeft = (currentRect.left + deltaX).coerceIn(
+                                                offX,
+                                                (currentRect.right - 20).toFloat()
+                                            ).toInt()
+                                            val newTop = (currentRect.top + deltaY).coerceIn(
+                                                offY,
+                                                (currentRect.bottom - 20).toFloat()
+                                            ).toInt()
                                             Rect(
-                                                (newLeft + offsetX).toInt(),
-                                                (newTop + offsetY).toInt(),
-                                                cropRect.right,
-                                                cropRect.bottom
+                                                newLeft,
+                                                newTop,
+                                                currentRect.right,
+                                                currentRect.bottom
                                             )
                                         }
                                         CropHandle.TOP_RIGHT -> {
-                                            val newRight = (change.position.x - offsetX).coerceIn(cropRect.left - offsetX + 20f, imageDisplayWidth.toFloat())
-                                            val newTop = (change.position.y - offsetY).coerceIn(0f, cropRect.bottom - offsetY - 20f)
+                                            val newRight = (currentRect.right + deltaX).coerceIn(
+                                                (currentRect.left + 20).toFloat(),
+                                                offX + imgW
+                                            ).toInt()
+                                            val newTop = (currentRect.top + deltaY).coerceIn(
+                                                offY,
+                                                (currentRect.bottom - 20).toFloat()
+                                            ).toInt()
                                             Rect(
-                                                cropRect.left,
-                                                (newTop + offsetY).toInt(),
-                                                (newRight + offsetX).toInt(),
-                                                cropRect.bottom
+                                                currentRect.left,
+                                                newTop,
+                                                newRight,
+                                                currentRect.bottom
                                             )
                                         }
                                         CropHandle.BOTTOM_LEFT -> {
-                                            val newLeft = (change.position.x - offsetX).coerceIn(0f, cropRect.right - offsetX - 20f)
-                                            val newBottom = (change.position.y - offsetY).coerceIn(cropRect.top - offsetY + 20f, imageDisplayHeight.toFloat())
+                                            val newLeft = (currentRect.left + deltaX).coerceIn(
+                                                offX,
+                                                (currentRect.right - 20).toFloat()
+                                            ).toInt()
+                                            val newBottom = (currentRect.bottom + deltaY).coerceIn(
+                                                (currentRect.top + 20).toFloat(),
+                                                offY + imgH
+                                            ).toInt()
                                             Rect(
-                                                (newLeft + offsetX).toInt(),
-                                                cropRect.top,
-                                                cropRect.right,
-                                                (newBottom + offsetY).toInt()
+                                                newLeft,
+                                                currentRect.top,
+                                                currentRect.right,
+                                                newBottom
                                             )
                                         }
                                         CropHandle.BOTTOM_RIGHT -> {
-                                            val newRight = (change.position.x - offsetX).coerceIn(cropRect.left - offsetX + 20f, imageDisplayWidth.toFloat())
-                                            val newBottom = (change.position.y - offsetY).coerceIn(cropRect.top - offsetY + 20f, imageDisplayHeight.toFloat())
+                                            val newRight = (currentRect.right + deltaX).coerceIn(
+                                                (currentRect.left + 20).toFloat(),
+                                                offX + imgW
+                                            ).toInt()
+                                            val newBottom = (currentRect.bottom + deltaY).coerceIn(
+                                                (currentRect.top + 20).toFloat(),
+                                                offY + imgH
+                                            ).toInt()
                                             Rect(
-                                                cropRect.left,
-                                                cropRect.top,
-                                                (newRight + offsetX).toInt(),
-                                                (newBottom + offsetY).toInt()
+                                                currentRect.left,
+                                                currentRect.top,
+                                                newRight,
+                                                newBottom
                                             )
                                         }
                                         CropHandle.CENTER -> {
-                                            val dx = change.position.x - (cropRect.left + cropRect.right) / 2f
-                                            val dy = change.position.y - (cropRect.top + cropRect.bottom) / 2f
-                                            val newLeft = (cropRect.left + dx).coerceIn(offsetX, offsetX + imageDisplayWidth - (cropRect.right - cropRect.left))
-                                            val newTop = (cropRect.top + dy).coerceIn(offsetY, offsetY + imageDisplayHeight - (cropRect.bottom - cropRect.top))
+                                            val rectWidth = currentRect.right - currentRect.left
+                                            val rectHeight = currentRect.bottom - currentRect.top
+                                            val newLeft = (currentRect.left + deltaX).coerceIn(
+                                                offX,
+                                                offX + imgW - rectWidth
+                                            ).toInt()
+                                            val newTop = (currentRect.top + deltaY).coerceIn(
+                                                offY,
+                                                offY + imgH - rectHeight
+                                            ).toInt()
                                             Rect(
-                                                newLeft.toInt(),
-                                                newTop.toInt(),
-                                                (newLeft + (cropRect.right - cropRect.left)).toInt(),
-                                                (newTop + (cropRect.bottom - cropRect.top)).toInt()
+                                                newLeft,
+                                                newTop,
+                                                newLeft + rectWidth,
+                                                newTop + rectHeight
                                             )
                                         }
                                     }
-                                    cropRect = newRect
+                                    updateCropRectState.value(newRect)
                                 }
                             },
                             onDragEnd = {
@@ -193,19 +251,21 @@ fun CropOverlay(
                     }
             ) {
                 // Затемнение области вне обрезки
-                val overlayPath = Path().apply {
+                val fullRectPath = Path().apply {
                     addRect(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height))
-                    val cropRectPath = Path().apply {
-                        addRect(
-                            androidx.compose.ui.geometry.Rect(
-                                cropRect.left.toFloat(),
-                                cropRect.top.toFloat(),
-                                cropRect.right.toFloat(),
-                                cropRect.bottom.toFloat()
-                            )
+                }
+                val cropRectPath = Path().apply {
+                    addRect(
+                        androidx.compose.ui.geometry.Rect(
+                            cropRect.left.toFloat(),
+                            cropRect.top.toFloat(),
+                            cropRect.right.toFloat(),
+                            cropRect.bottom.toFloat()
                         )
-                    }
-                    op(cropRectPath, androidx.compose.ui.geometry.PathOperation.Difference)
+                    )
+                }
+                val overlayPath = Path().apply {
+                    op(fullRectPath, cropRectPath, PathOperation.Difference)
                 }
                 drawPath(overlayPath, Color.Black.copy(alpha = 0.5f))
                 
@@ -317,9 +377,10 @@ private fun scaleCropRectToBitmap(
  * Определяет, какой угол прямоугольника обрезки был захвачен для перетаскивания.
  */
 private fun getCropHandle(offset: Offset, cropRect: Rect): CropHandle? {
-    val handleSize = 30f // Размер области захвата в пикселях
+    val handleSize = 50f // Размер области захвата в пикселях (увеличен для удобства)
     
-    val handles = mapOf(
+    // Проверяем углы в первую очередь (приоритет)
+    val handles = listOf(
         CropHandle.TOP_LEFT to Offset(cropRect.left.toFloat(), cropRect.top.toFloat()),
         CropHandle.TOP_RIGHT to Offset(cropRect.right.toFloat(), cropRect.top.toFloat()),
         CropHandle.BOTTOM_LEFT to Offset(cropRect.left.toFloat(), cropRect.bottom.toFloat()),
@@ -327,16 +388,15 @@ private fun getCropHandle(offset: Offset, cropRect: Rect): CropHandle? {
     )
     
     // Проверяем углы
-    handles.forEach { (handle, position) ->
-        if (kotlin.math.abs(offset.x - position.x) < handleSize &&
-            kotlin.math.abs(offset.y - position.y) < handleSize) {
+    for ((handle, position) in handles) {
+        val distanceX = kotlin.math.abs(offset.x - position.x)
+        val distanceY = kotlin.math.abs(offset.y - position.y)
+        if (distanceX < handleSize && distanceY < handleSize) {
             return handle
         }
     }
     
-    // Проверяем центр (для перемещения всего прямоугольника)
-    val centerX = (cropRect.left + cropRect.right) / 2f
-    val centerY = (cropRect.top + cropRect.bottom) / 2f
+    // Проверяем центр (для перемещения всего прямоугольника) только если не попали в угол
     if (offset.x >= cropRect.left && offset.x <= cropRect.right &&
         offset.y >= cropRect.top && offset.y <= cropRect.bottom) {
         return CropHandle.CENTER

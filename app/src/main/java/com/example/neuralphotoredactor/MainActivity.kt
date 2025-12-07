@@ -199,6 +199,8 @@ class MainActivity : ComponentActivity() {
                                 colorBalanceBlue = editorUiState.colorBalanceBlue,
                                 currentEditCategory = editorUiState.currentEditCategory,
                                 appliedEdits = editorUiState.appliedEdits,
+                                showCropOverlay = editorUiState.showCropOverlay,
+                                cropBitmap = editorUiState.cropBitmap,
                                 onFilterToggle = { filter ->
                                     editorViewModel.toggleFilter(filter)
                                 },
@@ -238,6 +240,12 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSaveToGallery = {
                                     editorViewModel.saveEditedImageToGallery()
+                                },
+                                onCropApply = { cropRect ->
+                                    editorViewModel.applyCrop(cropRect)
+                                },
+                                onCropCancel = {
+                                    editorViewModel.cancelCrop()
                                 }
                             )
                         },

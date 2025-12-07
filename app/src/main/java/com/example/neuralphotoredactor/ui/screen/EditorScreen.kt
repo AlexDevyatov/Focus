@@ -21,10 +21,12 @@ import coil.compose.AsyncImage
 import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
+import com.example.neuralphotoredactor.ui.components.CropOverlay
 import com.example.neuralphotoredactor.ui.components.EditControls
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 import com.example.neuralphotoredactor.ui.viewmodel.EditCategory
+import android.graphics.Rect
 
 /**
  * Получить локализованное название фильтра.
@@ -70,6 +72,8 @@ fun EditorScreen(
     colorBalanceBlue: Float,
     currentEditCategory: EditCategory,
     appliedEdits: List<Pair<EditType, Float>>,
+    showCropOverlay: Boolean,
+    cropBitmap: android.graphics.Bitmap?,
     onFilterToggle: (FilterType) -> Unit,
     onIntensityChange: (FilterType, Float) -> Unit,
     onClearFilters: () -> Unit,
@@ -83,6 +87,8 @@ fun EditorScreen(
     onColorBalanceChange: (EditType, Float) -> Unit,
     onClearGeometricEdits: () -> Unit,
     onSaveToGallery: () -> Unit,
+    onCropApply: (Rect) -> Unit,
+    onCropCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -158,6 +164,16 @@ fun EditorScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
+                }
+                
+                // Overlay для кадрирования
+                if (showCropOverlay) {
+                    CropOverlay(
+                        bitmap = cropBitmap,
+                        onCropApply = onCropApply,
+                        onCropCancel = onCropCancel,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
             

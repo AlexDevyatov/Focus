@@ -356,6 +356,18 @@ class EditorViewModel @Inject constructor(
      * Для цветовых корректировок применяет сразу.
      */
     fun applyEdit(editType: EditType, value: Float = 0f, cropRect: Rect? = null) {
+        // Для кадрирования показываем overlay и загружаем bitmap
+        if (editType == EditType.CROP) {
+            viewModelScope.launch {
+                val bitmap = getBitmapForCrop()
+                _uiState.value = _uiState.value.copy(
+                    showCropOverlay = true,
+                    cropBitmap = bitmap
+                )
+            }
+            return
+        }
+        
         currentPreviewJob?.cancel()
         
         // Для геометрических операций накапливаем изменения
@@ -374,6 +386,77 @@ class EditorViewModel @Inject constructor(
         
         // Пересчитываем предпросмотр со всеми накопленными изменениями
         recalculatePreview()
+    }
+    
+    /**
+     * Получить bitmap для кадрирования (previewBitmap или загрузить из imageUri).
+     */
+    suspend fun getBitmapForCrop(): Bitmap? {
+        return _uiState.value.previewBitmap ?: getOrLoadOriginalBitmap()
+    }
+    
+    /**
+     * Применить кадрирование с указанным прямоугольником.
+     */
+    fun applyCrop(cropRect: Rect) {
+        currentPreviewJob?.cancel()
+        
+        _uiState.value = _uiState.value.copy(
+            showCropOverlay = false,
+            appliedEdits = _uiState.value.appliedEdits + (EditType.CROP to 0f)
+        )
+        
+        // Применяем кадрирование и пересчитываем предпросмотр
+        currentPreviewJob = viewModelScope.launch {
+            delay(100)
+            
+            val originalBitmap = getOrLoadOriginalBitmap()
+            if (originalBitmap == null || originalBitmap.isRecycled) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Не удалось загрузить изображение"
+                )
+                return@launch
+            }
+            
+            try {
+                val croppedBitmap = processingRepository.applyEdit(
+                    originalBitmap,
+                    EditType.CROP,
+                    0f,
+                    cropRect
+                )
+                
+                if (isActive && croppedBitmap != null) {
+                    _uiState.value = _uiState.value.copy(
+                        previewBitmap = croppedBitmap,
+                        cropBitmap = null,
+                        error = null
+                    )
+                    // Обновляем кэш
+                    cachedOriginalBitmap = croppedBitmap
+                } else if (isActive) {
+                    _uiState.value = _uiState.value.copy(
+                        error = "Не удалось применить кадрирование"
+                    )
+                }
+            } catch (e: Exception) {
+                if (isActive) {
+                    _uiState.value = _uiState.value.copy(
+                        error = e.message ?: "Ошибка применения кадрирования"
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * Отменить кадрирование.
+     */
+    fun cancelCrop() {
+        _uiState.value = _uiState.value.copy(
+            showCropOverlay = false,
+            cropBitmap = null
+        )
     }
     
     /**
@@ -596,6 +679,7 @@ data class EditorUiState(
     val imageData: ImageData? = null,
     val processedResult: ProcessingResult? = null,
     val previewBitmap: Bitmap? = null, // Быстрый предпросмотр без сохранения
+    val cropBitmap: Bitmap? = null, // Bitmap для кадрирования
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedFilters: List<Pair<FilterType, Float>> = emptyList(), // Список выбранных фильтров с интенсивностями
@@ -608,7 +692,8 @@ data class EditorUiState(
     val colorBalanceGreen: Float = 0f,
     val colorBalanceBlue: Float = 0f,
     val appliedEdits: List<Pair<EditType, Float>> = emptyList(), // Накопленные редактирования (повороты, отражения)
-    val currentEditCategory: EditCategory = EditCategory.BRIGHTNESS // Текущая категория редактирования
+    val currentEditCategory: EditCategory = EditCategory.BRIGHTNESS, // Текущая категория редактирования
+    val showCropOverlay: Boolean = false // Показывать overlay для кадрирования
 )
 
 /**

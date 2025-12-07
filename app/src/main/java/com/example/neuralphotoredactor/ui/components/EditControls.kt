@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -174,6 +175,7 @@ fun EditControls(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         items(listOf(
+                            EditType.CROP,
                             EditType.ROTATE_90,
                             EditType.ROTATE_180,
                             EditType.ROTATE_270,
@@ -213,6 +215,7 @@ private fun getCategoryName(category: EditCategory): String {
 @Composable
 private fun getEditName(editType: EditType): String {
     return when (editType) {
+        EditType.CROP -> stringResource(R.string.edit_crop)
         EditType.ROTATE_90 -> stringResource(R.string.edit_rotate_90)
         EditType.ROTATE_180 -> stringResource(R.string.edit_rotate_180)
         EditType.ROTATE_270 -> stringResource(R.string.edit_rotate_270)
@@ -225,6 +228,7 @@ private fun getEditName(editType: EditType): String {
 @Composable
 private fun getEditIcon(editType: EditType): androidx.compose.ui.graphics.vector.ImageVector {
     return when (editType) {
+        EditType.CROP -> Icons.Filled.Crop
         EditType.ROTATE_90, EditType.ROTATE_180, EditType.ROTATE_270 -> Icons.Filled.RotateRight
         EditType.FLIP_HORIZONTAL -> Icons.Filled.SwapHoriz
         EditType.FLIP_VERTICAL -> Icons.Filled.SwapHoriz // Используем SwapHoriz как fallback
