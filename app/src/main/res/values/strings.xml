@@ -58,6 +58,7 @@
     
     <!-- Processed Images Screen -->
     <string name="processed_images_empty">Нет обработанных изображений</string>
+    <string name="image_saved_toast">Изображение сохранено</string>
     
     <!-- Image Editing -->
     <string name="edit_crop">Кадрирование</string>

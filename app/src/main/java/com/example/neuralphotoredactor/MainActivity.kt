@@ -23,6 +23,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import android.widget.Toast
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.example.neuralphotoredactor.ui.navigation.AppNavigation
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -32,6 +37,7 @@ import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
 import com.example.neuralphotoredactor.ui.screen.ProcessedImagesScreen
 import com.example.neuralphotoredactor.ui.theme.AppTheme
+import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.viewmodel.EditorViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.GalleryViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.HistoryViewModel
@@ -57,6 +63,9 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
+                    val context = LocalContext.current
+                    val coroutineScope = rememberCoroutineScope()
+                    
                     val galleryViewModel: GalleryViewModel = viewModel()
                     val editorViewModel: EditorViewModel = viewModel()
                     val historyViewModel: HistoryViewModel = viewModel()
@@ -71,7 +80,18 @@ class MainActivity : ComponentActivity() {
                     // Настраиваем callback для навигации на экран обработанных изображений
                     editorViewModel.onNavigateToProcessed = {
                         processedImagesViewModel.refreshImages()
-                        navController.navigate("processed")
+                        // Показываем Toast сообщение и выполняем навигацию после задержки
+                        coroutineScope.launch(Dispatchers.Main) {
+                            // Показываем Toast сообщение
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.image_saved_toast),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            // Выполняем навигацию после небольшой задержки, чтобы Toast был виден
+                            delay(500) // Задержка 500мс для отображения Toast
+                            navController.navigate("processed")
+                        }
                     }
                     
                     // Используем collectAsState() для реактивного обновления UI
@@ -81,7 +101,6 @@ class MainActivity : ComponentActivity() {
                     val processedImagesUiState by processedImagesViewModel.uiState.collectAsState()
                     
                     // Логика для работы с камерой
-                    val context = LocalContext.current
                     var imageUri: Uri? by remember { mutableStateOf(null) }
                     
                     // Функция для создания временного файла
