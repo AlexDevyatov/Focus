@@ -37,9 +37,12 @@ class ErsganImageProcessor @Inject constructor(
 ) {
     
     companion object {
-        private const val PATCH_SIZE = 50
-        private const val OVERLAP = 5 // Перекрытие патчей для избежания артефактов на границах
-        private const val MAX_PARALLEL_PATCHES = 4 // Максимальное количество патчей, обрабатываемых параллельно
+        // Увеличенный размер патча для уменьшения количества патчей и накладных расходов
+        private const val PATCH_SIZE = 100
+        private const val OVERLAP = 10 // Перекрытие патчей для избежания артефактов на границах
+        // Увеличено количество параллельных патчей для лучшего использования многоядерности
+        // Оптимальное значение зависит от количества ядер CPU (обычно 4-8)
+        private const val MAX_PARALLEL_PATCHES = 8
     }
     
     // Мьютекс для синхронизации доступа к Interpreter (он не потокобезопасен)
@@ -89,6 +92,9 @@ class ErsganImageProcessor @Inject constructor(
             val outputWidth = (bitmap.width * scaleX).toInt()
             val outputHeight = (bitmap.height * scaleY).toInt()
             val outputBitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+            
+            // Заполняем белым цветом (чтобы не было черного фона)
+            outputBitmap.eraseColor(android.graphics.Color.WHITE)
             
             // Вычисляем размеры патча с учетом масштаба
             val patchInputSize = PATCH_SIZE
@@ -164,15 +170,19 @@ class ErsganImageProcessor @Inject constructor(
                                 patchBitmap.recycle()
                             }
                             
-                            // Логируем успешную обработку патча
+                            // Логируем успешную обработку патча (только для каждого 10-го патча или при ошибках)
                             if (processedPatch != null) {
                                 synchronized(results) {
                                     processedCount++
+                                    // Логируем только каждый 10-й патч или каждый 25% прогресса для уменьшения накладных расходов
                                     val progress = (processedCount * 100) / totalPatches
-                                    android.util.Log.d("ErsganImageProcessor", 
-                                        "✓ Патч [${patchInfo.patchX}, ${patchInfo.patchY}] успешно обработан " +
-                                        "($processedCount/$totalPatches, $progress%). " +
-                                        "Размер: ${patchInfo.actualPatchWidth}x${patchInfo.actualPatchHeight}")
+                                    val shouldLog = processedCount % 10 == 0 || progress % 25 == 0 || processedCount == totalPatches
+                                    
+                                    if (shouldLog) {
+                                        android.util.Log.d("ErsganImageProcessor", 
+                                            "✓ Патч [${patchInfo.patchX}, ${patchInfo.patchY}] обработан " +
+                                            "($processedCount/$totalPatches, $progress%)")
+                                    }
                                 }
                             } else {
                                 android.util.Log.e("ErsganImageProcessor", "✗ Ошибка обработки патча [${patchInfo.patchX}, ${patchInfo.patchY}]")
@@ -186,30 +196,48 @@ class ErsganImageProcessor @Inject constructor(
             }
             
             // Копируем обработанные патчи в итоговое изображение
+            // Используем Canvas для эффективного копирования
             val canvas = android.graphics.Canvas(outputBitmap)
+            val paint = android.graphics.Paint().apply {
+                isFilterBitmap = true // Включаем фильтрацию для лучшего качества при масштабировании
+                isAntiAlias = false // Отключаем антиалиасинг для скорости
+            }
+            
+            var copiedPatches = 0
             for (result in results) {
-                if (result.processedBitmap != null) {
+                if (result.processedBitmap != null && !result.processedBitmap.isRecycled) {
                     val patchInfo = result.patchInfo
                     val dstX = (patchInfo.srcX * scaleX).toInt()
                     val dstY = (patchInfo.srcY * scaleY).toInt()
                     val dstWidth = (patchInfo.actualPatchWidth * scaleX).toInt().coerceAtMost(outputWidth - dstX)
                     val dstHeight = (patchInfo.actualPatchHeight * scaleY).toInt().coerceAtMost(outputHeight - dstY)
                     
-                    // Ресайзим обработанный патч до нужного размера, если нужно
-                    val finalPatch = if (result.processedBitmap.width != dstWidth || result.processedBitmap.height != dstHeight) {
-                        Bitmap.createScaledBitmap(result.processedBitmap, dstWidth, dstHeight, true)
-                    } else {
-                        result.processedBitmap
+                    // Проверяем валидность координат
+                    if (dstX >= 0 && dstY >= 0 && dstX + dstWidth <= outputWidth && dstY + dstHeight <= outputHeight) {
+                        // Ресайзим обработанный патч до нужного размера, если нужно
+                        val finalPatch = if (result.processedBitmap.width != dstWidth || result.processedBitmap.height != dstHeight) {
+                            Bitmap.createScaledBitmap(result.processedBitmap, dstWidth, dstHeight, true)
+                        } else {
+                            result.processedBitmap
+                        }
+                        
+                        // Проверяем, что патч не пустой перед копированием
+                        if (finalPatch != null && !finalPatch.isRecycled) {
+                            // Копируем патч в итоговое изображение
+                            canvas.drawBitmap(finalPatch, dstX.toFloat(), dstY.toFloat(), paint)
+                            copiedPatches++
+                            
+                            // Освобождаем обработанный патч
+                            if (finalPatch != result.processedBitmap) {
+                                finalPatch.recycle()
+                            }
+                        }
                     }
                     
-                    // Копируем патч в итоговое изображение
-                    canvas.drawBitmap(finalPatch, dstX.toFloat(), dstY.toFloat(), null)
-                    
-                    // Освобождаем обработанный патч
-                    if (finalPatch != result.processedBitmap) {
-                        finalPatch.recycle()
+                    // Освобождаем исходный патч
+                    if (!result.processedBitmap.isRecycled) {
+                        result.processedBitmap.recycle()
                     }
-                    result.processedBitmap.recycle()
                 }
             }
             
@@ -295,20 +323,133 @@ class ErsganImageProcessor @Inject constructor(
                 interpreter?.run(inputBuffer, outputBuffer)
             }
             
-            // Создаем TensorBuffer из результата
+            // Получаем размеры выходного изображения
             val outputShape = outputTensor.shape()
-            val tensorBuffer = TensorBuffer.createFixedSize(outputShape, outputDataType)
+            val outputWidth = outputShape[1]
+            val outputHeight = outputShape[2]
+            val outputChannels = outputShape[3]
+            
+            android.util.Log.d("ErsganImageProcessor", 
+                "Выходной тензор: ${outputShape.contentToString()}, тип: $outputDataType, каналов: $outputChannels")
+            
+            // Обрабатываем выходные данные вручную
             outputBuffer.rewind()
-            tensorBuffer.loadBuffer(outputBuffer)
             
-            // Создаем TensorImage из TensorBuffer
-            val outputImage = TensorImage(outputDataType)
-            outputImage.load(
-                tensorBuffer,
-                org.tensorflow.lite.support.image.ColorSpaceType.RGB
-            )
+            // Логируем первые значения только для первого патча (для диагностики)
+            // Это уменьшает накладные расходы на логирование
+            val shouldLogFirstValues = false // Отключаем детальное логирование для производительности
             
-            outputImage.bitmap
+            val resultBitmap = when (outputDataType) {
+                org.tensorflow.lite.DataType.FLOAT32 -> {
+                    // Данные в формате FLOAT32 - могут быть [0, 1] или [0, 255]
+                    val bitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+                    val pixels = IntArray(outputWidth * outputHeight)
+                    
+                    // Проверяем диапазон первых значений для определения формата
+                    // Читаем первые 3 значения (RGB первого пикселя) для определения формата
+                    val rSample = outputBuffer.getFloat()
+                    val gSample = outputBuffer.getFloat()
+                    val bSample = outputBuffer.getFloat()
+                    outputBuffer.rewind() // Возвращаемся в начало
+                    
+                    // Определяем формат по первому пикселю
+                    val isNormalized = rSample >= 0f && rSample <= 1f && 
+                                      gSample >= 0f && gSample <= 1f && 
+                                      bSample >= 0f && bSample <= 1f
+                    
+                    // Оптимизация: используем прямой доступ к массиву пикселей
+                    var pixelIndex = 0
+                    for (y in 0 until outputHeight) {
+                        for (x in 0 until outputWidth) {
+                            // Читаем RGB значения
+                            val r = outputBuffer.getFloat()
+                            val g = outputBuffer.getFloat()
+                            val b = outputBuffer.getFloat()
+                            
+                            // Денормализуем, если нужно (оптимизированная версия)
+                            val rInt = if (isNormalized) {
+                                (r * 255f + 0.5f).toInt().coerceIn(0, 255) // +0.5 для правильного округления
+                            } else {
+                                r.toInt().coerceIn(0, 255)
+                            }
+                            val gInt = if (isNormalized) {
+                                (g * 255f + 0.5f).toInt().coerceIn(0, 255)
+                            } else {
+                                g.toInt().coerceIn(0, 255)
+                            }
+                            val bInt = if (isNormalized) {
+                                (b * 255f + 0.5f).toInt().coerceIn(0, 255)
+                            } else {
+                                b.toInt().coerceIn(0, 255)
+                            }
+                            
+                            // Создаем ARGB пиксель напрямую (быстрее чем Color.argb)
+                            pixels[pixelIndex++] = (255 shl 24) or (rInt shl 16) or (gInt shl 8) or bInt
+                        }
+                    }
+                    
+                    bitmap.setPixels(pixels, 0, outputWidth, 0, 0, outputWidth, outputHeight)
+                    bitmap
+                }
+                org.tensorflow.lite.DataType.UINT8 -> {
+                    // Данные уже в формате [0, 255]
+                    val bitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+                    val pixels = IntArray(outputWidth * outputHeight)
+                    
+                    // Оптимизация: используем прямой доступ к массиву пикселей
+                    var pixelIndex = 0
+                    for (y in 0 until outputHeight) {
+                        for (x in 0 until outputWidth) {
+                            val r = outputBuffer.get().toInt() and 0xFF
+                            val g = outputBuffer.get().toInt() and 0xFF
+                            val b = outputBuffer.get().toInt() and 0xFF
+                            
+                            // Создаем ARGB пиксель напрямую (быстрее чем Color.argb)
+                            pixels[pixelIndex++] = (255 shl 24) or (r shl 16) or (g shl 8) or b
+                        }
+                    }
+                    
+                    bitmap.setPixels(pixels, 0, outputWidth, 0, 0, outputWidth, outputHeight)
+                    bitmap
+                }
+                else -> {
+                    android.util.Log.e("ErsganImageProcessor", "Неподдерживаемый тип выходных данных: $outputDataType")
+                    // Fallback: используем TensorImage
+                    val tensorBuffer = TensorBuffer.createFixedSize(outputShape, outputDataType)
+                    outputBuffer.rewind()
+                    tensorBuffer.loadBuffer(outputBuffer)
+                    
+                    val outputImage = TensorImage(outputDataType)
+                    outputImage.load(
+                        tensorBuffer,
+                        org.tensorflow.lite.support.image.ColorSpaceType.RGB
+                    )
+                    outputImage.bitmap
+                }
+            }
+            
+            // Проверяем результат и логируем информацию
+            if (resultBitmap != null && !resultBitmap.isRecycled) {
+                android.util.Log.d("ErsganImageProcessor", 
+                    "Патч обработан: ${resultBitmap.width}x${resultBitmap.height}, " +
+                    "конфиг: ${resultBitmap.config}, " +
+                    "непрозрачный: ${resultBitmap.hasAlpha()}")
+                
+                // Проверяем первый пиксель для диагностики
+                if (resultBitmap.width > 0 && resultBitmap.height > 0) {
+                    val testPixel = resultBitmap.getPixel(0, 0)
+                    val alpha = android.graphics.Color.alpha(testPixel)
+                    val red = android.graphics.Color.red(testPixel)
+                    val green = android.graphics.Color.green(testPixel)
+                    val blue = android.graphics.Color.blue(testPixel)
+                    android.util.Log.d("ErsganImageProcessor", 
+                        "Первый пиксель обработанного патча: ARGB($alpha, $red, $green, $blue)")
+                }
+            } else {
+                android.util.Log.e("ErsganImageProcessor", "Обработанный патч null или переработан")
+            }
+            
+            resultBitmap
         } catch (e: Exception) {
             android.util.Log.e("ErsganImageProcessor", "Ошибка обработки патча: ${e.message}", e)
             null

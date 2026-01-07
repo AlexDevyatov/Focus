@@ -53,7 +53,11 @@ object ModelLoader {
      */
     fun createInterpreter(modelBuffer: MappedByteBuffer): Interpreter {
         val options = Interpreter.Options()
-        options.setNumThreads(4)
+        // Увеличено количество потоков для лучшего использования многоядерности
+        // Runtime.getRuntime().availableProcessors() обычно возвращает 4-8 на современных устройствах
+        val numThreads = Runtime.getRuntime().availableProcessors().coerceAtLeast(4)
+        options.setNumThreads(numThreads)
+        android.util.Log.d("ModelLoader", "Interpreter создан с $numThreads потоками")
         return Interpreter(modelBuffer, options)
     }
 }

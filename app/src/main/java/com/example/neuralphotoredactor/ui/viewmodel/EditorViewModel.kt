@@ -68,6 +68,7 @@ class EditorViewModel @Inject constructor(
             imageData = imageData,
             processedResult = null,
             previewBitmap = null,
+            fullSizeBitmap = null,
             selectedFilters = emptyList(),
             currentFilterIntensity = 0.5f
         )
@@ -139,7 +140,11 @@ class EditorViewModel @Inject constructor(
         currentPreviewJob?.cancel()
         
         if (filters.isEmpty()) {
-            _uiState.value = _uiState.value.copy(previewBitmap = null, isLoading = false)
+            _uiState.value = _uiState.value.copy(
+                previewBitmap = null,
+                fullSizeBitmap = null,
+                isLoading = false
+            )
             return
         }
         
@@ -182,16 +187,43 @@ class EditorViewModel @Inject constructor(
             
             try {
                 android.util.Log.d("EditorViewModel", "Применяем ${filters.size} фильтров для предпросмотра")
-                val previewBitmap = processingRepository.previewFilters(
+                val processedBitmap = processingRepository.previewFilters(
                     originalBitmap,
                     filters.map { it.first to it.second }
                 )
                 
                 if (isActive) {
-                    if (previewBitmap != null) {
-                        android.util.Log.d("EditorViewModel", "Предпросмотр создан: ${previewBitmap.width}x${previewBitmap.height}")
+                    if (processedBitmap != null) {
+                        android.util.Log.d("EditorViewModel", "Обработанное изображение создано: ${processedBitmap.width}x${processedBitmap.height}")
+                        
+                        // Проверяем размер Bitmap в байтах
+                        val bitmapSizeBytes = processedBitmap.width * processedBitmap.height * 4 // ARGB_8888 = 4 байта на пиксель
+                        val maxCanvasSizeBytes = 100 * 1024 * 1024 // ~100 МБ - максимальный размер для Canvas
+                        
+                        // Масштабируем для preview, чтобы избежать ошибки Canvas
+                        // Используем максимум 2048x2048 для безопасности и производительности
+                        val maxPreviewDimension = 2048
+                        val previewBitmap = if (bitmapSizeBytes > maxCanvasSizeBytes || 
+                                               processedBitmap.width > maxPreviewDimension || 
+                                               processedBitmap.height > maxPreviewDimension) {
+                            val scale = minOf(
+                                maxPreviewDimension.toFloat() / processedBitmap.width,
+                                maxPreviewDimension.toFloat() / processedBitmap.height
+                            )
+                            val scaledWidth = (processedBitmap.width * scale).toInt()
+                            val scaledHeight = (processedBitmap.height * scale).toInt()
+                            android.util.Log.d("EditorViewModel", 
+                                "Масштабируем preview: ${processedBitmap.width}x${processedBitmap.height} (${bitmapSizeBytes / 1024 / 1024} МБ) -> ${scaledWidth}x${scaledHeight}")
+                            Bitmap.createScaledBitmap(processedBitmap, scaledWidth, scaledHeight, true)
+                        } else {
+                            processedBitmap
+                        }
+                        
+                        // Сохраняем оригинальный большой Bitmap для сохранения в файл
+                        // previewBitmap будет использоваться только для отображения
                         _uiState.value = _uiState.value.copy(
                             previewBitmap = previewBitmap,
+                            fullSizeBitmap = if (previewBitmap != processedBitmap) processedBitmap else null,
                             isLoading = false
                         )
                     } else {
@@ -241,9 +273,13 @@ class EditorViewModel @Inject constructor(
             )
             
             try {
-                val result = if (previewBitmap != null && !previewBitmap.isRecycled) {
-                    // Используем уже обработанный previewBitmap для быстрого сохранения
-                    android.util.Log.d("EditorViewModel", "Используем previewBitmap для сохранения (${previewBitmap.width}x${previewBitmap.height})")
+                // Используем fullSizeBitmap если есть (полноразмерное изображение), иначе previewBitmap
+                val bitmapToSave = _uiState.value.fullSizeBitmap ?: previewBitmap
+                
+                val result = if (bitmapToSave != null && !bitmapToSave.isRecycled) {
+                    // Используем уже обработанный Bitmap для быстрого сохранения
+                    android.util.Log.d("EditorViewModel", 
+                        "Используем ${if (_uiState.value.fullSizeBitmap != null) "fullSizeBitmap" else "previewBitmap"} для сохранения (${bitmapToSave.width}x${bitmapToSave.height})")
                     
                     val filterNames = selectedFilters.joinToString("_") { it.first.name }
                     val timestamp = System.currentTimeMillis()
@@ -251,7 +287,7 @@ class EditorViewModel @Inject constructor(
                     
                     // Сохраняем в галерею и в папку processed
                     val uri = processingRepository.saveEditedImageToGallery(
-                        previewBitmap, 
+                        bitmapToSave, 
                         fileName,
                         originalUri = currentImage.uri,
                         filterType = filterNames
@@ -279,7 +315,8 @@ class EditorViewModel @Inject constructor(
                 if (isActive && result != null) {
                     _uiState.value = _uiState.value.copy(
                         processedResult = result,
-                        previewBitmap = null, // Очищаем предпросмотр после сохранения
+                        previewBitmap = null,
+                        fullSizeBitmap = null, // Очищаем полноразмерное изображение после сохранения
                         isLoading = false
                     )
                     
@@ -342,6 +379,7 @@ class EditorViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             processedResult = null,
             previewBitmap = null,
+            fullSizeBitmap = null,
             selectedFilters = emptyList(),
             currentFilterIntensity = 0.5f
         )
@@ -684,7 +722,8 @@ class EditorViewModel @Inject constructor(
      * Сохранить отредактированное изображение в галерею.
      */
     fun saveEditedImageToGallery() {
-        val previewBitmap = _uiState.value.previewBitmap ?: return
+        // Используем fullSizeBitmap если есть (полноразмерное изображение), иначе previewBitmap
+        val bitmapToSave = _uiState.value.fullSizeBitmap ?: _uiState.value.previewBitmap ?: return
         
         currentFilterJob?.cancel()
         currentPreviewJob?.cancel()
@@ -699,8 +738,10 @@ class EditorViewModel @Inject constructor(
                 val timestamp = System.currentTimeMillis()
                 val fileName = "edited_${timestamp}.jpg"
                 // Сохраняем и в галерею, и в папку processed
+                android.util.Log.d("EditorViewModel", 
+                    "Сохраняем ${if (_uiState.value.fullSizeBitmap != null) "fullSizeBitmap" else "previewBitmap"}: ${bitmapToSave.width}x${bitmapToSave.height}")
                 val uri = processingRepository.saveEditedImageToGallery(
-                    previewBitmap, 
+                    bitmapToSave, 
                     fileName,
                     originalUri = _uiState.value.imageData?.uri,
                     filterType = "edited"
@@ -743,7 +784,8 @@ class EditorViewModel @Inject constructor(
 data class EditorUiState(
     val imageData: ImageData? = null,
     val processedResult: ProcessingResult? = null,
-    val previewBitmap: Bitmap? = null, // Быстрый предпросмотр без сохранения
+    val previewBitmap: Bitmap? = null, // Быстрый предпросмотр без сохранения (масштабирован для UI)
+    val fullSizeBitmap: Bitmap? = null, // Полноразмерное обработанное изображение для сохранения
     val cropBitmap: Bitmap? = null, // Bitmap для кадрирования
     val isLoading: Boolean = false,
     val error: String? = null,
