@@ -8,14 +8,19 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
 /**
- * Утилита для загрузки TFLite моделей из assets.
+ * Утилита для загрузки TFLite моделей из assets и файловой системы.
+ * 
+ * Используется для загрузки множества моделей. Каждая модель загружается
+ * в отдельный MappedByteBuffer, из которого создается отдельный Interpreter.
+ * 
+ * Для управления множеством моделей и их Interpreter'ами используйте TFLiteModelRepository.
  */
 object ModelLoader {
     /**
      * Загрузить TFLite модель из assets.
      * 
      * @param context Контекст приложения
-     * @param modelPath Путь к модели в assets (например, "model.tflite")
+     * @param modelPath Путь к модели в assets (например, "ersgan.tflite")
      * @return MappedByteBuffer с моделью
      */
     fun loadModelFile(context: Context, modelPath: String): MappedByteBuffer {

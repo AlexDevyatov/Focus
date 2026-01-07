@@ -11,27 +11,33 @@ import java.nio.ByteBuffer
 import javax.inject.Inject
 
 /**
- * Процессор изображений с использованием TensorFlow Lite.
+ * Процессор изображений для модели ERSGAN (Enhanced Super-Resolution Generative Adversarial Network).
  * 
- * Выполняет инференс TFLite моделей для обработки изображений.
+ * Выполняет инференс модели ERSGAN для super resolution (увеличения разрешения изображений).
  * Работает полностью оффлайн.
+ * 
+ * Каждый нейрофильтр имеет свой собственный процессор с соответствующим Interpreter'ом.
+ * Этот процессор специфичен для модели ERSGAN и использует Interpreter, загруженный из ersgan.tflite.
+ * 
+ * Для других моделей создавайте отдельные процессоры (например, StyleTransferImageProcessor,
+ * DenoiseImageProcessor и т.д.) с соответствующими Interpreter'ами.
  */
-class ImageProcessor @Inject constructor(
+class ErsganImageProcessor @Inject constructor(
     private val interpreter: Interpreter?,
     private val preprocessor: ImagePreprocessor,
     private val postprocessor: ImagePostprocessor
 ) {
     
     /**
-     * Обработать изображение с применением указанного фильтра.
+     * Обработать изображение через модель ERSGAN для увеличения разрешения.
      * 
      * @param bitmap Исходное изображение
-     * @param filterType Тип фильтра
-     * @return Обработанное изображение или null в случае ошибки
+     * @param filterType Тип фильтра (должен соответствовать ERSGAN модели)
+     * @return Обработанное изображение с увеличенным разрешением или null в случае ошибки
      */
     fun processImage(bitmap: Bitmap, filterType: FilterType): Bitmap? {
         if (interpreter == null) {
-            android.util.Log.e("ImageProcessor", "TFLite Interpreter не инициализирован")
+            android.util.Log.e("ErsganImageProcessor", "ERSGAN Interpreter не инициализирован")
             return null
         }
         
@@ -39,7 +45,7 @@ class ImageProcessor @Inject constructor(
             val originalWidth = bitmap.width
             val originalHeight = bitmap.height
             
-            // Получаем размеры входного тензора модели
+            // Получаем размеры входного тензора модели ERSGAN
             val inputShape = interpreter.getInputTensor(0).shape()
             val targetWidth = inputShape[1]
             val targetHeight = inputShape[2]
@@ -58,7 +64,7 @@ class ImageProcessor @Inject constructor(
             )
             outputBuffer.order(java.nio.ByteOrder.nativeOrder())
             
-            // Инференс
+            // Инференс через модель ERSGAN
             interpreter.run(inputImage.buffer, outputBuffer)
             
             // Создаем TensorBuffer из результата
@@ -76,8 +82,8 @@ class ImageProcessor @Inject constructor(
             // Постпроцессинг
             postprocessor.postprocess(outputImage, originalWidth, originalHeight)
         } catch (e: Exception) {
+            android.util.Log.e("ErsganImageProcessor", "Ошибка обработки через ERSGAN: ${e.message}", e)
             null
         }
     }
 }
-

@@ -7,6 +7,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -21,12 +22,12 @@ private val LightColorScheme = lightColorScheme(
     surface = SurfaceLight,
     background = BackgroundLight,
     error = ErrorLight,
-    onPrimary = BackgroundLight,
-    onSecondary = BackgroundLight,
-    onTertiary = BackgroundLight,
-    onSurface = PrimaryLight,
-    onBackground = PrimaryLight,
-    onError = BackgroundLight
+    onPrimary = Color(0xFFFFFFFF), // Белый текст на ярких цветах
+    onSecondary = Color(0xFFFFFFFF),
+    onTertiary = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF212121), // Темно-серый текст на светлых поверхностях для лучшей читаемости
+    onBackground = Color(0xFF212121),
+    onError = Color(0xFFFFFFFF)
 )
 
 /**
@@ -50,17 +51,17 @@ private val DarkColorScheme = darkColorScheme(
 /**
  * Основная тема приложения.
  * 
- * Поддерживает светлую и темную тему с указанными цветами.
+ * Использует светлую тему с указанными цветами.
  * 
- * @param darkTheme Если true, используется темная тема, иначе светлая
+ * @param darkTheme Игнорируется - всегда используется светлая тема
  * @param content Composable контент, который будет обернут в тему
  */
 @Composable
 fun AppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Всегда используем светлую тему
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = LightColorScheme
     
     // Настройка системного статус-бара
     val view = LocalView.current
@@ -68,7 +69,7 @@ fun AppTheme(
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
         }
     }
 

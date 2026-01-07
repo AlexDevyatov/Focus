@@ -13,7 +13,7 @@ import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
-import com.example.neuralphotoredactor.ml.interpreter.ImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.ErsganImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -30,7 +30,7 @@ import javax.inject.Inject
  */
 class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val imageProcessor: ImageProcessor,
+    private val ersganImageProcessor: ErsganImageProcessor,
     private val imageFilterProcessor: ImageFilterProcessor,
     private val imageEditProcessor: ImageEditProcessor,
     private val imageStorage: ImageStorage,
@@ -58,8 +58,8 @@ class ProcessingRepositoryImpl @Inject constructor(
                     imageFilterProcessor.applyFilter(bitmap, filterType, intensity, isPreview = false)
                 }
                 else -> {
-                    // Используем ImageProcessor для ML-фильтров (требуют TFLite модели)
-                    imageProcessor.processImage(bitmap, filterType)
+                    // Используем ErsganImageProcessor для ML-фильтров (требуют TFLite модели)
+                    ersganImageProcessor.processImage(bitmap, filterType)
                 }
             } ?: return@withContext null
             
@@ -132,8 +132,8 @@ class ProcessingRepositoryImpl @Inject constructor(
                     imageFilterProcessor.applyFilter(bitmap, filterType, intensity, isPreview = true)
                 }
                 else -> {
-                    // Используем ImageProcessor для ML-фильтров (требуют TFLite модели)
-                    imageProcessor.processImage(bitmap, filterType)
+                    // Используем ErsganImageProcessor для ML-фильтров (требуют TFLite модели)
+                    ersganImageProcessor.processImage(bitmap, filterType)
                 }
             }
             
