@@ -139,8 +139,18 @@ class EditorViewModel @Inject constructor(
         currentPreviewJob?.cancel()
         
         if (filters.isEmpty()) {
-            _uiState.value = _uiState.value.copy(previewBitmap = null)
+            _uiState.value = _uiState.value.copy(previewBitmap = null, isLoading = false)
             return
+        }
+        
+        // Проверяем, есть ли нейросетевые фильтры (они требуют больше времени)
+        val hasNeuralFilters = filters.any { (filterType, _) ->
+            filterType in neuralFilters
+        }
+        
+        // Устанавливаем isLoading для нейросетевых фильтров, так как они долго обрабатываются
+        if (hasNeuralFilters) {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
         }
         
         currentPreviewJob = viewModelScope.launch {
@@ -152,7 +162,8 @@ class EditorViewModel @Inject constructor(
                 android.util.Log.e("EditorViewModel", "Не удалось получить исходный Bitmap для предпросмотра")
                 if (isActive) {
                     _uiState.value = _uiState.value.copy(
-                        error = "Не удалось загрузить изображение"
+                        error = "Не удалось загрузить изображение",
+                        isLoading = false
                     )
                 }
                 return@launch
@@ -179,11 +190,15 @@ class EditorViewModel @Inject constructor(
                 if (isActive) {
                     if (previewBitmap != null) {
                         android.util.Log.d("EditorViewModel", "Предпросмотр создан: ${previewBitmap.width}x${previewBitmap.height}")
-                        _uiState.value = _uiState.value.copy(previewBitmap = previewBitmap)
+                        _uiState.value = _uiState.value.copy(
+                            previewBitmap = previewBitmap,
+                            isLoading = false
+                        )
                     } else {
                         android.util.Log.e("EditorViewModel", "Предпросмотр вернул null")
                         _uiState.value = _uiState.value.copy(
-                            error = "Не удалось применить фильтры"
+                            error = "Не удалось применить фильтры",
+                            isLoading = false
                         )
                     }
                 }
@@ -191,7 +206,8 @@ class EditorViewModel @Inject constructor(
                 android.util.Log.e("EditorViewModel", "Ошибка при применении фильтров: ${e.message}", e)
                 if (isActive) {
                     _uiState.value = _uiState.value.copy(
-                        error = e.message ?: "Ошибка применения фильтров"
+                        error = e.message ?: "Ошибка применения фильтров",
+                        isLoading = false
                     )
                 }
             }
@@ -200,10 +216,14 @@ class EditorViewModel @Inject constructor(
     
     /**
      * Применить выбранные фильтры с сохранением в файл (для финального результата).
+     * 
+     * Использует уже обработанный previewBitmap для быстрого сохранения без повторной обработки.
+     * Сохраняет изображение в галерею и в папку processed.
      */
     fun applyFilters() {
         val currentImage = _uiState.value.imageData ?: return
         val selectedFilters = _uiState.value.selectedFilters
+        val previewBitmap = _uiState.value.previewBitmap
         
         if (selectedFilters.isEmpty()) {
             android.util.Log.w("EditorViewModel", "Нет выбранных фильтров для применения")
@@ -221,10 +241,39 @@ class EditorViewModel @Inject constructor(
             )
             
             try {
-                val result = processingRepository.processImageWithFilters(
-                    currentImage,
-                    selectedFilters.map { it.first to it.second }
-                )
+                val result = if (previewBitmap != null && !previewBitmap.isRecycled) {
+                    // Используем уже обработанный previewBitmap для быстрого сохранения
+                    android.util.Log.d("EditorViewModel", "Используем previewBitmap для сохранения (${previewBitmap.width}x${previewBitmap.height})")
+                    
+                    val filterNames = selectedFilters.joinToString("_") { it.first.name }
+                    val timestamp = System.currentTimeMillis()
+                    val fileName = "processed_${timestamp}_${filterNames}.jpg"
+                    
+                    // Сохраняем в галерею и в папку processed
+                    val uri = processingRepository.saveEditedImageToGallery(
+                        previewBitmap, 
+                        fileName,
+                        originalUri = currentImage.uri,
+                        filterType = filterNames
+                    )
+                    
+                    if (uri != null) {
+                        ProcessingResult(
+                            originalUri = currentImage.uri,
+                            processedUri = uri,
+                            filterType = filterNames
+                        )
+                    } else {
+                        null
+                    }
+                } else {
+                    // Если previewBitmap нет, обрабатываем заново (fallback)
+                    android.util.Log.d("EditorViewModel", "PreviewBitmap отсутствует, обрабатываем заново")
+                    processingRepository.processImageWithFilters(
+                        currentImage,
+                        selectedFilters.map { it.first to it.second }
+                    )
+                }
                 
                 // Проверяем, что корутина не была отменена и результат успешен
                 if (isActive && result != null) {
@@ -243,7 +292,7 @@ class EditorViewModel @Inject constructor(
                     // Если результат null, показываем ошибку
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Не удалось применить фильтры"
+                        error = "Не удалось сохранить изображение"
                     )
                 }
             } catch (e: Exception) {
@@ -650,7 +699,12 @@ class EditorViewModel @Inject constructor(
                 val timestamp = System.currentTimeMillis()
                 val fileName = "edited_${timestamp}.jpg"
                 // Сохраняем и в галерею, и в папку processed
-                val uri = processingRepository.saveEditedImageToGallery(previewBitmap, fileName)
+                val uri = processingRepository.saveEditedImageToGallery(
+                    previewBitmap, 
+                    fileName,
+                    originalUri = _uiState.value.imageData?.uri,
+                    filterType = "edited"
+                )
                 
                 if (isActive && uri != null) {
                     _uiState.value = _uiState.value.copy(

@@ -110,11 +110,15 @@ interface ProcessingRepository {
      * 
      * @param bitmap Изображение для сохранения
      * @param fileName Имя файла
+     * @param originalUri URI исходного изображения (опционально, для истории)
+     * @param filterType Тип фильтра или редактирования (опционально, для истории)
      * @return URI сохраненного файла или null в случае ошибки
      */
     suspend fun saveEditedImageToGallery(
         bitmap: android.graphics.Bitmap,
-        fileName: String
+        fileName: String,
+        originalUri: android.net.Uri? = null,
+        filterType: String? = null
     ): android.net.Uri?
 }
 

@@ -4,6 +4,13 @@ import android.graphics.Bitmap
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.ml.preprocessor.ImagePreprocessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
@@ -29,41 +36,224 @@ class ErsganImageProcessor @Inject constructor(
     private val postprocessor: ImagePostprocessor
 ) {
     
+    companion object {
+        private const val PATCH_SIZE = 50
+        private const val OVERLAP = 5 // Перекрытие патчей для избежания артефактов на границах
+        private const val MAX_PARALLEL_PATCHES = 4 // Максимальное количество патчей, обрабатываемых параллельно
+    }
+    
+    // Мьютекс для синхронизации доступа к Interpreter (он не потокобезопасен)
+    private val interpreterMutex = Mutex()
+    
     /**
-     * Обработать изображение через модель ERSGAN для увеличения разрешения.
+     * Обработать изображение через модель ESRGAN для увеличения разрешения по патчам 50x50.
+     * 
+     * Изображение разбивается на патчи размером 50x50 пикселей, каждый патч обрабатывается
+     * параллельно через модель, затем результаты собираются в итоговое изображение.
+     * 
+     * Параллельная обработка ускоряет процесс за счет использования нескольких потоков.
+     * Доступ к Interpreter синхронизируется через мьютекс, так как он не потокобезопасен.
      * 
      * @param bitmap Исходное изображение
-     * @param filterType Тип фильтра (должен соответствовать ERSGAN модели)
+     * @param filterType Тип фильтра (должен соответствовать ESRGAN модели)
      * @return Обработанное изображение с увеличенным разрешением или null в случае ошибки
      */
-    fun processImage(bitmap: Bitmap, filterType: FilterType): Bitmap? {
+    suspend fun processImage(bitmap: Bitmap, filterType: FilterType): Bitmap? = withContext(Dispatchers.Default) {
         if (interpreter == null) {
             android.util.Log.e("ErsganImageProcessor", "ESRGAN Interpreter не инициализирован")
-            return null
+            return@withContext null
         }
         
-        return try {
-            // Получаем размеры входного тензора модели ESRGAN
+        return@withContext try {
+            // Получаем размеры входного и выходного тензоров модели ESRGAN
             val inputTensor = interpreter.getInputTensor(0)
             val inputShape = inputTensor.shape()
             val inputDataType = inputTensor.dataType()
+            val modelInputWidth = inputShape[1]
+            val modelInputHeight = inputShape[2]
+            
+            val outputTensor = interpreter.getOutputTensor(0)
+            val outputShape = outputTensor.shape()
+            val outputDataType = outputTensor.dataType()
+            val modelOutputWidth = outputShape[1]
+            val modelOutputHeight = outputShape[2]
+            
+            // Вычисляем масштаб увеличения
+            val scaleX = modelOutputWidth.toFloat() / modelInputWidth
+            val scaleY = modelOutputHeight.toFloat() / modelInputHeight
+            
+            android.util.Log.d("ErsganImageProcessor", "Input shape: ${inputShape.contentToString()}, Output shape: ${outputShape.contentToString()}")
+            android.util.Log.d("ErsganImageProcessor", "Original image: ${bitmap.width}x${bitmap.height}, Scale: ${scaleX}x${scaleY}")
+            
+            // Вычисляем размеры итогового изображения
+            val outputWidth = (bitmap.width * scaleX).toInt()
+            val outputHeight = (bitmap.height * scaleY).toInt()
+            val outputBitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+            
+            // Вычисляем размеры патча с учетом масштаба
+            val patchInputSize = PATCH_SIZE
+            val patchOutputSize = (patchInputSize * scaleX).toInt()
+            val stepSize = patchInputSize - OVERLAP // Шаг между патчами
+            
+            // Вычисляем количество патчей
+            val patchesX = ((bitmap.width - OVERLAP + stepSize - 1) / stepSize).coerceAtLeast(1)
+            val patchesY = ((bitmap.height - OVERLAP + stepSize - 1) / stepSize).coerceAtLeast(1)
+            
+            val totalPatches = patchesX * patchesY
+            android.util.Log.d("ErsganImageProcessor", "Processing ${patchesX}x${patchesY} = $totalPatches patches of ${patchInputSize}x${patchInputSize} (parallel: max $MAX_PARALLEL_PATCHES)")
+            
+            // Создаем список всех патчей для обработки
+            data class PatchInfo(
+                val patchX: Int,
+                val patchY: Int,
+                val srcX: Int,
+                val srcY: Int,
+                val actualPatchWidth: Int,
+                val actualPatchHeight: Int
+            )
+            
+            val patches = mutableListOf<PatchInfo>()
+            for (patchY in 0 until patchesY) {
+                for (patchX in 0 until patchesX) {
+                    val srcX = (patchX * stepSize).coerceAtMost(bitmap.width - patchInputSize)
+                    val srcY = (patchY * stepSize).coerceAtMost(bitmap.height - patchInputSize)
+                    val actualPatchWidth = (srcX + patchInputSize).coerceAtMost(bitmap.width) - srcX
+                    val actualPatchHeight = (srcY + patchInputSize).coerceAtMost(bitmap.height) - srcY
+                    patches.add(PatchInfo(patchX, patchY, srcX, srcY, actualPatchWidth, actualPatchHeight))
+                }
+            }
+            
+            // Обрабатываем патчи параллельно батчами
+            data class ProcessedPatchResult(
+                val patchInfo: PatchInfo,
+                val processedBitmap: Bitmap?
+            )
+            
+            val results = mutableListOf<ProcessedPatchResult>()
+            var processedCount = 0
+            
+            // Разбиваем патчи на батчи для параллельной обработки
+            patches.chunked(MAX_PARALLEL_PATCHES).forEach { batch ->
+                val batchResults = coroutineScope {
+                    batch.map { patchInfo ->
+                        async {
+                            // Извлекаем патч из исходного изображения
+                            val patchBitmap = Bitmap.createBitmap(
+                                bitmap, 
+                                patchInfo.srcX, 
+                                patchInfo.srcY, 
+                                patchInfo.actualPatchWidth, 
+                                patchInfo.actualPatchHeight
+                            )
+                            
+                            // Ресайзим патч до размера модели, если нужно
+                            val resizedPatch = if (patchInfo.actualPatchWidth != modelInputWidth || patchInfo.actualPatchHeight != modelInputHeight) {
+                                Bitmap.createScaledBitmap(patchBitmap, modelInputWidth, modelInputHeight, true)
+                            } else {
+                                patchBitmap
+                            }
+                            
+                            // Обрабатываем патч через модель (с синхронизацией через мьютекс)
+                            val processedPatch = processPatch(resizedPatch, inputTensor, outputTensor, inputDataType, outputDataType)
+                            
+                            // Освобождаем промежуточные bitmap
+                            if (resizedPatch != patchBitmap) {
+                                resizedPatch.recycle()
+                            }
+                            if (patchBitmap != bitmap) {
+                                patchBitmap.recycle()
+                            }
+                            
+                            // Логируем успешную обработку патча
+                            if (processedPatch != null) {
+                                synchronized(results) {
+                                    processedCount++
+                                    val progress = (processedCount * 100) / totalPatches
+                                    android.util.Log.d("ErsganImageProcessor", 
+                                        "✓ Патч [${patchInfo.patchX}, ${patchInfo.patchY}] успешно обработан " +
+                                        "($processedCount/$totalPatches, $progress%). " +
+                                        "Размер: ${patchInfo.actualPatchWidth}x${patchInfo.actualPatchHeight}")
+                                }
+                            } else {
+                                android.util.Log.e("ErsganImageProcessor", "✗ Ошибка обработки патча [${patchInfo.patchX}, ${patchInfo.patchY}]")
+                            }
+                            
+                            ProcessedPatchResult(patchInfo, processedPatch)
+                        }
+                    }.awaitAll()
+                }
+                results.addAll(batchResults)
+            }
+            
+            // Копируем обработанные патчи в итоговое изображение
+            val canvas = android.graphics.Canvas(outputBitmap)
+            for (result in results) {
+                if (result.processedBitmap != null) {
+                    val patchInfo = result.patchInfo
+                    val dstX = (patchInfo.srcX * scaleX).toInt()
+                    val dstY = (patchInfo.srcY * scaleY).toInt()
+                    val dstWidth = (patchInfo.actualPatchWidth * scaleX).toInt().coerceAtMost(outputWidth - dstX)
+                    val dstHeight = (patchInfo.actualPatchHeight * scaleY).toInt().coerceAtMost(outputHeight - dstY)
+                    
+                    // Ресайзим обработанный патч до нужного размера, если нужно
+                    val finalPatch = if (result.processedBitmap.width != dstWidth || result.processedBitmap.height != dstHeight) {
+                        Bitmap.createScaledBitmap(result.processedBitmap, dstWidth, dstHeight, true)
+                    } else {
+                        result.processedBitmap
+                    }
+                    
+                    // Копируем патч в итоговое изображение
+                    canvas.drawBitmap(finalPatch, dstX.toFloat(), dstY.toFloat(), null)
+                    
+                    // Освобождаем обработанный патч
+                    if (finalPatch != result.processedBitmap) {
+                        finalPatch.recycle()
+                    }
+                    result.processedBitmap.recycle()
+                }
+            }
+            
+            android.util.Log.d("ErsganImageProcessor", "Обработка завершена: ${outputWidth}x${outputHeight}, обработано патчей: ${results.count { it.processedBitmap != null }}/$totalPatches")
+            outputBitmap
+        } catch (e: Exception) {
+            android.util.Log.e("ErsganImageProcessor", "Ошибка обработки через ESRGAN: ${e.message}", e)
+            e.printStackTrace()
+            null
+        }
+    }
+    
+    /**
+     * Обработать один патч через модель ESRGAN.
+     * 
+     * Использует мьютекс для синхронизации доступа к Interpreter, так как он не потокобезопасен.
+     * 
+     * @param patchBitmap Патч изображения для обработки
+     * @param inputTensor Входной тензор модели
+     * @param outputTensor Выходной тензор модели
+     * @param inputDataType Тип данных входного тензора
+     * @param outputDataType Тип данных выходного тензора
+     * @return Обработанный патч или null в случае ошибки
+     */
+    private suspend fun processPatch(
+        patchBitmap: Bitmap,
+        inputTensor: org.tensorflow.lite.Tensor,
+        outputTensor: org.tensorflow.lite.Tensor,
+        inputDataType: org.tensorflow.lite.DataType,
+        outputDataType: org.tensorflow.lite.DataType
+    ): Bitmap? = withContext(Dispatchers.Default) {
+        return@withContext try {
+            val inputShape = inputTensor.shape()
             val targetWidth = inputShape[1]
             val targetHeight = inputShape[2]
             
-            android.util.Log.d("ErsganImageProcessor", "Input shape: ${inputShape.contentToString()}, dtype: $inputDataType")
-            android.util.Log.d("ErsganImageProcessor", "Original image: ${bitmap.width}x${bitmap.height}, target: ${targetWidth}x${targetHeight}")
-            
-            // Ресайзим изображение до нужного размера
-            val resizedBitmap = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
-            
-            // Создаем входной буфер вручную с правильным форматом
+            // Создаем входной буфер
             val expectedBytes = inputTensor.numBytes()
             val inputBuffer = ByteBuffer.allocateDirect(expectedBytes)
             inputBuffer.order(java.nio.ByteOrder.nativeOrder())
             
-            // Получаем пиксели изображения
+            // Получаем пиксели патча
             val pixels = IntArray(targetWidth * targetHeight)
-            resizedBitmap.getPixels(pixels, 0, targetWidth, 0, 0, targetWidth, targetHeight)
+            patchBitmap.getPixels(pixels, 0, targetWidth, 0, 0, targetWidth, targetHeight)
             
             // Конвертируем пиксели в нужный формат данных
             when (inputDataType) {
@@ -88,22 +278,10 @@ class ErsganImageProcessor @Inject constructor(
                 }
                 else -> {
                     android.util.Log.e("ErsganImageProcessor", "Неподдерживаемый тип данных: $inputDataType")
-                    return null
+                    return@withContext null
                 }
             }
             inputBuffer.rewind()
-            
-            // Освобождаем промежуточный bitmap
-            if (resizedBitmap != bitmap) {
-                resizedBitmap.recycle()
-            }
-            
-            // Подготовка выходного тензора
-            val outputTensor = interpreter.getOutputTensor(0)
-            val outputShape = outputTensor.shape()
-            val outputDataType = outputTensor.dataType()
-            
-            android.util.Log.d("ErsganImageProcessor", "Output shape: ${outputShape.contentToString()}, dtype: $outputDataType")
             
             // Создаем ByteBuffer для вывода
             val outputBuffer = ByteBuffer.allocateDirect(
@@ -111,10 +289,14 @@ class ErsganImageProcessor @Inject constructor(
             )
             outputBuffer.order(java.nio.ByteOrder.nativeOrder())
             
-            // Инференс через модель ESRGAN
-            interpreter.run(inputBuffer, outputBuffer)
+            // Инференс через модель ESRGAN с синхронизацией через мьютекс
+            // Interpreter не потокобезопасен, поэтому используем мьютекс
+            interpreterMutex.withLock {
+                interpreter?.run(inputBuffer, outputBuffer)
+            }
             
             // Создаем TensorBuffer из результата
+            val outputShape = outputTensor.shape()
             val tensorBuffer = TensorBuffer.createFixedSize(outputShape, outputDataType)
             outputBuffer.rewind()
             tensorBuffer.loadBuffer(outputBuffer)
@@ -126,12 +308,9 @@ class ErsganImageProcessor @Inject constructor(
                 org.tensorflow.lite.support.image.ColorSpaceType.RGB
             )
             
-            // Для super resolution модель уже увеличила разрешение
-            // Возвращаем результат напрямую без постпроцессинга
             outputImage.bitmap
         } catch (e: Exception) {
-            android.util.Log.e("ErsganImageProcessor", "Ошибка обработки через ESRGAN: ${e.message}", e)
-            e.printStackTrace()
+            android.util.Log.e("ErsganImageProcessor", "Ошибка обработки патча: ${e.message}", e)
             null
         }
     }

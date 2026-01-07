@@ -426,7 +426,9 @@ class ProcessingRepositoryImpl @Inject constructor(
     
     override suspend fun saveEditedImageToGallery(
         bitmap: android.graphics.Bitmap,
-        fileName: String
+        fileName: String,
+        originalUri: android.net.Uri?,
+        filterType: String?
     ): android.net.Uri? = withContext(Dispatchers.IO) {
         try {
             val timestamp = System.currentTimeMillis()
@@ -436,7 +438,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                 "${fileName}_${timestamp}.jpg"
             }
             
-            android.util.Log.d("ProcessingRepository", "Сохранение отредактированного изображения в галерею и processed: $finalFileName")
+            android.util.Log.d("ProcessingRepository", "Сохранение обработанного изображения в галерею и processed: $finalFileName")
             
             // Сохраняем в галерею
             val galleryUri = imageStorage.saveBitmapToGallery(bitmap, finalFileName)
@@ -455,9 +457,9 @@ class ProcessingRepositoryImpl @Inject constructor(
                 
                 // Сохраняем в базу данных для истории
                 val result = ProcessingResult(
-                    originalUri = android.net.Uri.EMPTY, // Для отредактированных изображений оригинал может быть неизвестен
+                    originalUri = originalUri ?: android.net.Uri.EMPTY,
                     processedUri = processedUri,
-                    filterType = "edited"
+                    filterType = filterType ?: "edited"
                 )
                 val entity = ProcessingHistoryMapper.toEntity(result)
                 processingHistoryDao.insert(entity)
