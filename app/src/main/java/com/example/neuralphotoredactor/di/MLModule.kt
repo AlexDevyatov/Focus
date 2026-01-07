@@ -55,18 +55,19 @@ abstract class MLModule {
     
     companion object {
         /**
-         * Предоставляет Interpreter для модели ERSGAN (Enhanced Super-Resolution Generative Adversarial Network).
+         * Предоставляет Interpreter для модели ESRGAN (Enhanced Super-Resolution Generative Adversarial Network).
          * 
          * Эта модель используется для super resolution (увеличения разрешения изображений).
+         * Применяется для фильтра UPSCALE.
          * Модель загружается из assets при инициализации приложения.
          * 
-         * ВАЖНО: Создайте файл ersgan.tflite в app/src/main/assets/
+         * ВАЖНО: Создайте файл esrgan.tflite в app/src/main/assets/
          * 
          * Для других моделей используйте TFLiteModelRepository, который поддерживает
          * динамическую загрузку множества моделей с кэшированием Interpreter'ов.
          * 
          * @param context Контекст приложения для доступа к assets
-         * @return Interpreter для модели ERSGAN или null, если модель не найдена
+         * @return Interpreter для модели ESRGAN или null, если модель не найдена
          */
         @Provides
         @Singleton
@@ -74,30 +75,31 @@ abstract class MLModule {
             @ApplicationContext context: Context
         ): Interpreter? {
             return try {
-                val modelBuffer = ModelLoader.loadModelFile(context, "ersgan.tflite")
+                val modelBuffer = ModelLoader.loadModelFile(context, "esrgan.tflite")
                 ModelLoader.createInterpreter(modelBuffer)
             } catch (e: Exception) {
                 // Если модель не найдена, возвращаем null
                 // Обработка ошибки будет в ErsganImageProcessor
-                android.util.Log.e("MLModule", "ERSGAN модель не найдена: ${e.message}")
+                android.util.Log.e("MLModule", "ESRGAN модель не найдена: ${e.message}")
                 null
             }
         }
         
         /**
-         * Предоставляет ErsganImageProcessor с Interpreter для модели ERSGAN.
+         * Предоставляет ErsganImageProcessor с Interpreter для модели ESRGAN.
          * 
-         * Этот процессор используется для обработки изображений через модель ERSGAN
+         * Этот процессор используется для обработки изображений через модель ESRGAN
          * для super resolution (увеличения разрешения).
+         * Применяется для фильтра UPSCALE.
          * 
          * Для работы с другими моделями создавайте отдельные процессоры
          * (например, StyleTransferImageProcessor, DenoiseImageProcessor)
          * с соответствующими Interpreter'ами через TFLiteModelRepository.
          * 
-         * @param interpreter Interpreter для модели ERSGAN
+         * @param interpreter Interpreter для модели ESRGAN
          * @param preprocessor Препроцессор изображений
          * @param postprocessor Постпроцессор изображений
-         * @return ErsganImageProcessor для обработки изображений через ERSGAN
+         * @return ErsganImageProcessor для обработки изображений через ESRGAN
          */
         @Provides
         @Singleton
