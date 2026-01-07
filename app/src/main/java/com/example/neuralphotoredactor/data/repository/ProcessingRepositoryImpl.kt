@@ -166,8 +166,60 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             android.util.Log.d("ProcessingRepository", "Применяем ${filters.size} фильтров к Bitmap ${bitmap.width}x${bitmap.height}")
             
-            // Используем оптимизированный метод для множественных фильтров
-            val result = imageFilterProcessor.applyFilters(bitmap, filters, isPreview = true)
+            // Разделяем фильтры на обычные и нейросетевые
+            val regularFilters = filters.filter { (filterType, _) ->
+                filterType in listOf(
+                    FilterType.GAUSSIAN_BLUR,
+                    FilterType.NOISE_REDUCTION,
+                    FilterType.SHARPEN,
+                    FilterType.VIGNETTE,
+                    FilterType.GRAYSCALE,
+                    FilterType.SEPIA
+                )
+            }
+            
+            val neuralFilters = filters.filter { (filterType, _) ->
+                filterType in listOf(
+                    FilterType.ENHANCE,
+                    FilterType.STYLE_TRANSFER,
+                    FilterType.DENOISE,
+                    FilterType.UPSCALE,
+                    FilterType.COLOR_CORRECTION
+                )
+            }
+            
+            var workingBitmap: Bitmap = bitmap
+            
+            // Сначала применяем нейросетевые фильтры (без intensity)
+            for ((filterType, _) in neuralFilters) {
+                val processed = ersganImageProcessor.processImage(workingBitmap, filterType)
+                if (processed != null) {
+                    // Освобождаем промежуточный bitmap, если он отличается от исходного
+                    if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
+                        workingBitmap.recycle()
+                    }
+                    workingBitmap = processed
+                } else {
+                    android.util.Log.e("ProcessingRepository", "Нейросетевой фильтр $filterType вернул null")
+                    // Освобождаем промежуточный bitmap при ошибке
+                    if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
+                        workingBitmap.recycle()
+                    }
+                    return@withContext null
+                }
+            }
+            
+            // Затем применяем обычные фильтры (с intensity)
+            val result = if (regularFilters.isNotEmpty()) {
+                imageFilterProcessor.applyFilters(workingBitmap, regularFilters, isPreview = true)
+            } else {
+                workingBitmap
+            }
+            
+            // Освобождаем промежуточный bitmap, если он отличается от исходного и результата
+            if (result != null && workingBitmap != bitmap && workingBitmap != result && !workingBitmap.isRecycled) {
+                workingBitmap.recycle()
+            }
             
             if (result != null) {
                 android.util.Log.d("ProcessingRepository", "Фильтры применены успешно: ${result.width}x${result.height}")
@@ -200,9 +252,66 @@ class ProcessingRepositoryImpl @Inject constructor(
             // Загружаем Bitmap из URI
             bitmap = loadBitmapFromUriSync(imageData.uri) ?: return@withContext null
             
-            // Применяем фильтры (isPreview = false для финального результата)
-            processedBitmap = imageFilterProcessor.applyFilters(bitmap, filters, isPreview = false)
-                ?: return@withContext null
+            // Разделяем фильтры на обычные и нейросетевые
+            val regularFilters = filters.filter { (filterType, _) ->
+                filterType in listOf(
+                    FilterType.GAUSSIAN_BLUR,
+                    FilterType.NOISE_REDUCTION,
+                    FilterType.SHARPEN,
+                    FilterType.VIGNETTE,
+                    FilterType.GRAYSCALE,
+                    FilterType.SEPIA
+                )
+            }
+            
+            val neuralFilters = filters.filter { (filterType, _) ->
+                filterType in listOf(
+                    FilterType.ENHANCE,
+                    FilterType.STYLE_TRANSFER,
+                    FilterType.DENOISE,
+                    FilterType.UPSCALE,
+                    FilterType.COLOR_CORRECTION
+                )
+            }
+            
+            var workingBitmap: Bitmap = bitmap
+            
+            // Сначала применяем нейросетевые фильтры (без intensity)
+            for ((filterType, _) in neuralFilters) {
+                val processed = ersganImageProcessor.processImage(workingBitmap, filterType)
+                if (processed != null) {
+                    // Освобождаем промежуточный bitmap, если он отличается от исходного
+                    if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
+                        workingBitmap.recycle()
+                    }
+                    workingBitmap = processed
+                } else {
+                    android.util.Log.e("ProcessingRepository", "Нейросетевой фильтр $filterType вернул null")
+                    // Освобождаем промежуточный bitmap при ошибке
+                    if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
+                        workingBitmap.recycle()
+                    }
+                    return@withContext null
+                }
+            }
+            
+            // Затем применяем обычные фильтры (с intensity, isPreview = false для финального результата)
+            processedBitmap = if (regularFilters.isNotEmpty()) {
+                imageFilterProcessor.applyFilters(workingBitmap, regularFilters, isPreview = false)
+            } else {
+                workingBitmap
+            } ?: run {
+                // Освобождаем промежуточный bitmap при ошибке
+                if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
+                    workingBitmap.recycle()
+                }
+                return@withContext null
+            }
+            
+            // Освобождаем промежуточный bitmap, если он отличается от исходного и результата
+            if (workingBitmap != bitmap && workingBitmap != processedBitmap && !workingBitmap.isRecycled) {
+                workingBitmap.recycle()
+            }
             
             // Освобождаем исходный bitmap после обработки
             if (bitmap != processedBitmap && !bitmap.isRecycled) {

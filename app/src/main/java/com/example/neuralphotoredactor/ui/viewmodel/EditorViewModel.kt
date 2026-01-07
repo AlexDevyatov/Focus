@@ -90,8 +90,14 @@ class EditorViewModel @Inject constructor(
             // Удаляем фильтр, если он уже выбран
             currentFilters.removeAt(existingIndex)
         } else {
-            // Добавляем фильтр с интенсивностью по умолчанию
-            currentFilters.add(Pair(filterType, 0.5f))
+            // Для нейросетевых фильтров не добавляем intensity (null)
+            // Для обычных фильтров добавляем с интенсивностью по умолчанию
+            val intensity = if (filterType in neuralFilters) {
+                null // Нейросетевые фильтры применяются без настроек
+            } else {
+                0.5f // Обычные фильтры с интенсивностью по умолчанию
+            }
+            currentFilters.add(Pair(filterType, intensity))
         }
         
         _uiState.value = _uiState.value.copy(selectedFilters = currentFilters)
@@ -100,6 +106,11 @@ class EditorViewModel @Inject constructor(
     }
     
     fun updateFilterIntensity(filterType: FilterType, intensity: Float) {
+        // Нейросетевые фильтры не поддерживают изменение intensity
+        if (filterType in neuralFilters) {
+            return
+        }
+        
         val currentFilters = _uiState.value.selectedFilters.toMutableList()
         val existingIndex = currentFilters.indexOfFirst { it.first == filterType }
         
@@ -123,7 +134,7 @@ class EditorViewModel @Inject constructor(
      * Быстрый предпросмотр множественных фильтров без сохранения в файл.
      * Используется для отображения результата в реальном времени.
      */
-    private fun previewFilters(filters: List<Pair<FilterType, Float>>) {
+    private fun previewFilters(filters: List<Pair<FilterType, Float?>>) {
         // Отменяем предыдущий предпросмотр
         currentPreviewJob?.cancel()
         
@@ -682,7 +693,7 @@ data class EditorUiState(
     val cropBitmap: Bitmap? = null, // Bitmap для кадрирования
     val isLoading: Boolean = false,
     val error: String? = null,
-    val selectedFilters: List<Pair<FilterType, Float>> = emptyList(), // Список выбранных фильтров с интенсивностями
+    val selectedFilters: List<Pair<FilterType, Float?>> = emptyList(), // Список выбранных фильтров с интенсивностями (null для нейросетевых)
     val currentFilterIntensity: Float = 0.5f, // Интенсивность для текущего редактируемого фильтра
     val showNeuralFilters: Boolean = false, // Показывать нейросетевые фильтры (false = обычные)
     val showEditMode: Boolean = false, // Показывать режим редактирования (false = фильтры)

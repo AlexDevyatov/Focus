@@ -61,7 +61,7 @@ fun EditorScreen(
     isLoading: Boolean,
     error: String?,
     filters: List<FilterType>,
-    selectedFilters: List<Pair<FilterType, Float>>,
+    selectedFilters: List<Pair<FilterType, Float?>>,
     currentFilterIntensity: Float,
     showNeuralFilters: Boolean,
     showEditMode: Boolean,
@@ -267,26 +267,44 @@ fun EditorScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
-                        // Слайдеры для каждого выбранного фильтра
+                        // Слайдеры только для обычных фильтров (нейросетевые применяются сразу без настроек)
                         selectedFilters.forEach { (filterType, intensity) ->
-                            val currentIntensity = intensity ?: currentFilterIntensity
-                            Column(
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            ) {
+                            val isNeuralFilter = filterType in listOf(
+                                FilterType.ENHANCE,
+                                FilterType.STYLE_TRANSFER,
+                                FilterType.DENOISE,
+                                FilterType.UPSCALE,
+                                FilterType.COLOR_CORRECTION
+                            )
+                            
+                            if (isNeuralFilter) {
+                                // Для нейросетевых фильтров показываем только название без слайдера
                                 Text(
-                                    text = "${getFilterName(filterType)}: ${(currentIntensity * 100).toInt()}%",
+                                    text = getFilterName(filterType),
                                     style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(bottom = 4.dp)
+                                    modifier = Modifier.padding(vertical = 8.dp)
                                 )
-                                Slider(
-                                    value = currentIntensity,
-                                    onValueChange = { newIntensity ->
-                                        onIntensityChange(filterType, newIntensity)
-                                    },
-                                    valueRange = 0f..1f,
-                                    steps = 99,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                            } else {
+                                // Для обычных фильтров показываем слайдер
+                                val currentIntensity = intensity ?: currentFilterIntensity
+                                Column(
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "${getFilterName(filterType)}: ${(currentIntensity * 100).toInt()}%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                    Slider(
+                                        value = currentIntensity,
+                                        onValueChange = { newIntensity ->
+                                            onIntensityChange(filterType, newIntensity)
+                                        },
+                                        valueRange = 0f..1f,
+                                        steps = 99,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
                     }
