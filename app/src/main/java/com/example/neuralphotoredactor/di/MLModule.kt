@@ -103,12 +103,12 @@ abstract class MLModule {
          */
         @Provides
         @Singleton
-        fun provideErsganImageProcessor(
+        fun provideEsrganImageProcessor(
             interpreter: Interpreter?,
             preprocessor: ImagePreprocessor,
             postprocessor: ImagePostprocessor
         ): EsrganImageProcessor {
-            return EsrganImageProcessor(interpreter, preprocessor, postprocessor)
+            return EsrganImageProcessor(interpreter)
         }
     }
 }

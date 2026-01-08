@@ -2,8 +2,6 @@ package com.example.neuralphotoredactor.ml.interpreter
 
 import android.graphics.Bitmap
 import com.example.neuralphotoredactor.domain.enums.FilterType
-import com.example.neuralphotoredactor.ml.preprocessor.ImagePreprocessor
-import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -33,9 +31,7 @@ import kotlin.math.cos
  * DenoiseImageProcessor и т.д.) с соответствующими Interpreter'ами.
  */
 class EsrganImageProcessor @Inject constructor(
-    private val interpreter: Interpreter?,
-    private val preprocessor: ImagePreprocessor,
-    private val postprocessor: ImagePostprocessor
+    private val interpreter: Interpreter?
 ) {
     
     companion object {
