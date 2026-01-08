@@ -176,8 +176,9 @@ class MainActivity : ComponentActivity() {
                             BottomNavigationBar(navController = navController)
                         }
                     ) { paddingValues ->
-                        AppNavigation(
-                            navController = navController,
+                        Box(modifier = Modifier.padding(paddingValues)) {
+                            AppNavigation(
+                                navController = navController,
                             galleryScreen = {
                             GalleryScreen(
                                 images = galleryUiState.images,
@@ -299,6 +300,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     )
+                        }
                     }
                 }
             }

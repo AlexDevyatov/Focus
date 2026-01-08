@@ -34,7 +34,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
             // Для API 31-32 используем только алгоритмические методы
             val useAGSL = false // Отключено, так как требует API 33+ и hardware acceleration
             
-            if (useAGSL) {
+            if (useAGSL && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val result = when (filterType) {
                     FilterType.GAUSSIAN_BLUR -> applyGaussianBlurAGSL(bitmap, intensity ?: 0.5f)
                     FilterType.NOISE_REDUCTION -> applyNoiseReductionAGSL(bitmap, intensity ?: 0.5f)
@@ -217,9 +217,9 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         }
     }
     
-    // ==================== AGSL методы (API 31+) ====================
+    // ==================== AGSL методы (API 33+) ====================
     
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyGrayscaleAGSL(bitmap: Bitmap): Bitmap? {
         return try {
             val result = applyAGSLShader(bitmap, AGSLShaders.GRAYSCALE_SHADER)
@@ -233,7 +233,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         }
     }
     
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applySepiaAGSL(bitmap: Bitmap, intensity: Float): Bitmap? {
         return try {
             val shaderCode = AGSLShaders.SEPIA_SHADER.replace(
@@ -251,7 +251,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         }
     }
     
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyVignetteAGSL(bitmap: Bitmap, intensity: Float): Bitmap? {
         return try {
             val shaderCode = AGSLShaders.VIGNETTE_SHADER
@@ -268,7 +268,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         }
     }
     
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applySharpenAGSL(bitmap: Bitmap, intensity: Float): Bitmap? {
         val strength = intensity * 2f // Максимальная сила 2.0
         return try {
@@ -286,7 +286,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         }
     }
     
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyGaussianBlurAGSL(bitmap: Bitmap, intensity: Float): Bitmap? {
         return try {
             // Для размытия используем встроенный createBlurEffect (быстрее и качественнее)
@@ -303,7 +303,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
         }
     }
     
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyNoiseReductionAGSL(bitmap: Bitmap, intensity: Float): Bitmap? {
         return try {
             val shaderCode = AGSLShaders.NOISE_REDUCTION_SHADER
@@ -328,12 +328,16 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
      * @param configureUniforms Функция для настройки uniform переменных
      * @return Обработанное изображение
      */
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU) // API 33 для RuntimeShader
     private fun applyAGSLShader(
         bitmap: Bitmap,
         shaderCode: String
     ): Bitmap? {
         return try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                return null
+            }
+            
             android.util.Log.d("ImageFilterProcessor", "Применяем AGSL шейдер, размер Bitmap: ${bitmap.width}x${bitmap.height}")
             
             // Создаем RuntimeShader из кода AGSL
@@ -388,7 +392,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
      * Применить RenderEffect к изображению через Paint.
      * Альтернативный подход, который работает без hardware acceleration.
      */
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyRenderEffect(
         bitmap: Bitmap,
         createEffect: (RenderEffect?) -> RenderEffect
@@ -411,7 +415,7 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
      * ВАЖНО: Этот метод отключен, так как RenderEffect не работает в software rendering.
      * Используются только алгоритмические методы (fallback).
      */
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyRenderEffectViaPaint(bitmap: Bitmap, effect: RenderEffect): Bitmap? {
         // Отключено: RenderEffect требует hardware acceleration и API 33+ для setRenderEffect
         android.util.Log.w("ImageFilterProcessor", "applyRenderEffectViaPaint отключен, используем fallback")
@@ -690,14 +694,14 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
      * @return Обработанное изображение
      */
     private fun applyVignette(bitmap: Bitmap, intensity: Float): Bitmap? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             applyVignetteRenderEffect(bitmap, intensity)
         } else {
             applyVignetteAlgorithmic(bitmap, intensity)
         }
     }
     
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyVignetteRenderEffect(bitmap: Bitmap, intensity: Float): Bitmap? {
         // Используем более эффективный подход с радиальным градиентом
         return applyVignetteAlgorithmic(bitmap, intensity)
