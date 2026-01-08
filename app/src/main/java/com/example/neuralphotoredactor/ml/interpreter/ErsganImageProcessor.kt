@@ -16,6 +16,8 @@ import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import java.nio.ByteBuffer
 import javax.inject.Inject
+import kotlin.math.PI
+import kotlin.math.cos
 
 /**
  * Процессор изображений для модели ESRGAN (Enhanced Super-Resolution Generative Adversarial Network).
@@ -39,7 +41,8 @@ class ErsganImageProcessor @Inject constructor(
     companion object {
         private const val PATCH_SIZE = 64
         // Увеличено перекрытие для лучшего устранения артефактов на границах
-        private const val OVERLAP = 24 // Перекрытие патчей для избежания артефактов на границах
+        // Для 4x масштаба рекомендуется перекрытие 30-40 пикселей для плавного blending
+        private const val OVERLAP = 32 // Перекрытие патчей для избежания артефактов на границах
         // Увеличено количество параллельных патчей для лучшего использования многоядерности
         // Оптимальное значение зависит от количества ядер CPU (обычно 4-8)
         private const val MAX_PARALLEL_PATCHES = 8
@@ -241,9 +244,9 @@ class ErsganImageProcessor @Inject constructor(
                             finalPatch.getPixels(patchPixels, 0, dstWidth, 0, 0, dstWidth, dstHeight)
                             
                             // Вычисляем размер перекрытия в выходных координатах
-                            // Увеличиваем перекрытие для более агрессивного сглаживания
-                            val overlapX = (OVERLAP * scaleX).toInt().coerceAtLeast(20)
-                            val overlapY = (OVERLAP * scaleY).toInt().coerceAtLeast(20)
+                            // Для 4x масштаба перекрытие в 32 пикселя становится ~128 пикселей на выходе
+                            val overlapX = (OVERLAP * scaleX).toInt().coerceAtLeast(32)
+                            val overlapY = (OVERLAP * scaleY).toInt().coerceAtLeast(32)
                             
                             // Копируем патч с blending на границах
                             for (y in 0 until dstHeight) {
@@ -256,7 +259,7 @@ class ErsganImageProcessor @Inject constructor(
                                         val patchIndex = y * dstWidth + x
                                         val patchPixel = patchPixels[patchIndex]
                                         
-                                        // Вычисляем вес для blending на границах с использованием плавной функции
+                                        // Вычисляем вес для blending на границах с использованием улучшенной функции
                                         var weight = 1.0f
                                         
                                         // Проверяем, находимся ли мы в области перекрытия
@@ -265,16 +268,18 @@ class ErsganImageProcessor @Inject constructor(
                                         val distFromTop = y
                                         val distFromBottom = dstHeight - y - 1
                                         
-                                        // Используем косинусную функцию для более плавного перехода
-                                        // Это создает более естественное сглаживание на границах
+                                        // Используем улучшенную весовую функцию для более плавного перехода
+                                        // Косинусная функция с дополнительным сглаживанием для устранения видимых швов
                                         fun smoothWeight(distance: Int, overlap: Int): Float {
                                             if (distance >= overlap) return 1.0f
                                             val normalized = distance.toFloat() / overlap
-                                            // Используем более плавную кривую (полиномиальное сглаживание)
-                                            return (1.0f - normalized * normalized * normalized)
+                                            // Используем косинусную интерполяцию для более естественного blending
+                                            // Это обеспечивает плавный переход без видимых артефактов
+                                            return 0.5f * (1.0f - cos(normalized * PI.toFloat()))
                                         }
 
                                         // Применяем веса на границах для плавного перехода
+                                        // Учитываем все четыре границы патча
                                         if (distFromLeft < overlapX && dstX > 0) {
                                             weight *= smoothWeight(distFromLeft, overlapX)
                                         }
@@ -288,8 +293,8 @@ class ErsganImageProcessor @Inject constructor(
                                             weight *= smoothWeight(distFromBottom, overlapY)
                                         }
                                         
-                                        // Убеждаемся, что вес не меньше минимального для избежания артефактов
-                                        weight = weight.coerceAtLeast(0.3f)
+                                        // Минимальный вес для избежания полного затухания (может вызвать артефакты)
+                                        weight = weight.coerceIn(0.1f, 1.0f)
                                         
                                         // Blending: усредняем с существующим пикселем
                                         val existingWeight = weights[outputIndex]
@@ -388,19 +393,16 @@ class ErsganImageProcessor @Inject constructor(
             patchBitmap.getPixels(pixels, 0, targetWidth, 0, 0, targetWidth, targetHeight)
             
             // Конвертируем пиксели в нужный формат данных
-            // Большинство моделей ESRGAN ожидают RGB, но некоторые могут ожидать BGR
-            // Если цвета искажены, попробуйте поменять порядок каналов
+            // Модель ESRGAN (kaggle/esrgan-tf2) ожидает RGB float32 в диапазоне [0, 255]
             when (inputDataType) {
                 org.tensorflow.lite.DataType.FLOAT32 -> {
-                    // Нормализуем значения в диапазон [0, 1]
+                    // Подаем RGB float32 в диапазоне [0, 255] (без нормализации)
                     for (pixel in pixels) {
-                        val r = ((pixel shr 16) and 0xFF) / 255.0f
-                        val g = ((pixel shr 8) and 0xFF) / 255.0f
-                        val b = (pixel and 0xFF) / 255.0f
+                        val r = ((pixel shr 16) and 0xFF).toFloat()
+                        val g = ((pixel shr 8) and 0xFF).toFloat()
+                        val b = (pixel and 0xFF).toFloat()
                         
-                        // Подаем RGB (стандарт для ESRGAN)
-                        // Если цвета искажены, попробуйте BGR: putFloat(b), putFloat(g), putFloat(r)
-                        // Пока оставляем RGB, так как выходные данные уже переключены на BGR
+                        // Подаем RGB (модель ожидает именно RGB)
                         inputBuffer.putFloat(r)
                         inputBuffer.putFloat(g)
                         inputBuffer.putFloat(b)
@@ -413,9 +415,7 @@ class ErsganImageProcessor @Inject constructor(
                         val g = ((pixel shr 8) and 0xFF).toByte()
                         val b = (pixel and 0xFF).toByte()
                         
-                        // Подаем RGB (стандарт для ESRGAN)
-                        // Если цвета искажены, попробуйте BGR: put(b), put(g), put(r)
-                        // Пока оставляем RGB, так как выходные данные уже переключены на BGR
+                        // Подаем RGB (модель ожидает именно RGB)
                         inputBuffer.put(r)
                         inputBuffer.put(g)
                         inputBuffer.put(b)
@@ -450,82 +450,26 @@ class ErsganImageProcessor @Inject constructor(
                 "Выходной тензор: ${outputShape.contentToString()}, тип: $outputDataType, каналов: $outputChannels")
             
             // Обрабатываем выходные данные вручную
+            // Модель ESRGAN (kaggle/esrgan-tf2) возвращает RGB float32 в диапазоне [0, 255]
             outputBuffer.rewind()
-            
-            // Логируем первые значения для диагностики формата данных
-            val positionBeforeRead = outputBuffer.position()
-            val firstValues = mutableListOf<Float>()
-            repeat(minOf(9, outputWidth * outputHeight * outputChannels)) {
-                if (outputDataType == org.tensorflow.lite.DataType.FLOAT32) {
-                    firstValues.add(outputBuffer.getFloat())
-                } else {
-                    firstValues.add(outputBuffer.get().toFloat())
-                }
-            }
-            outputBuffer.rewind()
-            
-            android.util.Log.d("MODEL_DIAGNOSTICS", 
-                "Первые значения выходного буфера (тип $outputDataType): ${firstValues.take(9).joinToString(", ")}")
             
             val resultBitmap = when (outputDataType) {
                 org.tensorflow.lite.DataType.FLOAT32 -> {
-                    // Данные в формате FLOAT32 - могут быть [0, 1] или [0, 255]
+                    // Модель возвращает RGB float32 в диапазоне [0, 255]
                     val bitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
                     val pixels = IntArray(outputWidth * outputHeight)
-                    
-                    // Проверяем диапазон первых значений для определения формата
-                    // Читаем первые 3 значения (RGB первого пикселя) для определения формата
-                    val rSample = outputBuffer.getFloat()
-                    val gSample = outputBuffer.getFloat()
-                    val bSample = outputBuffer.getFloat()
-                    outputBuffer.rewind() // Возвращаемся в начало
-                    
-                    // Определяем формат по первому пикселю
-                    val isNormalized = rSample >= 0f && rSample <= 1f && 
-                                      gSample >= 0f && gSample <= 1f && 
-                                      bSample >= 0f && bSample <= 1f
-                    
-                    android.util.Log.d("MODEL_DIAGNOSTICS", 
-                        "Выходной формат: ${if (isNormalized) "нормализованный [0, 1]" else "денормализованный [0, 255]"}, " +
-                        "первые значения каналов: Ch1=$rSample, Ch2=$gSample, Ch3=$bSample")
-                    android.util.Log.d("MODEL_DIAGNOSTICS", 
-                        "Используется порядок BGR->RGB (Ch3=R, Ch2=G, Ch1=B). Если цвета искажены, попробуйте RGB (Ch1=R, Ch2=G, Ch3=B)")
                     
                     // Оптимизация: используем прямой доступ к массиву пикселей
                     var pixelIndex = 0
                     for (y in 0 until outputHeight) {
                         for (x in 0 until outputWidth) {
-                            // Читаем значения каналов (модель может возвращать RGB или BGR)
-                            val ch1 = outputBuffer.getFloat()
-                            val ch2 = outputBuffer.getFloat()
-                            val ch3 = outputBuffer.getFloat()
-                            
-                            // Денормализуем, если нужно
-                            val ch1Int = if (isNormalized) {
-                                (ch1 * 255f + 0.5f).toInt().coerceIn(0, 255)
-                            } else {
-                                ch1.toInt().coerceIn(0, 255)
-                            }
-                            val ch2Int = if (isNormalized) {
-                                (ch2 * 255f + 0.5f).toInt().coerceIn(0, 255)
-                            } else {
-                                ch2.toInt().coerceIn(0, 255)
-                            }
-                            val ch3Int = if (isNormalized) {
-                                (ch3 * 255f + 0.5f).toInt().coerceIn(0, 255)
-                            } else {
-                                ch3.toInt().coerceIn(0, 255)
-                            }
-
-                            // Модель Kaggle ESRGAN может возвращать BGR вместо RGB
-                            // Попробуем оба варианта - сначала BGR (часто используется в моделях)
-                            // Если цвета все еще искажены, поменяйте на RGB: val rInt = ch1Int; val gInt = ch2Int; val bInt = ch3Int
-                            val rInt = ch3Int // BGR -> RGB: третий канал становится красным
-                            val gInt = ch2Int
-                            val bInt = ch1Int // Первый канал становится синим
+                            // Читаем значения каналов RGB напрямую (без перестановки)
+                            val r = outputBuffer.getFloat().toInt().coerceIn(0, 255)
+                            val g = outputBuffer.getFloat().toInt().coerceIn(0, 255)
+                            val b = outputBuffer.getFloat().toInt().coerceIn(0, 255)
                             
                             // Создаем ARGB пиксель напрямую
-                            pixels[pixelIndex++] = (255 shl 24) or (rInt shl 16) or (gInt shl 8) or bInt
+                            pixels[pixelIndex++] = (255 shl 24) or (r shl 16) or (g shl 8) or b
                         }
                     }
                     
@@ -533,7 +477,7 @@ class ErsganImageProcessor @Inject constructor(
                     bitmap
                 }
                 org.tensorflow.lite.DataType.UINT8 -> {
-                    // Данные уже в формате [0, 255]
+                    // Данные уже в формате [0, 255] RGB
                     val bitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
                     val pixels = IntArray(outputWidth * outputHeight)
                     
@@ -541,16 +485,9 @@ class ErsganImageProcessor @Inject constructor(
                     var pixelIndex = 0
                     for (y in 0 until outputHeight) {
                         for (x in 0 until outputWidth) {
-                            val ch1 = outputBuffer.get().toInt() and 0xFF
-                            val ch2 = outputBuffer.get().toInt() and 0xFF
-                            val ch3 = outputBuffer.get().toInt() and 0xFF
-                            
-                            // Модель Kaggle ESRGAN может возвращать BGR вместо RGB
-                            // Попробуем BGR (часто используется в моделях)
-                            // Если цвета все еще искажены, поменяйте на RGB: val r = ch1; val g = ch2; val b = ch3
-                            val r = ch3 // BGR -> RGB
-                            val g = ch2
-                            val b = ch1
+                            val r = outputBuffer.get().toInt() and 0xFF
+                            val g = outputBuffer.get().toInt() and 0xFF
+                            val b = outputBuffer.get().toInt() and 0xFF
                             
                             // Создаем ARGB пиксель напрямую (быстрее чем Color.argb)
                             pixels[pixelIndex++] = (255 shl 24) or (r shl 16) or (g shl 8) or b
@@ -568,7 +505,6 @@ class ErsganImageProcessor @Inject constructor(
                     tensorBuffer.loadBuffer(outputBuffer)
                     
                     val outputImage = TensorImage(outputDataType)
-                    // Пробуем RGB, если цвета искажены, попробуйте BGR
                     outputImage.load(
                         tensorBuffer,
                         org.tensorflow.lite.support.image.ColorSpaceType.RGB
@@ -577,34 +513,11 @@ class ErsganImageProcessor @Inject constructor(
                 }
             }
             
-            // Проверяем результат и логируем информацию для диагностики цветов
+            // Проверяем результат
             if (resultBitmap != null && !resultBitmap.isRecycled) {
                 android.util.Log.d("ErsganImageProcessor", 
                     "Патч обработан: ${resultBitmap.width}x${resultBitmap.height}, " +
-                    "конфиг: ${resultBitmap.config}, " +
-                    "непрозрачный: ${resultBitmap.hasAlpha()}")
-                
-                // Проверяем несколько пикселей для диагностики цветов
-                if (resultBitmap.width > 0 && resultBitmap.height > 0) {
-                    val testPixel1 = resultBitmap.getPixel(0, 0)
-                    val testPixel2 = if (resultBitmap.width > 10 && resultBitmap.height > 10) {
-                        resultBitmap.getPixel(10, 10)
-                    } else {
-                        testPixel1
-                    }
-                    
-                    val r1 = android.graphics.Color.red(testPixel1)
-                    val g1 = android.graphics.Color.green(testPixel1)
-                    val b1 = android.graphics.Color.blue(testPixel1)
-                    val r2 = android.graphics.Color.red(testPixel2)
-                    val g2 = android.graphics.Color.green(testPixel2)
-                    val b2 = android.graphics.Color.blue(testPixel2)
-                    
-                    android.util.Log.d("MODEL_DIAGNOSTICS", 
-                        "Пиксели обработанного патча: [0,0] RGB($r1, $g1, $b1), [10,10] RGB($r2, $g2, $b2)")
-                    android.util.Log.d("MODEL_DIAGNOSTICS", 
-                        "Если цвета искажены (например, красный выглядит синим), поменяйте порядок каналов в коде")
-                }
+                    "конфиг: ${resultBitmap.config}")
             } else {
                 android.util.Log.e("ErsganImageProcessor", "Обработанный патч null или переработан")
             }
