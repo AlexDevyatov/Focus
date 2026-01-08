@@ -37,7 +37,6 @@
     <string name="filter_sepia">Сепия</string>
     
     <!-- Neural Network Filters -->
-    <string name="filter_enhance">Улучшение</string>
     <string name="filter_style_transfer">Стилизация</string>
     <string name="filter_denoise">Удаление шумов (ML)</string>
     <string name="filter_upscale">Увеличение разрешения</string>

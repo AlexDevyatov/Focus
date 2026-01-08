@@ -43,7 +43,6 @@ class ImageFilterProcessorImpl @Inject constructor() : ImageFilterProcessor {
                     FilterType.GRAYSCALE -> applyGrayscaleAGSL(bitmap)
                     FilterType.SEPIA -> applySepiaAGSL(bitmap, intensity ?: 1.0f)
                     // Старые фильтры - возвращаем null (требуют ML модели)
-                    FilterType.ENHANCE,
                     FilterType.STYLE_TRANSFER,
                     FilterType.DENOISE,
                     FilterType.UPSCALE,

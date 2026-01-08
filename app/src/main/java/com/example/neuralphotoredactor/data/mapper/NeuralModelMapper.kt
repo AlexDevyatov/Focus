@@ -73,7 +73,7 @@ object NeuralModelMapper {
                 "STYLE_TRANSFER", "STYLIZATION", "STYLE" -> ModelType.STYLE_TRANSFER
                 "SUPER_RESOLUTION", "SUPERRESOLUTION", "UPSCALE" -> ModelType.SUPER_RESOLUTION
                 "FILTER" -> ModelType.FILTER
-                "ENHANCEMENT", "ENHANCE" -> ModelType.ENHANCEMENT
+                "ENHANCEMENT" -> ModelType.ENHANCEMENT
                 else -> ModelType.OTHER
             }
         }

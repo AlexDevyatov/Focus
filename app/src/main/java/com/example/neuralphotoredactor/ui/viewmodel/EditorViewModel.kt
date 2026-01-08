@@ -54,7 +54,6 @@ class EditorViewModel @Inject constructor(
     
     // Нейросетевые фильтры (требуют TFLite модели)
     val neuralFilters = listOf(
-        FilterType.ENHANCE,
         FilterType.STYLE_TRANSFER,
         FilterType.DENOISE,
         FilterType.UPSCALE,

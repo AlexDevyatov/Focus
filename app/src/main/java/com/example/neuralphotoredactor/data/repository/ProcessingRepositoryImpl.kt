@@ -180,7 +180,6 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             val neuralFilters = filters.filter { (filterType, _) ->
                 filterType in listOf(
-                    FilterType.ENHANCE,
                     FilterType.STYLE_TRANSFER,
                     FilterType.DENOISE,
                     FilterType.UPSCALE,
@@ -266,7 +265,6 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             val neuralFilters = filters.filter { (filterType, _) ->
                 filterType in listOf(
-                    FilterType.ENHANCE,
                     FilterType.STYLE_TRANSFER,
                     FilterType.DENOISE,
                     FilterType.UPSCALE,

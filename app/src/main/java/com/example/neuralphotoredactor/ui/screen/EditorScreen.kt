@@ -40,7 +40,6 @@ private fun getFilterName(filterType: FilterType): String {
         FilterType.VIGNETTE -> stringResource(R.string.filter_vignette)
         FilterType.GRAYSCALE -> stringResource(R.string.filter_grayscale)
         FilterType.SEPIA -> stringResource(R.string.filter_sepia)
-        FilterType.ENHANCE -> stringResource(R.string.filter_enhance)
         FilterType.STYLE_TRANSFER -> stringResource(R.string.filter_style_transfer)
         FilterType.DENOISE -> stringResource(R.string.filter_denoise)
         FilterType.UPSCALE -> stringResource(R.string.filter_upscale)
@@ -270,7 +269,6 @@ fun EditorScreen(
                         // Слайдеры только для обычных фильтров (нейросетевые применяются сразу без настроек)
                         selectedFilters.forEach { (filterType, intensity) ->
                             val isNeuralFilter = filterType in listOf(
-                                FilterType.ENHANCE,
                                 FilterType.STYLE_TRANSFER,
                                 FilterType.DENOISE,
                                 FilterType.UPSCALE,
