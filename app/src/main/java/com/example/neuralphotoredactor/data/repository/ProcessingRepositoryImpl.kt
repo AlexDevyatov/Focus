@@ -13,7 +13,7 @@ import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
-import com.example.neuralphotoredactor.ml.interpreter.ErsganImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -30,7 +30,7 @@ import javax.inject.Inject
  */
 class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val ersganImageProcessor: ErsganImageProcessor,
+    private val esrganImageProcessor: EsrganImageProcessor,
     private val imageFilterProcessor: ImageFilterProcessor,
     private val imageEditProcessor: ImageEditProcessor,
     private val imageStorage: ImageStorage,
@@ -59,7 +59,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                 }
                 else -> {
                     // Используем ErsganImageProcessor для ML-фильтров (требуют TFLite модели)
-                    ersganImageProcessor.processImage(bitmap, filterType)
+                    esrganImageProcessor.processImage(bitmap, filterType)
                 }
             } ?: return@withContext null
             
@@ -133,7 +133,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                 }
                 else -> {
                     // Используем ErsganImageProcessor для ML-фильтров (требуют TFLite модели)
-                    ersganImageProcessor.processImage(bitmap, filterType)
+                    esrganImageProcessor.processImage(bitmap, filterType)
                 }
             }
             
@@ -192,7 +192,7 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             // Сначала применяем нейросетевые фильтры (без intensity)
             for ((filterType, _) in neuralFilters) {
-                val processed = ersganImageProcessor.processImage(workingBitmap, filterType)
+                val processed = esrganImageProcessor.processImage(workingBitmap, filterType)
                 if (processed != null) {
                     // Освобождаем промежуточный bitmap, если он отличается от исходного
                     if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
@@ -278,7 +278,7 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             // Сначала применяем нейросетевые фильтры (без intensity)
             for ((filterType, _) in neuralFilters) {
-                val processed = ersganImageProcessor.processImage(workingBitmap, filterType)
+                val processed = esrganImageProcessor.processImage(workingBitmap, filterType)
                 if (processed != null) {
                     // Освобождаем промежуточный bitmap, если он отличается от исходного
                     if (workingBitmap != bitmap && !workingBitmap.isRecycled) {

@@ -32,7 +32,7 @@ import kotlin.math.cos
  * Для других моделей создавайте отдельные процессоры (например, StyleTransferImageProcessor,
  * DenoiseImageProcessor и т.д.) с соответствующими Interpreter'ами.
  */
-class ErsganImageProcessor @Inject constructor(
+class EsrganImageProcessor @Inject constructor(
     private val interpreter: Interpreter?,
     private val preprocessor: ImagePreprocessor,
     private val postprocessor: ImagePostprocessor

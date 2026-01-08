@@ -5,7 +5,7 @@ import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessorImpl
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessorImpl
-import com.example.neuralphotoredactor.ml.interpreter.ErsganImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessorImpl
 import com.example.neuralphotoredactor.ml.preprocessor.ImagePreprocessor
@@ -107,8 +107,8 @@ abstract class MLModule {
             interpreter: Interpreter?,
             preprocessor: ImagePreprocessor,
             postprocessor: ImagePostprocessor
-        ): ErsganImageProcessor {
-            return ErsganImageProcessor(interpreter, preprocessor, postprocessor)
+        ): EsrganImageProcessor {
+            return EsrganImageProcessor(interpreter, preprocessor, postprocessor)
         }
     }
 }
