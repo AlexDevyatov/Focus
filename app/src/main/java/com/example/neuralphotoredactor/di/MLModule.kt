@@ -6,6 +6,7 @@ import com.example.neuralphotoredactor.ml.edit.ImageEditProcessorImpl
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessorImpl
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessorImpl
 import com.example.neuralphotoredactor.ml.preprocessor.ImagePreprocessor
@@ -71,6 +72,7 @@ abstract class MLModule {
          */
         @Provides
         @Singleton
+        @EsrganInterpreter
         fun provideERSGANInterpreter(
             @ApplicationContext context: Context
         ): Interpreter? {
@@ -104,11 +106,62 @@ abstract class MLModule {
         @Provides
         @Singleton
         fun provideEsrganImageProcessor(
-            interpreter: Interpreter?,
+            @EsrganInterpreter interpreter: Interpreter?,
             preprocessor: ImagePreprocessor,
             postprocessor: ImagePostprocessor
         ): EsrganImageProcessor {
             return EsrganImageProcessor(interpreter)
+        }
+        
+        /**
+         * Предоставляет Interpreter для модели SplitterNet (удаление шумов).
+         * 
+         * Эта модель используется для удаления шумов с изображений.
+         * Применяется для фильтра DENOISE.
+         * Модель загружается из assets при инициализации приложения.
+         * 
+         * ВАЖНО: Создайте файл splitternet_midd_model.tflite в app/src/main/assets/
+         * 
+         * @param context Контекст приложения для доступа к assets
+         * @return Interpreter для модели SplitterNet или null, если модель не найдена
+         */
+        @Provides
+        @Singleton
+        @SplitterNetInterpreter
+        fun provideSplitterNetInterpreter(
+            @ApplicationContext context: Context
+        ): Interpreter? {
+            return try {
+                val modelBuffer = ModelLoader.loadModelFile(context, "splitternet_midd_model.tflite")
+                ModelLoader.createInterpreter(modelBuffer)
+            } catch (e: Exception) {
+                // Если модель не найдена, возвращаем null
+                // Обработка ошибки будет в SplitterNetImageProcessor
+                android.util.Log.e("MLModule", "SplitterNet модель не найдена: ${e.message}")
+                null
+            }
+        }
+        
+        /**
+         * Предоставляет SplitterNetImageProcessor с Interpreter для модели SplitterNet.
+         * 
+         * Этот процессор используется для обработки изображений через модель SplitterNet
+         * для удаления шумов.
+         * Применяется для фильтра DENOISE.
+         * 
+         * Обрабатывает изображение любого размера, разбивая его на патчи 256x256 с перекрытием,
+         * обрабатывает каждый патч через модель, и собирает результат обратно в исходный размер
+         * с использованием взвешенного усреднения.
+         * 
+         * @param interpreter Interpreter для модели SplitterNet
+         * @return SplitterNetImageProcessor для обработки изображений через SplitterNet
+         */
+        @Provides
+        @Singleton
+        fun provideSplitterNetImageProcessor(
+            @SplitterNetInterpreter interpreter: Interpreter?
+        ): SplitterNetImageProcessor {
+            return SplitterNetImageProcessor(interpreter)
         }
     }
 }

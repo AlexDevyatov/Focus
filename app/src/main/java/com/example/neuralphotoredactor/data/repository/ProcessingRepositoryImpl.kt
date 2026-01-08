@@ -14,6 +14,7 @@ import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,7 @@ import javax.inject.Inject
 class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val esrganImageProcessor: EsrganImageProcessor,
+    private val splitterNetImageProcessor: SplitterNetImageProcessor,
     private val imageFilterProcessor: ImageFilterProcessor,
     private val imageEditProcessor: ImageEditProcessor,
     private val imageStorage: ImageStorage,
@@ -57,8 +59,12 @@ class ProcessingRepositoryImpl @Inject constructor(
                     // Используем ImageFilterProcessor для новых фильтров
                     imageFilterProcessor.applyFilter(bitmap, filterType, intensity, isPreview = false)
                 }
+                FilterType.DENOISE -> {
+                    // Используем SplitterNetImageProcessor для удаления шумов
+                    splitterNetImageProcessor.processImage(bitmap, filterType)
+                }
                 else -> {
-                    // Используем ErsganImageProcessor для ML-фильтров (требуют TFLite модели)
+                    // Используем ErsganImageProcessor для других ML-фильтров (требуют TFLite модели)
                     esrganImageProcessor.processImage(bitmap, filterType)
                 }
             } ?: return@withContext null
@@ -131,8 +137,12 @@ class ProcessingRepositoryImpl @Inject constructor(
                     // isPreview = true для быстрого предпросмотра
                     imageFilterProcessor.applyFilter(bitmap, filterType, intensity, isPreview = true)
                 }
+                FilterType.DENOISE -> {
+                    // Используем SplitterNetImageProcessor для удаления шумов
+                    splitterNetImageProcessor.processImage(bitmap, filterType)
+                }
                 else -> {
-                    // Используем ErsganImageProcessor для ML-фильтров (требуют TFLite модели)
+                    // Используем ErsganImageProcessor для других ML-фильтров (требуют TFLite модели)
                     esrganImageProcessor.processImage(bitmap, filterType)
                 }
             }
@@ -191,7 +201,16 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             // Сначала применяем нейросетевые фильтры (без intensity)
             for ((filterType, _) in neuralFilters) {
-                val processed = esrganImageProcessor.processImage(workingBitmap, filterType)
+                val processed = when (filterType) {
+                    FilterType.DENOISE -> {
+                        // Используем SplitterNetImageProcessor для удаления шумов
+                        splitterNetImageProcessor.processImage(workingBitmap, filterType)
+                    }
+                    else -> {
+                        // Используем ErsganImageProcessor для других ML-фильтров
+                        esrganImageProcessor.processImage(workingBitmap, filterType)
+                    }
+                }
                 if (processed != null) {
                     // Освобождаем промежуточный bitmap, если он отличается от исходного
                     if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
@@ -276,7 +295,16 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             // Сначала применяем нейросетевые фильтры (без intensity)
             for ((filterType, _) in neuralFilters) {
-                val processed = esrganImageProcessor.processImage(workingBitmap, filterType)
+                val processed = when (filterType) {
+                    FilterType.DENOISE -> {
+                        // Используем SplitterNetImageProcessor для удаления шумов
+                        splitterNetImageProcessor.processImage(workingBitmap, filterType)
+                    }
+                    else -> {
+                        // Используем ErsganImageProcessor для других ML-фильтров
+                        esrganImageProcessor.processImage(workingBitmap, filterType)
+                    }
+                }
                 if (processed != null) {
                     // Освобождаем промежуточный bitmap, если он отличается от исходного
                     if (workingBitmap != bitmap && !workingBitmap.isRecycled) {
