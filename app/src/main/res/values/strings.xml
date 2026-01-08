@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Neural Photo Redactor</string>
+    <string name="app_name">Focus</string>
     
     <!-- Screen Titles -->
     <string name="screen_gallery">Галерея</string>
