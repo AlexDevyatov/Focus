@@ -24,9 +24,6 @@ import kotlin.math.cos
  * Применяется для фильтра UPSCALE.
  * Работает полностью оффлайн.
  * 
- * Каждый нейрофильтр имеет свой собственный процессор с соответствующим Interpreter'ом.
- * Этот процессор специфичен для модели ESRGAN и использует Interpreter, загруженный из esrgan.tflite.
- * 
  * Для других моделей создавайте отдельные процессоры (например, StyleTransferImageProcessor,
  * DenoiseImageProcessor и т.д.) с соответствующими Interpreter'ами.
  */
@@ -233,20 +230,28 @@ class EsrganImageProcessor @Inject constructor(
                             result.processedBitmap
                         }
                         
-                        // Проверяем, что патч не пустой перед копированием
-                        if (finalPatch != null && !finalPatch.isRecycled) {
-                            // Получаем пиксели патча
-                            val patchPixels = IntArray(dstWidth * dstHeight)
-                            finalPatch.getPixels(patchPixels, 0, dstWidth, 0, 0, dstWidth, dstHeight)
-                            
-                            // Вычисляем размер перекрытия в выходных координатах
-                            // Для 4x масштаба перекрытие в 32 пикселя становится ~128 пикселей на выходе
-                            val overlapX = (OVERLAP * scaleX).toInt().coerceAtLeast(32)
-                            val overlapY = (OVERLAP * scaleY).toInt().coerceAtLeast(32)
-                            
-                            // Копируем патч с blending на границах
-                            for (y in 0 until dstHeight) {
-                                for (x in 0 until dstWidth) {
+                        // Проверяем, что патч не переработан перед копированием
+                        if (finalPatch.isRecycled) {
+                            android.util.Log.w("ErsganImageProcessor", "Патч переработан, пропускаем")
+                            // Освобождаем исходный патч, если создали новый
+                            if (finalPatch != result.processedBitmap) {
+                                finalPatch.recycle()
+                            }
+                            continue
+                        }
+                        
+                        // Получаем пиксели патча
+                        val patchPixels = IntArray(dstWidth * dstHeight)
+                        finalPatch.getPixels(patchPixels, 0, dstWidth, 0, 0, dstWidth, dstHeight)
+                        
+                        // Вычисляем размер перекрытия в выходных координатах
+                        // Для 4x масштаба перекрытие в 32 пикселя становится ~128 пикселей на выходе
+                        val overlapX = (OVERLAP * scaleX).toInt().coerceAtLeast(32)
+                        val overlapY = (OVERLAP * scaleY).toInt().coerceAtLeast(32)
+                        
+                        // Копируем патч с blending на границах
+                        for (y in 0 until dstHeight) {
+                            for (x in 0 until dstWidth) {
                                     val outputX = dstX + x
                                     val outputY = dstY + y
                                     val outputIndex = outputY * outputWidth + outputX
@@ -327,18 +332,19 @@ class EsrganImageProcessor @Inject constructor(
                                 }
                             }
                             
-                            copiedPatches++
-                            
-                            // Освобождаем обработанный патч
-                            if (finalPatch != result.processedBitmap) {
-                                finalPatch.recycle()
-                            }
+                        copiedPatches++
+                        
+                        // Освобождаем обработанный патч
+                        if (finalPatch != result.processedBitmap) {
+                            finalPatch.recycle()
                         }
                     }
-                    
-                    // Освобождаем исходный патч
-                    if (!result.processedBitmap.isRecycled) {
-                        result.processedBitmap.recycle()
+                }
+                
+                // Освобождаем исходный патч
+                result.processedBitmap?.let { bitmap ->
+                    if (!bitmap.isRecycled) {
+                        bitmap.recycle()
                     }
                 }
             }

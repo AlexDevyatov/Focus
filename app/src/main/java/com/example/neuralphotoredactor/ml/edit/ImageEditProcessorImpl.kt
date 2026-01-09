@@ -100,12 +100,6 @@ class ImageEditProcessorImpl @Inject constructor() : ImageEditProcessor {
         return try {
             val croppedBitmap = Bitmap.createBitmap(bitmap, left, top, width, height)
             
-            if (croppedBitmap == null) {
-                android.util.Log.e("ImageEditProcessor", 
-                    "Bitmap.createBitmap вернул null для области: left=$left, top=$top, width=$width, height=$height")
-                return null
-            }
-            
             android.util.Log.d("ImageEditProcessor", 
                 "Обрезка выполнена успешно: исходное ${bitmap.width}x${bitmap.height} -> результат ${croppedBitmap.width}x${croppedBitmap.height}")
             

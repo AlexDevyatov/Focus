@@ -40,12 +40,6 @@ class GalleryDataSourceImpl @Inject constructor(
         Log.d(TAG, "Cache invalidated")
     }
     
-    override suspend fun pickImage(): ImageData? {
-        // Реализация выбора изображения через Intent будет в UI слое
-        // Здесь возвращаем null, так как выбор происходит через Activity Result
-        return null
-    }
-    
     override suspend fun getAllImages(): List<ImageData> = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {

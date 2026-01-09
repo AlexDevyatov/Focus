@@ -8,13 +8,6 @@ import kotlinx.coroutines.flow.Flow
  */
 interface GalleryDataSource {
     /**
-     * Выбрать изображение из галереи.
-     * 
-     * @return ImageData или null
-     */
-    suspend fun pickImage(): ImageData?
-    
-    /**
      * Получить все изображения из галереи.
      * 
      * @return Список всех изображений

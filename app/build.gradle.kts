@@ -39,6 +39,14 @@ android {
     buildFeatures {
         compose = true
     }
+    
+    // Включаем опции для тестов
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 
@@ -91,6 +99,19 @@ dependencies {
     
     // Testing
     testImplementation(libs.junit)
+    // MockK для мокирования
+    testImplementation("io.mockk:mockk:1.13.8")
+    // Корутины для тестов
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    // Room для тестов
+    testImplementation("androidx.room:room-testing:2.6.1")
+    // Turbine для тестирования Flow
+    testImplementation("app.cash.turbine:turbine:1.0.0")
+    // Robolectric для Android-специфичных классов в unit-тестах
+    testImplementation("org.robolectric:robolectric:4.11.1")
+    // AndroidX Test Core для ApplicationProvider
+    testImplementation("androidx.test:core:1.5.0")
+    
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

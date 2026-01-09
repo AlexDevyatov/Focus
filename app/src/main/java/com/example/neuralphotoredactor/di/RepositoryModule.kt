@@ -1,7 +1,5 @@
 package com.example.neuralphotoredactor.di
 
-import com.example.neuralphotoredactor.data.datasource.CameraDataSource
-import com.example.neuralphotoredactor.data.datasource.CameraDataSourceImpl
 import com.example.neuralphotoredactor.data.datasource.GalleryDataSource
 import com.example.neuralphotoredactor.data.datasource.GalleryDataSourceImpl
 import com.example.neuralphotoredactor.data.repository.ImageRepositoryImpl
@@ -61,10 +59,5 @@ abstract class RepositoryModule {
     abstract fun bindGalleryDataSource(
         galleryDataSourceImpl: GalleryDataSourceImpl
     ): GalleryDataSource
-    
-    @Binds
-    abstract fun bindCameraDataSource(
-        cameraDataSourceImpl: CameraDataSourceImpl
-    ): CameraDataSource
 }
 

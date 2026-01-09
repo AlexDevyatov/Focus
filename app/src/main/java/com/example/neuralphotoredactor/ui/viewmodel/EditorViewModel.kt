@@ -9,7 +9,6 @@ import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
-import com.example.neuralphotoredactor.domain.usecase.ProcessImageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,7 +24,6 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class EditorViewModel @Inject constructor(
-    private val processImageUseCase: ProcessImageUseCase,
     private val processingRepository: ProcessingRepository
 ) : ViewModel() {
     
@@ -605,84 +603,79 @@ class EditorViewModel @Inject constructor(
                             bitmapsToRecycle.add(workingBitmap)
                         }
                         workingBitmap = result
+                    } else if (result == null) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Ошибка применения яркости"
+                        )
+                        return@launch
                     }
                 }
                 
                 if (_uiState.value.contrast != 0f) {
-                    if (workingBitmap == null || workingBitmap.isRecycled) {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Ошибка применения контраста"
-                        )
-                        return@launch
-                    }
                     val result = processingRepository.applyEdit(workingBitmap, EditType.CONTRAST, _uiState.value.contrast, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
                         }
                         workingBitmap = result
+                    } else if (result == null) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Ошибка применения контраста"
+                        )
+                        return@launch
                     }
                 }
                 
                 // Применяем цветовой баланс
                 if (_uiState.value.colorBalanceRed != 0f) {
-                    if (workingBitmap == null || workingBitmap.isRecycled) {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Ошибка применения цветового баланса"
-                        )
-                        return@launch
-                    }
                     val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_RED, _uiState.value.colorBalanceRed, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
                         }
                         workingBitmap = result
-                    }
-                }
-                
-                if (_uiState.value.colorBalanceGreen != 0f) {
-                    if (workingBitmap == null || workingBitmap.isRecycled) {
+                    } else if (result == null) {
                         _uiState.value = _uiState.value.copy(
                             error = "Ошибка применения цветового баланса"
                         )
                         return@launch
                     }
+                }
+                
+                if (_uiState.value.colorBalanceGreen != 0f) {
                     val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_GREEN, _uiState.value.colorBalanceGreen, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
                         }
                         workingBitmap = result
-                    }
-                }
-                
-                if (_uiState.value.colorBalanceBlue != 0f) {
-                    if (workingBitmap == null || workingBitmap.isRecycled) {
+                    } else if (result == null) {
                         _uiState.value = _uiState.value.copy(
                             error = "Ошибка применения цветового баланса"
                         )
                         return@launch
                     }
+                }
+                
+                if (_uiState.value.colorBalanceBlue != 0f) {
                     val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_BLUE, _uiState.value.colorBalanceBlue, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
                         }
                         workingBitmap = result
+                    } else if (result == null) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Ошибка применения цветового баланса"
+                        )
+                        return@launch
                     }
                 }
                 
                 if (isActive) {
-                    if (workingBitmap != null && !workingBitmap.isRecycled) {
-                        _uiState.value = _uiState.value.copy(
-                            previewBitmap = workingBitmap
-                        )
-                    } else {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Не удалось применить редактирование"
-                        )
-                    }
+                    _uiState.value = _uiState.value.copy(
+                        previewBitmap = workingBitmap
+                    )
                 }
                 
                 // Освобождаем промежуточные bitmaps

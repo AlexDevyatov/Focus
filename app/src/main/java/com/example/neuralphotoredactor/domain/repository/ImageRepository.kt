@@ -10,20 +10,6 @@ import kotlinx.coroutines.flow.Flow
  */
 interface ImageRepository {
     /**
-     * Получить изображение из галереи.
-     * 
-     * @return ImageData или null, если изображение не выбрано
-     */
-    suspend fun getImageFromGallery(): ImageData?
-    
-    /**
-     * Захватить изображение с камеры.
-     * 
-     * @return ImageData или null, если захват не удался
-     */
-    suspend fun captureImageFromCamera(): ImageData?
-    
-    /**
      * Получить все изображения из галереи.
      * 
      * @return Flow со списком всех изображений
