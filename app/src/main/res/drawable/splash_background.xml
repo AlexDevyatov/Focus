@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Фоновое изображение с правильным масштабированием для разных размеров экранов -->
+    <!-- Используем fill для заполнения всего экрана -->
+    <item>
+        <bitmap
+            android:src="@drawable/splash"
+            android:gravity="fill" />
+    </item>
+</layer-list>
+

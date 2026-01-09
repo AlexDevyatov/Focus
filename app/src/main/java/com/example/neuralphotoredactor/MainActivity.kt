@@ -21,10 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.widget.Toast
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,6 +48,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.*
 
 /**
@@ -54,8 +57,22 @@ import java.util.*
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Устанавливаем Splash Screen перед setContent для плавного перехода
+        val splashScreen = installSplashScreen()
+        
+        // Настраиваем условие для закрытия splash screen
+        // Splash screen будет оставаться видимым до тех пор, пока условие не станет false
+        val keepSplashOnScreen = AtomicBoolean(true)
+        splashScreen.setKeepOnScreenCondition { keepSplashOnScreen.get() }
+        
+        // Настраиваем обработчик закрытия splash screen
+        splashScreen.setOnExitAnimationListener { splashScreenView ->
+            splashScreenView.remove()
+        }
+        
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
         setContent {
             AppTheme {
                 Surface(
@@ -70,6 +87,14 @@ class MainActivity : ComponentActivity() {
                     val editorViewModel: EditorViewModel = viewModel()
                     val historyViewModel: HistoryViewModel = viewModel()
                     val processedImagesViewModel: ProcessedImagesViewModel = viewModel()
+                    
+                    // Закрываем splash screen после инициализации ViewModels
+                    // Используем LaunchedEffect для гарантированного закрытия после первого композиции
+                    LaunchedEffect(Unit) {
+                        // Небольшая задержка для плавного перехода (опционально)
+                        delay(300)
+                        keepSplashOnScreen.set(false)
+                    }
                     
                     // Настраиваем callback для обновления галереи и обработанных изображений после сохранения
                     editorViewModel.onImageSaved = {
