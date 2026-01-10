@@ -79,4 +79,10 @@
     <string name="edit_category_color">Цвет</string>
     <string name="edit_cancel">Отмена</string>
     <string name="edit_apply">Применить</string>
+    
+    <!-- Main Screen -->
+    <string name="main_button_gallery">Галерея</string>
+    <string name="main_button_ai_edit">ИИ</string>
+    <string name="main_button_camera">Камера</string>
+    <string name="main_button_history">История</string>
 </resources>
