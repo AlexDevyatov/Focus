@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
 import coil.compose.AsyncImage
 import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.domain.enums.EditType
@@ -135,8 +137,21 @@ fun EditorScreen(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
+                // Проверяем, есть ли выбранные нейрофильтры
+                val neuralFilterTypes = listOf(
+                    FilterType.STYLE_TRANSFER,
+                    FilterType.DENOISE,
+                    FilterType.UPSCALE,
+                    FilterType.COLOR_CORRECTION
+                )
+                val hasSelectedNeuralFilters = selectedFilters.any { (filterType, _) ->
+                    filterType in neuralFilterTypes
+                }
+                val isNeuralFilterProcessing = isLoading && hasSelectedNeuralFilters
+                
                 when {
-                    isLoading -> LoadingIndicator()
+                    // Для нейрофильтров показываем изображение с overlay, для остальных - LoadingIndicator
+                    isLoading && !isNeuralFilterProcessing -> LoadingIndicator()
                     error != null -> ErrorMessage(error, defaultMessageId = R.string.error_process_image)
                     previewBitmap != null -> {
                         // Отображаем быстрый предпросмотр
@@ -156,6 +171,7 @@ fun EditorScreen(
                         )
                     }
                     imageUri != null -> {
+                        // При обработке нейрофильтров показываем исходное изображение под overlay
                         AsyncImage(
                             model = imageUri,
                             contentDescription = stringResource(R.string.editor_original_image),
@@ -173,6 +189,21 @@ fun EditorScreen(
                         onCropCancel = onCropCancel,
                         modifier = Modifier.fillMaxSize()
                     )
+                }
+                
+                // Overlay с progress bar для нейрофильтров
+                if (isNeuralFilterProcessing) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
                 }
             }
             
