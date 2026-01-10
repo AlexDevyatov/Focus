@@ -3,10 +3,10 @@ package com.example.neuralphotoredactor.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Light theme colors - светлые и яркие цвета
-val PrimaryLight = Color(0xBAD71580) // Яркий синий Material Design
-val SecondaryLight = Color(0xFF03A9F4) // Светло-голубой
-val TertiaryLight = Color(0xFF00ACC1) // Бирюзовый
-val SurfaceLight = Color(0xFFFAFAFA) // Очень светлый серый фон
+val PrimaryLight = Color(0xFFFFFFFF) // Яркий синий Material Design
+val SecondaryLight = Color(0x63FF6E9E) // Светло-голубой
+val TertiaryLight = Color(0xFF030303) // Бирюзовый
+val SurfaceLight = Color(0xFFFF6F9D) // Очень светлый серый фон
 val BackgroundLight = Color(0xFFFFFFFF) // Белый фон
 val ErrorLight = Color(0xFFE53935) // Яркий красный
 
