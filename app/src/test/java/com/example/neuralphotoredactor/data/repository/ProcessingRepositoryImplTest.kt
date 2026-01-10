@@ -15,6 +15,7 @@ import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
+import com.example.neuralphotoredactor.ml.interpreter.AnimeGan2ImageProcessor
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
 import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import io.mockk.coEvery
@@ -50,6 +51,7 @@ class ProcessingRepositoryImplTest {
     private lateinit var contentResolver: ContentResolver
     private lateinit var esrganImageProcessor: EsrganImageProcessor
     private lateinit var splitterNetImageProcessor: SplitterNetImageProcessor
+    private lateinit var animeGan2ImageProcessor: AnimeGan2ImageProcessor
     private lateinit var imageFilterProcessor: ImageFilterProcessor
     private lateinit var imageEditProcessor: ImageEditProcessor
     private lateinit var imageStorage: ImageStorage
@@ -66,6 +68,7 @@ class ProcessingRepositoryImplTest {
         contentResolver = mockk(relaxed = true)
         esrganImageProcessor = mockk(relaxed = true)
         splitterNetImageProcessor = mockk(relaxed = true)
+        animeGan2ImageProcessor = mockk(relaxed = true)
         imageFilterProcessor = mockk(relaxed = true)
         imageEditProcessor = mockk(relaxed = true)
         imageStorage = mockk(relaxed = true)
@@ -79,6 +82,7 @@ class ProcessingRepositoryImplTest {
             context = contextSpy,
             esrganImageProcessor = esrganImageProcessor,
             splitterNetImageProcessor = splitterNetImageProcessor,
+            animeGan2ImageProcessor = animeGan2ImageProcessor,
             imageFilterProcessor = imageFilterProcessor,
             imageEditProcessor = imageEditProcessor,
             imageStorage = imageStorage,

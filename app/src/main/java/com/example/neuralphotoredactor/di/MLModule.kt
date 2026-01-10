@@ -5,6 +5,7 @@ import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessorImpl
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessorImpl
+import com.example.neuralphotoredactor.ml.interpreter.AnimeGan2ImageProcessor
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
 import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessor
@@ -162,6 +163,58 @@ abstract class MLModule {
             @SplitterNetInterpreter interpreter: Interpreter?
         ): SplitterNetImageProcessor {
             return SplitterNetImageProcessor(interpreter)
+        }
+        
+        /**
+         * Предоставляет Interpreter для модели AnimeGAN2 (стилизация в аниме стиль).
+         * 
+         * Эта модель используется для стилизации изображений в аниме стиль.
+         * Применяется для фильтра STYLE_TRANSFER.
+         * Модель загружается из assets при инициализации приложения.
+         * 
+         * ВАЖНО: Создайте файл animegan2_paprika.tflite в app/src/main/assets/
+         * 
+         * @param context Контекст приложения для доступа к assets
+         * @return Interpreter для модели AnimeGAN2 или null, если модель не найдена
+         */
+        @Provides
+        @Singleton
+        @AnimeGan2Interpreter
+        fun provideAnimeGan2Interpreter(
+            @ApplicationContext context: Context
+        ): Interpreter? {
+            return try {
+                val modelBuffer = ModelLoader.loadModelFile(context, "animegan2_paprika.tflite")
+                ModelLoader.createInterpreter(modelBuffer)
+            } catch (e: Exception) {
+                // Если модель не найдена, возвращаем null
+                // Обработка ошибки будет в AnimeGan2ImageProcessor
+                android.util.Log.e("MLModule", "AnimeGAN2 модель не найдена: ${e.message}")
+                null
+            }
+        }
+        
+        /**
+         * Предоставляет AnimeGan2ImageProcessor с Interpreter для модели AnimeGAN2.
+         * 
+         * Этот процессор используется для обработки изображений через модель AnimeGAN2
+         * для стилизации в аниме стиль.
+         * Применяется для фильтра STYLE_TRANSFER.
+         * 
+         * Использует настройки из test_animegan2.py:
+         * - Нормализация входных данных: (img_array / 127.5) - 1.0 (диапазон [-1, 1])
+         * - Поддержка CHW и HWC форматов
+         * - Денормализация выходных данных: ((output_img + 1.0) * 127.5) (диапазон [0, 255])
+         * 
+         * @param interpreter Interpreter для модели AnimeGAN2
+         * @return AnimeGan2ImageProcessor для обработки изображений через AnimeGAN2
+         */
+        @Provides
+        @Singleton
+        fun provideAnimeGan2ImageProcessor(
+            @AnimeGan2Interpreter interpreter: Interpreter?
+        ): AnimeGan2ImageProcessor {
+            return AnimeGan2ImageProcessor(interpreter)
         }
     }
 }

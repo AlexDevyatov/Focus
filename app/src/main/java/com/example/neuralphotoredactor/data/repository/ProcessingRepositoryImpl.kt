@@ -13,6 +13,7 @@ import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
+import com.example.neuralphotoredactor.ml.interpreter.AnimeGan2ImageProcessor
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
 import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -33,6 +34,7 @@ class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val esrganImageProcessor: EsrganImageProcessor,
     private val splitterNetImageProcessor: SplitterNetImageProcessor,
+    private val animeGan2ImageProcessor: AnimeGan2ImageProcessor,
     private val imageFilterProcessor: ImageFilterProcessor,
     private val imageEditProcessor: ImageEditProcessor,
     private val imageStorage: ImageStorage,
@@ -62,6 +64,10 @@ class ProcessingRepositoryImpl @Inject constructor(
                 FilterType.DENOISE -> {
                     // Используем SplitterNetImageProcessor для удаления шумов
                     splitterNetImageProcessor.processImage(bitmap, filterType)
+                }
+                FilterType.STYLE_TRANSFER -> {
+                    // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
+                    animeGan2ImageProcessor.processImage(bitmap, filterType)
                 }
                 else -> {
                     // Используем ErsganImageProcessor для других ML-фильтров (требуют TFLite модели)
@@ -141,6 +147,31 @@ class ProcessingRepositoryImpl @Inject constructor(
                     // Используем SplitterNetImageProcessor для удаления шумов
                     splitterNetImageProcessor.processImage(bitmap, filterType)
                 }
+                FilterType.STYLE_TRANSFER -> {
+                    // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
+                    // Масштабируем для предпросмотра для ускорения обработки
+                    val maxPreviewDimension = 512 // Меньший размер для быстрого предпросмотра стилизации
+                    val scaledBitmap = if (bitmap.width > maxPreviewDimension || bitmap.height > maxPreviewDimension) {
+                        val scale = minOf(
+                            maxPreviewDimension.toFloat() / bitmap.width,
+                            maxPreviewDimension.toFloat() / bitmap.height
+                        )
+                        val scaledWidth = (bitmap.width * scale).toInt().coerceAtLeast(1)
+                        val scaledHeight = (bitmap.height * scale).toInt().coerceAtLeast(1)
+                        android.util.Log.d("ProcessingRepository", 
+                            "Масштабируем для предпросмотра стилизации: ${bitmap.width}x${bitmap.height} -> ${scaledWidth}x${scaledHeight}")
+                        Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, true)
+                    } else {
+                        null // Не масштабируем, используем оригинал
+                    }
+                    val bitmapToProcess = scaledBitmap ?: bitmap
+                    animeGan2ImageProcessor.processImage(bitmapToProcess, filterType).also {
+                        // Освобождаем масштабированный bitmap после использования
+                        if (scaledBitmap != null && scaledBitmap != bitmap) {
+                            scaledBitmap.recycle()
+                        }
+                    }
+                }
                 else -> {
                     // Используем ErsganImageProcessor для других ML-фильтров (требуют TFLite модели)
                     esrganImageProcessor.processImage(bitmap, filterType)
@@ -205,6 +236,31 @@ class ProcessingRepositoryImpl @Inject constructor(
                     FilterType.DENOISE -> {
                         // Используем SplitterNetImageProcessor для удаления шумов
                         splitterNetImageProcessor.processImage(workingBitmap, filterType)
+                    }
+                    FilterType.STYLE_TRANSFER -> {
+                        // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
+                        // Масштабируем для предпросмотра для ускорения обработки
+                        val maxPreviewDimension = 512 // Меньший размер для быстрого предпросмотра стилизации
+                        val scaledBitmap = if (workingBitmap.width > maxPreviewDimension || workingBitmap.height > maxPreviewDimension) {
+                            val scale = minOf(
+                                maxPreviewDimension.toFloat() / workingBitmap.width,
+                                maxPreviewDimension.toFloat() / workingBitmap.height
+                            )
+                            val scaledWidth = (workingBitmap.width * scale).toInt().coerceAtLeast(1)
+                            val scaledHeight = (workingBitmap.height * scale).toInt().coerceAtLeast(1)
+                            android.util.Log.d("ProcessingRepository", 
+                                "Масштабируем для предпросмотра стилизации: ${workingBitmap.width}x${workingBitmap.height} -> ${scaledWidth}x${scaledHeight}")
+                            Bitmap.createScaledBitmap(workingBitmap, scaledWidth, scaledHeight, true)
+                        } else {
+                            null // Не масштабируем, используем оригинал
+                        }
+                        val bitmapToProcess = scaledBitmap ?: workingBitmap
+                        animeGan2ImageProcessor.processImage(bitmapToProcess, filterType).also {
+                            // Освобождаем масштабированный bitmap после использования
+                            if (scaledBitmap != null && scaledBitmap != workingBitmap) {
+                                scaledBitmap.recycle()
+                            }
+                        }
                     }
                     else -> {
                         // Используем ErsganImageProcessor для других ML-фильтров
@@ -299,6 +355,10 @@ class ProcessingRepositoryImpl @Inject constructor(
                     FilterType.DENOISE -> {
                         // Используем SplitterNetImageProcessor для удаления шумов
                         splitterNetImageProcessor.processImage(workingBitmap, filterType)
+                    }
+                    FilterType.STYLE_TRANSFER -> {
+                        // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
+                        animeGan2ImageProcessor.processImage(workingBitmap, filterType)
                     }
                     else -> {
                         // Используем ErsganImageProcessor для других ML-фильтров

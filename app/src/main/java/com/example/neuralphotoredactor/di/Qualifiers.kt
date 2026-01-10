@@ -16,3 +16,10 @@ annotation class EsrganInterpreter
 @Retention(AnnotationRetention.BINARY)
 annotation class SplitterNetInterpreter
 
+/**
+ * Квалификатор для Interpreter модели AnimeGAN2 (стилизация в аниме стиль).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class AnimeGan2Interpreter
+
