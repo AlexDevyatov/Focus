@@ -22,7 +22,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.widget.Toast
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,7 +32,6 @@ import kotlinx.coroutines.launch
 import com.example.neuralphotoredactor.ui.navigation.AppNavigation
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import com.example.neuralphotoredactor.ui.navigation.BottomNavigationBar
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
@@ -74,8 +72,7 @@ class MainActivity : ComponentActivity() {
         }
         
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        
+
         setContent {
             AppTheme {
                 Surface(
@@ -224,16 +221,7 @@ class MainActivity : ComponentActivity() {
                         mainViewModel.setNavigator(mainNavigator)
                     }
                     
-                    // Определяем текущий маршрут для условного отображения BottomNavigationBar
-                    val currentRoute by navController.currentBackStackEntryAsState()
-                    val showBottomBar = currentRoute?.destination?.route != "main"
-                    
                     Scaffold(
-                        bottomBar = {
-                            if (showBottomBar) {
-                                BottomNavigationBar(navController = navController)
-                            }
-                        }
                     ) { paddingValues ->
                         Box(modifier = Modifier.padding(paddingValues)) {
                             AppNavigation(
@@ -251,14 +239,14 @@ class MainActivity : ComponentActivity() {
                                     editorViewModel.setImage(image)
                                     navController.navigate("editor")
                                 },
-                                onCameraClick = {
-                                    handleCameraClick()
-                                },
                                 onRefresh = {
                                     galleryViewModel.refreshImages()
                                 },
                                 onPermissionGranted = {
                                     galleryViewModel.loadImages()
+                                },
+                                onBackClick = {
+                                    navController.popBackStack()
                                 }
                             )
                         },
@@ -328,6 +316,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onCropCancel = {
                                     editorViewModel.cancelCrop()
+                                },
+                                onBackClick = {
+                                    navController.popBackStack()
                                 }
                             )
                         },
@@ -343,6 +334,9 @@ class MainActivity : ComponentActivity() {
                                         )
                                     )
                                     navController.navigate("editor")
+                                },
+                                onBackClick = {
+                                    navController.popBackStack()
                                 }
                             )
                         },
@@ -358,6 +352,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onRefresh = {
                                     processedImagesViewModel.refreshImages()
+                                },
+                                onBackClick = {
+                                    navController.popBackStack()
                                 }
                             )
                         }

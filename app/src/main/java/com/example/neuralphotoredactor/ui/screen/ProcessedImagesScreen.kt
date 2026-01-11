@@ -16,8 +16,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
@@ -25,6 +28,7 @@ import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
+import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 
 /**
  * Экран обработанных изображений.
@@ -40,12 +44,33 @@ fun ProcessedImagesScreen(
     error: String?,
     onImageClick: (ImageData) -> Unit,
     onRefresh: () -> Unit,
+    onBackClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.screen_processed_images)) }
+                title = { 
+                    Text(
+                        text = stringResource(R.string.screen_processed_images),
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundDark
+                ),
+                navigationIcon = {
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.back_arrow),
+                                contentDescription = stringResource(R.string.navigate_back),
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
             )
         },
         modifier = modifier

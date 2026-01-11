@@ -2,7 +2,7 @@
     <string name="app_name">Focus</string>
     
     <!-- Screen Titles -->
-    <string name="screen_gallery">Галерея</string>
+    <string name="screen_gallery">Все фото</string>
     <string name="screen_editor">Редактор</string>
     <string name="screen_history">История</string>
     <string name="screen_processed_images">Обработанные</string>
@@ -85,4 +85,7 @@
     <string name="main_button_ai_edit">ИИ</string>
     <string name="main_button_camera">Камера</string>
     <string name="main_button_history">История</string>
+    
+    <!-- Navigation -->
+    <string name="navigate_back">Назад</string>
 </resources>

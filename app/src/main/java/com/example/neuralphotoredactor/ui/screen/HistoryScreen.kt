@@ -7,12 +7,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import coil.compose.AsyncImage
 import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
+import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 
 /**
  * Экран истории обработок.
@@ -24,12 +28,33 @@ fun HistoryScreen(
     isLoading: Boolean,
     error: String?,
     onItemClick: (com.example.neuralphotoredactor.domain.model.ProcessingResult) -> Unit,
+    onBackClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.screen_history)) }
+                title = { 
+                    Text(
+                        text = stringResource(R.string.screen_history),
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundDark
+                ),
+                navigationIcon = {
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.back_arrow),
+                                contentDescription = stringResource(R.string.navigate_back),
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
             )
         },
         modifier = modifier

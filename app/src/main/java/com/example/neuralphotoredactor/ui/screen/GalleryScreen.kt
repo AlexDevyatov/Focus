@@ -24,16 +24,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
+import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 
 /**
  * Экран галереи для выбора изображений.
@@ -48,9 +50,9 @@ fun GalleryScreen(
     isRefreshing: Boolean,
     error: String?,
     onImageClick: (com.example.neuralphotoredactor.domain.model.ImageData) -> Unit,
-    onCameraClick: () -> Unit,
     onRefresh: () -> Unit,
     onPermissionGranted: () -> Unit = {},
+    onBackClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -101,7 +103,27 @@ fun GalleryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.screen_gallery)) }
+                title = { 
+                    Text(
+                        text = stringResource(R.string.screen_gallery),
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundDark
+                ),
+                navigationIcon = {
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.back_arrow),
+                                contentDescription = stringResource(R.string.navigate_back),
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
             )
         },
         modifier = modifier
@@ -174,7 +196,6 @@ fun GalleryScreen(
                     ) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
-                            contentPadding = PaddingValues(bottom = 80.dp), // Отступ снизу для FAB
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.fillMaxSize()
@@ -191,24 +212,6 @@ fun GalleryScreen(
                             }
                         }
                     }
-                }
-            }
-            
-            // FAB поверх контента для гарантии видимости (виден во всех состояниях, кроме loading)
-            // Размещаем FAB выше bottom navigation (стандартная высота ~80dp + отступ 16dp)
-            if (!isLoading) {
-                FloatingActionButton(
-                    onClick = onCameraClick,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 96.dp, end = 16.dp) // 80dp (высота navigation) + 16dp (отступ)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CameraAlt,
-                        contentDescription = stringResource(R.string.gallery_camera_button)
-                    )
                 }
             }
         }
