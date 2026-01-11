@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -24,7 +26,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.neuralphotoredactor.R
+import com.example.neuralphotoredactor.ui.viewmodel.MainViewModel
 
 /**
  * Главный экран приложения с кнопками для навигации.
@@ -32,12 +36,10 @@ import com.example.neuralphotoredactor.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    onGalleryClick: () -> Unit,
-    onAiEditClick: () -> Unit,
-    onCameraClick: () -> Unit,
-    onHistoryClick: () -> Unit,
+    viewModel: MainViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -63,7 +65,7 @@ fun MainScreen(
             )
             
             FilledTonalButton(
-                onClick = onGalleryClick,
+                onClick = { viewModel.navigateToGallery() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
@@ -92,7 +94,7 @@ fun MainScreen(
                 horizontalArrangement = Arrangement.spacedBy(11.dp)
             ) {
                 FilledTonalButton(
-                    onClick = onAiEditClick,
+                    onClick = { viewModel.navigateToProcessedImages() },
                     modifier = Modifier
                         .weight(0.66f)
                         .height(60.dp),
@@ -119,7 +121,7 @@ fun MainScreen(
                 }
                 
                 FilledTonalButton(
-                    onClick = onCameraClick,
+                    onClick = { viewModel.openCamera() },
                     modifier = Modifier
                         .weight(0.34f)
                         .height(60.dp),
@@ -140,7 +142,7 @@ fun MainScreen(
             }
             
             FilledTonalButton(
-                onClick = onHistoryClick,
+                onClick = { viewModel.navigateToHistory() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),

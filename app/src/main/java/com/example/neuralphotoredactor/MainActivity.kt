@@ -44,6 +44,7 @@ import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.viewmodel.EditorViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.GalleryViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.HistoryViewModel
+import com.example.neuralphotoredactor.ui.viewmodel.MainNavigator
 import com.example.neuralphotoredactor.ui.viewmodel.MainViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.ProcessedImagesViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -199,6 +200,30 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     
+                    // Реализуем интерфейс навигации и передаем в ViewModel
+                    val mainNavigator = object : MainNavigator {
+                        override fun navigateToGallery() {
+                            navController.navigate("gallery")
+                        }
+                        
+                        override fun navigateToProcessedImages() {
+                            navController.navigate("processed")
+                        }
+                        
+                        override fun navigateToHistory() {
+                            navController.navigate("history")
+                        }
+                        
+                        override fun openCamera() {
+                            handleCameraClick()
+                        }
+                    }
+                    
+                    // Устанавливаем навигатор в ViewModel
+                    LaunchedEffect(mainViewModel) {
+                        mainViewModel.setNavigator(mainNavigator)
+                    }
+                    
                     // Определяем текущий маршрут для условного отображения BottomNavigationBar
                     val currentRoute by navController.currentBackStackEntryAsState()
                     val showBottomBar = currentRoute?.destination?.route != "main"
@@ -214,20 +239,7 @@ class MainActivity : ComponentActivity() {
                             AppNavigation(
                                 navController = navController,
                                 mainScreen = {
-                                    MainScreen(
-                                        onGalleryClick = {
-                                            navController.navigate("gallery")
-                                        },
-                                        onAiEditClick = {
-                                            navController.navigate("processed")
-                                        },
-                                        onCameraClick = {
-                                            handleCameraClick()
-                                        },
-                                        onHistoryClick = {
-                                            navController.navigate("history")
-                                        }
-                                    )
+                                    MainScreen(viewModel = mainViewModel)
                                 },
                                 galleryScreen = {
                             GalleryScreen(

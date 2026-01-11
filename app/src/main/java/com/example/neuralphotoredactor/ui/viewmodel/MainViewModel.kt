@@ -15,6 +15,51 @@ class MainViewModel @Inject constructor() : ViewModel() {
     
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+    
+    private var navigator: MainNavigator? = null
+    
+    /**
+     * Установить навигатор для выполнения навигации.
+     */
+    fun setNavigator(navigator: MainNavigator) {
+        this.navigator = navigator
+    }
+    
+    /**
+     * Очистить навигатор при уничтожении ViewModel.
+     */
+    override fun onCleared() {
+        super.onCleared()
+        navigator = null
+    }
+    
+    /**
+     * Навигация на экран галереи.
+     */
+    fun navigateToGallery() {
+        navigator?.navigateToGallery()
+    }
+    
+    /**
+     * Навигация на экран обработанных изображений (ИИ).
+     */
+    fun navigateToProcessedImages() {
+        navigator?.navigateToProcessedImages()
+    }
+    
+    /**
+     * Навигация на экран истории.
+     */
+    fun navigateToHistory() {
+        navigator?.navigateToHistory()
+    }
+    
+    /**
+     * Открытие камеры.
+     */
+    fun openCamera() {
+        navigator?.openCamera()
+    }
 }
 
 /**
