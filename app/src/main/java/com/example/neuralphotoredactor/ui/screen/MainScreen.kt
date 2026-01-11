@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateRectAsState
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
@@ -47,31 +49,38 @@ fun MainScreen(
     onHistoryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        // Фоновое изображение
-        Image(
-            painter = painterResource(id = R.drawable.background),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        
-        // Контент поверх фона
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Контент
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(48.dp),
+                .padding(start = 108.dp, end = 96.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Spacer(modifier = Modifier.weight(1f))
+            
+            // Логотип
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .scale(3f)
+                    .padding(bottom = 32.dp),
+                contentScale = ContentScale.Fit
+            )
             
             FilledTonalButton(
                 onClick = onGalleryClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp),
-                shape = MaterialTheme.shapes.large,
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -92,17 +101,17 @@ fun MainScreen(
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                horizontalArrangement = Arrangement.spacedBy(11.dp)
             ) {
                 FilledTonalButton(
                     onClick = onAiEditClick,
                     modifier = Modifier
                         .weight(1f)
                         .height(80.dp),
-                    shape = MaterialTheme.shapes.large,
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Icon(
@@ -123,7 +132,7 @@ fun MainScreen(
                     modifier = Modifier
                         .width(120.dp)
                         .height(80.dp),
-                    shape = MaterialTheme.shapes.large,
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
@@ -142,7 +151,7 @@ fun MainScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp),
-                shape = MaterialTheme.shapes.large,
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -175,16 +184,12 @@ fun MainScreen(
 @Composable
 private fun MainScreenPreview() {
     AppTheme {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Фоновое изображение
-            Image(
-                painter = painterResource(id = R.drawable.background),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Контент поверх фона
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Контент
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -193,6 +198,16 @@ private fun MainScreenPreview() {
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Spacer(modifier = Modifier.weight(1f))
+                
+                // Логотип
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 32.dp),
+                    contentScale = ContentScale.Fit
+                )
                 
                 FilledTonalButton(
                     onClick = {},
@@ -235,7 +250,7 @@ private fun MainScreenPreview() {
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.surface,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            contentColor = MaterialTheme.colorScheme.surface
                         )
                     ) {
                         Icon(

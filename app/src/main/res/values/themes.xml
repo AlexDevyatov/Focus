@@ -6,9 +6,9 @@
     <!-- Тема для Splash Screen -->
     <style name="Theme.NeuralPhotoRedactor.Splash" parent="Theme.SplashScreen">
         <!-- Фоновое изображение через windowBackground для полноэкранного отображения -->
-        <item name="android:windowBackground">@drawable/splash_direct</item>
+        <item name="android:windowBackground">@drawable/splash_background_logo</item>
         <!-- Также устанавливаем через windowSplashScreenBackground для совместимости -->
-        <item name="windowSplashScreenBackground">@drawable/splash_direct</item>
+        <item name="windowSplashScreenBackground">@drawable/splash_background_logo</item>
         <!-- Продолжительность анимации появления (в миллисекундах) -->
         <item name="windowSplashScreenAnimationDuration">300</item>
         <!-- Указываем тему после закрытия splash screen для правильного перехода -->

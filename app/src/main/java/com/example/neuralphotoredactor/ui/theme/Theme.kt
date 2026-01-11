@@ -3,7 +3,6 @@ package com.example.neuralphotoredactor.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -15,12 +14,12 @@ import androidx.core.view.WindowCompat
 /**
  * Светлая цветовая схема Material Design 3.
  */
-private val LightColorScheme = lightColorScheme(
+private val ColorScheme = lightColorScheme(
     primary = PrimaryLight,
     secondary = SecondaryLight,
     tertiary = TertiaryLight,
     surface = SurfaceLight,
-    background = BackgroundLight,
+    background = BackgroundDark,
     error = ErrorLight,
     onPrimary = Color(0xFFFFFFFF), // Белый текст на ярких цветах
     onSecondary = Color(0xFFFFFFFF),
@@ -28,24 +27,6 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color(0xFF212121), // Темно-серый текст на светлых поверхностях для лучшей читаемости
     onBackground = Color(0xFF212121),
     onError = Color(0xFFFFFFFF)
-)
-
-/**
- * Темная цветовая схема Material Design 3.
- */
-private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryDark,
-    secondary = SecondaryDark,
-    tertiary = TertiaryDark,
-    surface = SurfaceDark,
-    background = BackgroundDark,
-    error = ErrorDark,
-    onPrimary = BackgroundDark,
-    onSecondary = BackgroundDark,
-    onTertiary = BackgroundDark,
-    onSurface = SecondaryDark,
-    onBackground = SecondaryDark,
-    onError = BackgroundDark
 )
 
 /**
@@ -61,7 +42,7 @@ fun AppTheme(
     darkTheme: Boolean = false, // Всегда используем светлую тему
     content: @Composable () -> Unit
 ) {
-    val colorScheme = LightColorScheme
+    val colorScheme = ColorScheme
     
     // Настройка системного статус-бара
     val view = LocalView.current
