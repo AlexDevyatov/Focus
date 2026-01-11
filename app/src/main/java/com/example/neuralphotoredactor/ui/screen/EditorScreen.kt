@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -121,26 +120,20 @@ fun EditorScreen(
                     }
                 },
                 actions = {
-                    if (selectedFilters.isNotEmpty()) {
-                        IconButton(onClick = onClearFilters) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = stringResource(R.string.editor_clear_filter)
-                            )
-                        }
-                    }
                     if (showEditMode) {
                         IconButton(onClick = onSaveToGallery) {
                             Icon(
-                                imageVector = Icons.Filled.Save,
-                                contentDescription = stringResource(R.string.edit_save_to_gallery)
+                                painter = painterResource(id = R.drawable.save_image),
+                                contentDescription = stringResource(R.string.edit_save_to_gallery),
+                                tint = Color.White
                             )
                         }
                     } else if (selectedFilters.isNotEmpty() || processedImageUri != null) {
                         IconButton(onClick = onSaveClick) {
                             Icon(
-                                imageVector = Icons.Filled.Save,
-                                contentDescription = stringResource(R.string.editor_save_button)
+                                painter = painterResource(id = R.drawable.save_image),
+                                contentDescription = stringResource(R.string.editor_save_button),
+                                tint = Color.White
                             )
                         }
                     }
