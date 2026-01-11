@@ -15,7 +15,7 @@ import androidx.core.view.WindowCompat
  * Светлая цветовая схема Material Design 3.
  */
 private val ColorScheme = lightColorScheme(
-    primary = PrimaryLight,
+    primary = BackgroundDark,
     secondary = SecondaryLight,
     tertiary = TertiaryLight,
     surface = SurfaceLight,

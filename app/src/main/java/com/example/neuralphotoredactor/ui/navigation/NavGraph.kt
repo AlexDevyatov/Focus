@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
+import com.example.neuralphotoredactor.ui.screen.MainScreen
 
 /**
  * Граф навигации приложения.
@@ -14,6 +15,7 @@ import com.example.neuralphotoredactor.ui.screen.HistoryScreen
 @Composable
 fun AppNavigation(
     navController: NavHostController,
+    mainScreen: @Composable () -> Unit,
     galleryScreen: @Composable () -> Unit,
     editorScreen: @Composable () -> Unit,
     historyScreen: @Composable () -> Unit,
@@ -21,8 +23,11 @@ fun AppNavigation(
 ) {
     NavHost(
         navController = navController,
-        startDestination = "gallery"
+        startDestination = "main"
     ) {
+        composable("main") {
+            mainScreen()
+        }
         composable("gallery") {
             galleryScreen()
         }

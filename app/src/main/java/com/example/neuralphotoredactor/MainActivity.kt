@@ -37,12 +37,14 @@ import com.example.neuralphotoredactor.ui.navigation.BottomNavigationBar
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
+import com.example.neuralphotoredactor.ui.screen.MainScreen
 import com.example.neuralphotoredactor.ui.screen.ProcessedImagesScreen
 import com.example.neuralphotoredactor.ui.theme.AppTheme
 import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.viewmodel.EditorViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.GalleryViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.HistoryViewModel
+import com.example.neuralphotoredactor.ui.viewmodel.MainViewModel
 import com.example.neuralphotoredactor.ui.viewmodel.ProcessedImagesViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -83,6 +85,7 @@ class MainActivity : ComponentActivity() {
                     val context = LocalContext.current
                     val coroutineScope = rememberCoroutineScope()
                     
+                    val mainViewModel: MainViewModel = viewModel()
                     val galleryViewModel: GalleryViewModel = viewModel()
                     val editorViewModel: EditorViewModel = viewModel()
                     val historyViewModel: HistoryViewModel = viewModel()
@@ -196,15 +199,37 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     
+                    // Определяем текущий маршрут для условного отображения BottomNavigationBar
+                    val currentRoute by navController.currentBackStackEntryAsState()
+                    val showBottomBar = currentRoute?.destination?.route != "main"
+                    
                     Scaffold(
                         bottomBar = {
-                            BottomNavigationBar(navController = navController)
+                            if (showBottomBar) {
+                                BottomNavigationBar(navController = navController)
+                            }
                         }
                     ) { paddingValues ->
                         Box(modifier = Modifier.padding(paddingValues)) {
                             AppNavigation(
                                 navController = navController,
-                            galleryScreen = {
+                                mainScreen = {
+                                    MainScreen(
+                                        onGalleryClick = {
+                                            navController.navigate("gallery")
+                                        },
+                                        onAiEditClick = {
+                                            navController.navigate("processed")
+                                        },
+                                        onCameraClick = {
+                                            handleCameraClick()
+                                        },
+                                        onHistoryClick = {
+                                            navController.navigate("history")
+                                        }
+                                    )
+                                },
+                                galleryScreen = {
                             GalleryScreen(
                                 images = galleryUiState.images,
                                 isLoading = galleryUiState.isLoading,

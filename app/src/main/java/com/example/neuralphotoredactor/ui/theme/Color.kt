@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 // Light theme colors - светлые и яркие цвета
 val PrimaryLight = Color(0xFFFFFFFF) // Яркий синий Material Design
-val SecondaryLight = Color(0x63FF6E9E) // Светло-голубой
+val SecondaryLight = Color(0x3BD9D9D9)
 val TertiaryLight = Color(0xFF030303) // Бирюзовый
 val SurfaceLight = Color(0xE89CD49F)
 val BackgroundLight = Color(0xFFFFFFFF) // Белый фон
