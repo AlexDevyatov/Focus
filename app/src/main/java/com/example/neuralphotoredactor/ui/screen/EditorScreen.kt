@@ -24,7 +24,7 @@ import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Tonality
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.FilterBAndW
 import androidx.compose.material.icons.filled.PhotoFilter
@@ -45,6 +45,13 @@ import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 import com.example.neuralphotoredactor.ui.viewmodel.EditCategory
 import android.graphics.Rect
+import androidx.compose.material.icons.filled.Brightness1
+import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.CropRotate
+import androidx.compose.material.icons.filled.Details
+import androidx.compose.material.icons.filled.FilterVintage
+import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.Vignette
 
 /**
  * Получить локализованное название фильтра.
@@ -305,8 +312,8 @@ fun EditorScreen(
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = SliderDefaults.colors(
-                                        thumbColor = Color.Red,
-                                        activeTrackColor = Color.Red
+                                        thumbColor = Color(0xFFFFA79B),
+                                        activeTrackColor = Color(0xFFFFA79B)
                                     )
                                 )
                                 
@@ -318,8 +325,8 @@ fun EditorScreen(
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = SliderDefaults.colors(
-                                        thumbColor = Color.Green,
-                                        activeTrackColor = Color.Green
+                                        thumbColor = Color(0xFF9CD49F),
+                                        activeTrackColor = Color(0xFF9CD49F)
                                     )
                                 )
                                 
@@ -331,8 +338,8 @@ fun EditorScreen(
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = SliderDefaults.colors(
-                                        thumbColor = Color.Blue,
-                                        activeTrackColor = Color.Blue
+                                        thumbColor = Color(0xFF86D1EA),
+                                        activeTrackColor = Color(0xFF86D1EA)
                                     )
                                 )
                             }
@@ -353,7 +360,12 @@ fun EditorScreen(
                             FilterType.UPSCALE,
                             FilterType.COLOR_CORRECTION
                         )
-                        if (filterType !in neuralFilters) {
+                        // Фильтры без слайдера
+                        val filtersWithoutSlider = listOf(
+                            FilterType.GRAYSCALE,
+                            FilterType.SEPIA
+                        )
+                        if (filterType !in neuralFilters && filterType !in filtersWithoutSlider) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -395,7 +407,7 @@ fun EditorScreen(
                             onClick = { onEditCategoryChange(EditCategory.BRIGHTNESS) }
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.WbSunny,
+                                imageVector = Icons.Filled.Brightness1,
                                 contentDescription = stringResource(R.string.edit_brightness),
                                 tint = Color.White
                             )
@@ -417,7 +429,7 @@ fun EditorScreen(
                             onClick = { onEditCategoryChange(EditCategory.CONTRAST) }
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Tonality,
+                                imageVector = Icons.Filled.Contrast,
                                 contentDescription = stringResource(R.string.edit_contrast),
                                 tint = Color.White
                             )
@@ -439,7 +451,7 @@ fun EditorScreen(
                             onClick = { onEditCategoryChange(EditCategory.COLOR_BALANCE) }
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Palette,
+                                painter = painterResource(R.drawable.triangle_circle),
                                 contentDescription = stringResource(R.string.edit_color_balance),
                                 tint = Color.White
                             )
@@ -461,7 +473,7 @@ fun EditorScreen(
                             onClick = { onEditClick(EditType.CROP) }
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Crop,
+                                imageVector = Icons.Filled.CropRotate,
                                 contentDescription = stringResource(R.string.edit_crop),
                                 tint = Color.White
                             )
@@ -483,7 +495,7 @@ fun EditorScreen(
                             onClick = { onEditClick(EditType.FLIP_HORIZONTAL) }
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.SwapHoriz,
+                                imageVector = Icons.Filled.Flip,
                                 contentDescription = stringResource(R.string.edit_flip),
                                 tint = Color.White
                             )
@@ -516,18 +528,34 @@ fun EditorScreen(
                             IconButton(
                                 onClick = { onFilterToggle(filterType) }
                             ) {
-                                Icon(
-                                    imageVector = when (filterType) {
-                                        FilterType.GAUSSIAN_BLUR -> Icons.Filled.BlurOn
-                                        FilterType.SHARPEN -> Icons.Filled.AutoFixHigh
-                                        FilterType.VIGNETTE -> Icons.Filled.CenterFocusStrong
-                                        FilterType.GRAYSCALE -> Icons.Filled.FilterBAndW
-                                        FilterType.SEPIA -> Icons.Filled.PhotoFilter
-                                        else -> Icons.Filled.BlurOn
-                                    },
-                                    contentDescription = getFilterName(filterType),
-                                    tint = Color.White
-                                )
+                                when (filterType) {
+                                    FilterType.VIGNETTE -> {
+                                        Icon(
+                                            painter = painterResource(R.drawable.vignette_2),
+                                            contentDescription = getFilterName(filterType),
+                                            tint = Color.White
+                                        )
+                                    }
+                                    FilterType.SEPIA -> {
+                                        Icon(
+                                            painter = painterResource(R.drawable.filter_vintage),
+                                            contentDescription = getFilterName(filterType),
+                                            tint = Color.White
+                                        )
+                                    }
+                                    else -> {
+                                        Icon(
+                                            imageVector = when (filterType) {
+                                                FilterType.GAUSSIAN_BLUR -> Icons.Filled.BlurOn
+                                                FilterType.SHARPEN -> Icons.Filled.Details
+                                                FilterType.GRAYSCALE -> Icons.Filled.FilterBAndW
+                                                else -> Icons.Filled.BlurOn
+                                            },
+                                            contentDescription = getFilterName(filterType),
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
                             }
                             if (isLastSelected) {
                                 Text(
