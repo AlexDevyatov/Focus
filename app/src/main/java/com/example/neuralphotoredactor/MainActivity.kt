@@ -318,7 +318,11 @@ class MainActivity : ComponentActivity() {
                                     editorViewModel.cancelCrop()
                                 },
                                 onBackClick = {
-                                    navController.popBackStack()
+                                    editorViewModel.resetAll()
+                                    navController.navigate("gallery") {
+                                        // Очищаем back stack до gallery, чтобы избежать возврата на editor
+                                        popUpTo("gallery") { inclusive = false }
+                                    }
                                 }
                             )
                         },

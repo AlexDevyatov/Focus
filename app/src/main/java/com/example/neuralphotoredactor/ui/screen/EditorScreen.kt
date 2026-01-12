@@ -256,8 +256,10 @@ fun EditorScreen(
             }
             
             // Слайдер Material Design 3 (скрывается при кадрировании)
-            if (!showCropOverlay && showEditMode) {
-                when (currentEditCategory) {
+            if (!showCropOverlay) {
+                if (showEditMode) {
+                    // Режим настроек
+                    when (currentEditCategory) {
                         EditCategory.BRIGHTNESS -> {
                             Column(
                                 modifier = Modifier
@@ -339,6 +341,37 @@ fun EditorScreen(
                             // Для геометрических операций слайдер не показываем
                         }
                     }
+                } else {
+                    // Режим фильтров - показываем слайдер для последнего выбранного фильтра
+                    val lastSelectedFilter = selectedFilters.lastOrNull()
+                    if (lastSelectedFilter != null) {
+                        val (filterType, savedIntensity) = lastSelectedFilter
+                        // Показываем слайдер только для обычных фильтров (не нейросетевых)
+                        val neuralFilters = listOf(
+                            FilterType.STYLE_TRANSFER,
+                            FilterType.DENOISE,
+                            FilterType.UPSCALE,
+                            FilterType.COLOR_CORRECTION
+                        )
+                        if (filterType !in neuralFilters) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Slider(
+                                    value = savedIntensity ?: currentFilterIntensity,
+                                    onValueChange = { intensity ->
+                                        onIntensityChange(filterType, intensity)
+                                    },
+                                    valueRange = 0f..1f,
+                                    steps = 99,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                }
             }
             
             // 5 иконок в ряд: в зависимости от режима (скрываются при кадрировании)

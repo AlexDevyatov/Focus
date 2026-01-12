@@ -99,8 +99,8 @@ class EditorViewModel @Inject constructor(
         }
         
         _uiState.value = _uiState.value.copy(selectedFilters = currentFilters)
-        // Обновляем предпросмотр
-        previewFilters(currentFilters)
+        // Пересчитываем предпросмотр с учетом всех настроек и фильтров
+        recalculatePreview()
     }
     
     fun updateFilterIntensity(filterType: FilterType, intensity: Float) {
@@ -124,8 +124,8 @@ class EditorViewModel @Inject constructor(
             selectedFilters = currentFilters,
             currentFilterIntensity = intensity
         )
-        // Обновляем предпросмотр
-        previewFilters(currentFilters)
+        // Пересчитываем предпросмотр с учетом всех настроек и фильтров
+        recalculatePreview()
     }
     
     /**
@@ -382,6 +382,32 @@ class EditorViewModel @Inject constructor(
         )
     }
     
+    /**
+     * Сбросить все настройки и фильтры (вызывается при нажатии кнопки назад).
+     */
+    fun resetAll() {
+        currentPreviewJob?.cancel()
+        currentFilterJob?.cancel()
+        _uiState.value = _uiState.value.copy(
+            processedResult = null,
+            previewBitmap = null,
+            fullSizeBitmap = null,
+            selectedFilters = emptyList(),
+            currentFilterIntensity = 0.5f,
+            brightness = 0f,
+            contrast = 0f,
+            colorBalanceRed = 0f,
+            colorBalanceGreen = 0f,
+            colorBalanceBlue = 0f,
+            appliedEdits = emptyList(),
+            currentEditCategory = EditCategory.BRIGHTNESS,
+            showCropOverlay = false,
+            cropBitmap = null
+        )
+        // Очищаем кэш
+        cachedOriginalBitmap = null
+    }
+    
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
@@ -397,6 +423,7 @@ class EditorViewModel @Inject constructor(
     
     /**
      * Переключить режим (фильтры/редактирование).
+     * Настройки и фильтры сохраняются в состоянии, перерисовка не происходит.
      */
     fun toggleEditMode() {
         _uiState.value = _uiState.value.copy(
@@ -558,10 +585,16 @@ class EditorViewModel @Inject constructor(
      * Пересчитать предпросмотр с учетом всех накопленных изменений.
      */
     private fun recalculatePreview() {
+        android.util.Log.e("EditorViewModel", "recalculatePreview() вызван")
+        android.util.Log.d("EditorViewModel", "  - brightness: ${_uiState.value.brightness}")
+        android.util.Log.d("EditorViewModel", "  - contrast: ${_uiState.value.contrast}")
+        android.util.Log.d("EditorViewModel", "  - colorBalance: R=${_uiState.value.colorBalanceRed}, G=${_uiState.value.colorBalanceGreen}, B=${_uiState.value.colorBalanceBlue}")
+        android.util.Log.d("EditorViewModel", "  - selectedFilters: ${_uiState.value.selectedFilters.size} фильтров")
+        android.util.Log.d("EditorViewModel", "  - appliedEdits: ${_uiState.value.appliedEdits.size} изменений")
         currentPreviewJob?.cancel()
         
         currentPreviewJob = viewModelScope.launch {
-            delay(100)
+            delay(400) // Увеличена задержка для уменьшения частоты вызовов при движении слайдера
             
             val originalBitmap = getOrLoadOriginalBitmap()
             if (originalBitmap == null || originalBitmap.isRecycled) {
@@ -688,15 +721,65 @@ class EditorViewModel @Inject constructor(
                     }
                 }
                 
-                if (isActive) {
+                if (isActive && workingBitmap != null && !workingBitmap.isRecycled) {
+                    // Сохраняем старые битмапы из UI перед обновлением
+                    val oldPreviewBitmap = _uiState.value.previewBitmap
+                    val oldFullSizeBitmap = _uiState.value.fullSizeBitmap
+                    
+                    // Масштабируем для preview, чтобы избежать ошибки Canvas
+                    // Используем максимум 2048x2048 для безопасности и производительности
+                    val maxPreviewDimension = 2048
+                    val bitmapSizeBytes = workingBitmap.width * workingBitmap.height * 4 // ARGB_8888 = 4 байта на пиксель
+                    val maxCanvasSizeBytes = 100 * 1024 * 1024 // ~100 МБ - максимальный размер для Canvas
+                    
+                    val previewBitmap = if (bitmapSizeBytes > maxCanvasSizeBytes || 
+                                           workingBitmap.width > maxPreviewDimension || 
+                                           workingBitmap.height > maxPreviewDimension) {
+                        val scale = minOf(
+                            maxPreviewDimension.toFloat() / workingBitmap.width,
+                            maxPreviewDimension.toFloat() / workingBitmap.height
+                        )
+                        val scaledWidth = (workingBitmap.width * scale).toInt()
+                        val scaledHeight = (workingBitmap.height * scale).toInt()
+                        android.util.Log.d("EditorViewModel", 
+                            "Масштабируем preview: ${workingBitmap.width}x${workingBitmap.height} (${bitmapSizeBytes / 1024 / 1024} МБ) -> ${scaledWidth}x${scaledHeight}")
+                        val scaled = Bitmap.createScaledBitmap(workingBitmap, scaledWidth, scaledHeight, true)
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        scaled
+                    } else {
+                        workingBitmap
+                    }
+                    
+                    // Обновляем состояние UI
                     _uiState.value = _uiState.value.copy(
-                        previewBitmap = workingBitmap
+                        previewBitmap = previewBitmap,
+                        fullSizeBitmap = if (previewBitmap != workingBitmap) workingBitmap else null
                     )
+                    
+                    // Освобождаем старые битмапы из UI после обновления состояния
+                    // Используем небольшую задержку, чтобы UI успел обновиться
+                    viewModelScope.launch {
+                        delay(200) // Даем время UI обновиться
+                        oldPreviewBitmap?.let {
+                            if (!it.isRecycled && it != previewBitmap && it != workingBitmap) {
+                                it.recycle()
+                            }
+                        }
+                        oldFullSizeBitmap?.let {
+                            if (!it.isRecycled && it != previewBitmap && it != workingBitmap && it != oldPreviewBitmap) {
+                                it.recycle()
+                            }
+                        }
+                    }
                 }
                 
-                // Освобождаем промежуточные bitmaps
+                // Освобождаем промежуточные bitmaps (но не те, что используются в UI)
                 bitmapsToRecycle.forEach { bitmap ->
-                    if (!bitmap.isRecycled) {
+                    val oldPreview = _uiState.value.previewBitmap
+                    val oldFullSize = _uiState.value.fullSizeBitmap
+                    if (!bitmap.isRecycled && bitmap != oldPreview && bitmap != oldFullSize) {
                         bitmap.recycle()
                     }
                 }
