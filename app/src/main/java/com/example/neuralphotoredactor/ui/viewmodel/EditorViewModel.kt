@@ -496,11 +496,6 @@ class EditorViewModel @Inject constructor(
     fun applyCrop(cropRect: Rect) {
         currentPreviewJob?.cancel()
         
-        _uiState.value = _uiState.value.copy(
-            showCropOverlay = false,
-            appliedEdits = _uiState.value.appliedEdits + (EditType.CROP to 0f)
-        )
-        
         // Применяем кадрирование и пересчитываем предпросмотр
         currentPreviewJob = viewModelScope.launch {
             delay(100)
@@ -522,13 +517,18 @@ class EditorViewModel @Inject constructor(
                 )
                 
                 if (isActive && croppedBitmap != null) {
+                    // Обновляем кэш на обрезанное изображение
+                    cachedOriginalBitmap = croppedBitmap
+                    
+                    // Обновляем состояние (не добавляем CROP в appliedEdits, так как он уже применен к исходному изображению)
                     _uiState.value = _uiState.value.copy(
-                        previewBitmap = croppedBitmap,
+                        showCropOverlay = false,
                         cropBitmap = null,
                         error = null
                     )
-                    // Обновляем кэш
-                    cachedOriginalBitmap = croppedBitmap
+                    
+                    // Пересчитываем предпросмотр с учетом всех настроек и фильтров
+                    recalculatePreview()
                 } else if (isActive) {
                     _uiState.value = _uiState.value.copy(
                         error = "Не удалось применить кадрирование"
@@ -576,9 +576,11 @@ class EditorViewModel @Inject constructor(
                 var workingBitmap: Bitmap? = originalBitmap
                 val bitmapsToRecycle = mutableListOf<Bitmap>()
                 
-                // Сначала применяем все геометрические изменения
+                // Сначала применяем все геометрические изменения (кроме CROP, так как он уже применен к исходному изображению)
                 for ((geometricEditType, _) in _uiState.value.appliedEdits) {
                     if (workingBitmap == null || workingBitmap.isRecycled) break
+                    // Пропускаем CROP, так как он уже применен к исходному изображению в кэше
+                    if (geometricEditType == EditType.CROP) continue
                     val result = processingRepository.applyEdit(workingBitmap, geometricEditType, 0f, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
