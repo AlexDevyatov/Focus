@@ -255,26 +255,15 @@ fun EditorScreen(
                 }
             }
             
-            // Слайдер Material Design 3 (скрывается при кадрировании и отражениях)
+            // Слайдер Material Design 3 (скрывается при кадрировании)
             if (!showCropOverlay && showEditMode) {
-                val lastAppliedEdit = appliedEdits.lastOrNull()?.first
-                val isFlipActive = lastAppliedEdit == EditType.FLIP_HORIZONTAL || lastAppliedEdit == EditType.FLIP_VERTICAL
-                
-                // Не показываем слайдер для отражений
-                if (!isFlipActive) {
-                    when (currentEditCategory) {
+                when (currentEditCategory) {
                         EditCategory.BRIGHTNESS -> {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
                             ) {
-                                Text(
-                                    text = stringResource(R.string.edit_brightness),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
                                 Slider(
                                     value = brightness,
                                     onValueChange = onBrightnessChange,
@@ -290,12 +279,6 @@ fun EditorScreen(
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
                             ) {
-                                Text(
-                                    text = stringResource(R.string.edit_contrast),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
                                 Slider(
                                     value = contrast,
                                     onValueChange = onContrastChange,
@@ -313,89 +296,49 @@ fun EditorScreen(
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 // Красный канал
-                                Column {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.edit_color_balance_red),
-                                            color = Color.Red,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                    Slider(
-                                        value = colorBalanceRed,
-                                        onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_RED, it) },
-                                        valueRange = -1f..1f,
-                                        steps = 199,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = Color.Red,
-                                            activeTrackColor = Color.Red
-                                        )
+                                Slider(
+                                    value = colorBalanceRed,
+                                    onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_RED, it) },
+                                    valueRange = -1f..1f,
+                                    steps = 199,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.Red,
+                                        activeTrackColor = Color.Red
                                     )
-                                }
+                                )
                                 
                                 // Зеленый канал
-                                Column {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.edit_color_balance_green),
-                                            color = Color.Green,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                    Slider(
-                                        value = colorBalanceGreen,
-                                        onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_GREEN, it) },
-                                        valueRange = -1f..1f,
-                                        steps = 199,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = Color.Green,
-                                            activeTrackColor = Color.Green
-                                        )
+                                Slider(
+                                    value = colorBalanceGreen,
+                                    onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_GREEN, it) },
+                                    valueRange = -1f..1f,
+                                    steps = 199,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.Green,
+                                        activeTrackColor = Color.Green
                                     )
-                                }
+                                )
                                 
                                 // Синий канал
-                                Column {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.edit_color_balance_blue),
-                                            color = Color.Blue,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                    Slider(
-                                        value = colorBalanceBlue,
-                                        onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_BLUE, it) },
-                                        valueRange = -1f..1f,
-                                        steps = 199,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = Color.Blue,
-                                            activeTrackColor = Color.Blue
-                                        )
+                                Slider(
+                                    value = colorBalanceBlue,
+                                    onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_BLUE, it) },
+                                    valueRange = -1f..1f,
+                                    steps = 199,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.Blue,
+                                        activeTrackColor = Color.Blue
                                     )
-                                }
+                                )
                             }
                         }
                         EditCategory.GEOMETRY -> {
                             // Для геометрических операций слайдер не показываем
                         }
                     }
-                }
             }
             
             // 5 иконок в ряд: в зависимости от режима (скрываются при кадрировании)
@@ -424,7 +367,7 @@ fun EditorScreen(
                                 tint = Color.White
                             )
                         }
-                        if (currentEditCategory == EditCategory.BRIGHTNESS && !showCropOverlay && !isFlipActive) {
+                        if (currentEditCategory == EditCategory.BRIGHTNESS && !showCropOverlay) {
                             Text(
                                 text = stringResource(R.string.edit_brightness),
                                 color = Color.White,
@@ -446,7 +389,7 @@ fun EditorScreen(
                                 tint = Color.White
                             )
                         }
-                        if (currentEditCategory == EditCategory.CONTRAST && !showCropOverlay && !isFlipActive) {
+                        if (currentEditCategory == EditCategory.CONTRAST && !showCropOverlay) {
                             Text(
                                 text = stringResource(R.string.edit_contrast),
                                 color = Color.White,
@@ -468,7 +411,7 @@ fun EditorScreen(
                                 tint = Color.White
                             )
                         }
-                        if (currentEditCategory == EditCategory.COLOR_BALANCE && !showCropOverlay && !isFlipActive) {
+                        if (currentEditCategory == EditCategory.COLOR_BALANCE && !showCropOverlay) {
                             Text(
                                 text = stringResource(R.string.edit_color_balance),
                                 color = Color.White,

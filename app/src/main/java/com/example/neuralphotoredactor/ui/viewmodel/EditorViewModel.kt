@@ -672,6 +672,20 @@ class EditorViewModel @Inject constructor(
                     }
                 }
                 
+                // Применяем фильтры, если они есть
+                if (workingBitmap != null && !workingBitmap.isRecycled && _uiState.value.selectedFilters.isNotEmpty()) {
+                    val filteredResult = processingRepository.previewFilters(
+                        workingBitmap,
+                        _uiState.value.selectedFilters.map { it.first to it.second }
+                    )
+                    if (filteredResult != null && filteredResult != workingBitmap) {
+                        if (workingBitmap != originalBitmap) {
+                            bitmapsToRecycle.add(workingBitmap)
+                        }
+                        workingBitmap = filteredResult
+                    }
+                }
+                
                 if (isActive) {
                     _uiState.value = _uiState.value.copy(
                         previewBitmap = workingBitmap
