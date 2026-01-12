@@ -40,7 +40,9 @@ fun CropOverlay(
     bitmap: Bitmap?,
     onCropApply: (Rect) -> Unit,
     onCropCancel: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showButtons: Boolean = true,
+    onCropRectChange: ((Rect) -> Unit)? = null
 ) {
     if (bitmap == null) return
     
@@ -80,19 +82,54 @@ fun CropOverlay(
     
     // Обновляем cropRect когда размеры изображения становятся доступными
     LaunchedEffect(imageDisplayWidth, imageDisplayHeight, offsetX, offsetY) {
-        if (imageDisplayWidth > 0 && imageDisplayHeight > 0) {
-            cropRect = Rect(
-                offsetX.toInt(),
-                offsetY.toInt(),
-                (offsetX + imageDisplayWidth).toInt(),
-                (offsetY + imageDisplayHeight).toInt()
+        if (imageDisplayWidth > 0 && imageDisplayHeight > 0 && bitmap != null) {
+            // Создаем рамку, покрывающую 75% изображения, центрированную
+            val cropWidth = (imageDisplayWidth * 0.75f).toInt()
+            val cropHeight = (imageDisplayHeight * 0.75f).toInt()
+            val cropLeft = offsetX.toInt() + (imageDisplayWidth - cropWidth) / 2
+            val cropTop = offsetY.toInt() + (imageDisplayHeight - cropHeight) / 2
+            val cropRight = cropLeft + cropWidth
+            val cropBottom = cropTop + cropHeight
+            
+            val newRect = Rect(
+                cropLeft,
+                cropTop,
+                cropRight,
+                cropBottom
             )
+            cropRect = newRect
+            // Вызываем callback с масштабированным Rect
+            val scaledRect = scaleCropRectToBitmap(
+                newRect,
+                bitmap.width,
+                bitmap.height,
+                imageDisplayWidth,
+                imageDisplayHeight,
+                offsetX,
+                offsetY
+            )
+            onCropRectChange?.invoke(scaledRect)
         }
     }
     
     // Callback для обновления cropRect из pointerInput
     val updateCropRect: (Rect) -> Unit = { newRect ->
         cropRect = newRect
+        // Масштабируем Rect в координаты bitmap перед передачей в callback
+        if (bitmap != null && imageDisplayWidth > 0 && imageDisplayHeight > 0) {
+            val scaledRect = scaleCropRectToBitmap(
+                newRect,
+                bitmap.width,
+                bitmap.height,
+                imageDisplayWidth,
+                imageDisplayHeight,
+                offsetX,
+                offsetY
+            )
+            onCropRectChange?.invoke(scaledRect)
+        } else {
+            onCropRectChange?.invoke(newRect)
+        }
     }
     var isDragging by remember { mutableStateOf(false) }
     
@@ -156,15 +193,16 @@ fun CropOverlay(
                                     val imgW = currentImageDisplayWidth.value
                                     val imgH = currentImageDisplayHeight.value
                                     
+                                    val minSize = 50f // Минимальный размер рамки
                                     val newRect = when (handle) {
                                         CropHandle.TOP_LEFT -> {
                                             val newLeft = (currentRect.left + deltaX).coerceIn(
                                                 offX,
-                                                (currentRect.right - 20).toFloat()
+                                                (currentRect.right - minSize)
                                             ).toInt()
                                             val newTop = (currentRect.top + deltaY).coerceIn(
                                                 offY,
-                                                (currentRect.bottom - 20).toFloat()
+                                                (currentRect.bottom - minSize)
                                             ).toInt()
                                             Rect(
                                                 newLeft,
@@ -175,12 +213,12 @@ fun CropOverlay(
                                         }
                                         CropHandle.TOP_RIGHT -> {
                                             val newRight = (currentRect.right + deltaX).coerceIn(
-                                                (currentRect.left + 20).toFloat(),
+                                                (currentRect.left + minSize),
                                                 offX + imgW
                                             ).toInt()
                                             val newTop = (currentRect.top + deltaY).coerceIn(
                                                 offY,
-                                                (currentRect.bottom - 20).toFloat()
+                                                (currentRect.bottom - minSize)
                                             ).toInt()
                                             Rect(
                                                 currentRect.left,
@@ -192,10 +230,10 @@ fun CropOverlay(
                                         CropHandle.BOTTOM_LEFT -> {
                                             val newLeft = (currentRect.left + deltaX).coerceIn(
                                                 offX,
-                                                (currentRect.right - 20).toFloat()
+                                                (currentRect.right - minSize)
                                             ).toInt()
                                             val newBottom = (currentRect.bottom + deltaY).coerceIn(
-                                                (currentRect.top + 20).toFloat(),
+                                                (currentRect.top + minSize),
                                                 offY + imgH
                                             ).toInt()
                                             Rect(
@@ -207,11 +245,11 @@ fun CropOverlay(
                                         }
                                         CropHandle.BOTTOM_RIGHT -> {
                                             val newRight = (currentRect.right + deltaX).coerceIn(
-                                                (currentRect.left + 20).toFloat(),
+                                                (currentRect.left + minSize),
                                                 offX + imgW
                                             ).toInt()
                                             val newBottom = (currentRect.bottom + deltaY).coerceIn(
-                                                (currentRect.top + 20).toFloat(),
+                                                (currentRect.top + minSize),
                                                 offY + imgH
                                             ).toInt()
                                             Rect(
@@ -219,6 +257,54 @@ fun CropOverlay(
                                                 currentRect.top,
                                                 newRight,
                                                 newBottom
+                                            )
+                                        }
+                                        CropHandle.TOP -> {
+                                            val newTop = (currentRect.top + deltaY).coerceIn(
+                                                offY,
+                                                (currentRect.bottom - minSize)
+                                            ).toInt()
+                                            Rect(
+                                                currentRect.left,
+                                                newTop,
+                                                currentRect.right,
+                                                currentRect.bottom
+                                            )
+                                        }
+                                        CropHandle.BOTTOM -> {
+                                            val newBottom = (currentRect.bottom + deltaY).coerceIn(
+                                                (currentRect.top + minSize),
+                                                offY + imgH
+                                            ).toInt()
+                                            Rect(
+                                                currentRect.left,
+                                                currentRect.top,
+                                                currentRect.right,
+                                                newBottom
+                                            )
+                                        }
+                                        CropHandle.LEFT -> {
+                                            val newLeft = (currentRect.left + deltaX).coerceIn(
+                                                offX,
+                                                (currentRect.right - minSize)
+                                            ).toInt()
+                                            Rect(
+                                                newLeft,
+                                                currentRect.top,
+                                                currentRect.right,
+                                                currentRect.bottom
+                                            )
+                                        }
+                                        CropHandle.RIGHT -> {
+                                            val newRight = (currentRect.right + deltaX).coerceIn(
+                                                (currentRect.left + minSize),
+                                                offX + imgW
+                                            ).toInt()
+                                            Rect(
+                                                currentRect.left,
+                                                currentRect.top,
+                                                newRight,
+                                                currentRect.bottom
                                             )
                                         }
                                         CropHandle.CENTER -> {
@@ -304,40 +390,42 @@ fun CropOverlay(
             }
         }
         
-        // Кнопки управления
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            FilledTonalButton(
-                onClick = onCropCancel,
-                modifier = Modifier.weight(1f)
+        // Кнопки управления (показываются только если showButtons == true)
+        if (showButtons) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Icon(Icons.Default.Close, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.edit_cancel))
-            }
-            Button(
-                onClick = {
-                    // Масштабируем координаты из UI в координаты bitmap
-                    val scaledRect = scaleCropRectToBitmap(
-                        cropRect,
-                        bitmap.width,
-                        bitmap.height,
-                        imageDisplayWidth,
-                        imageDisplayHeight,
-                        offsetX,
-                        offsetY
-                    )
-                    onCropApply(scaledRect)
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.edit_apply))
+                FilledTonalButton(
+                    onClick = onCropCancel,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.edit_cancel))
+                }
+                Button(
+                    onClick = {
+                        // Масштабируем координаты из UI в координаты bitmap
+                        val scaledRect = scaleCropRectToBitmap(
+                            cropRect,
+                            bitmap.width,
+                            bitmap.height,
+                            imageDisplayWidth,
+                            imageDisplayHeight,
+                            offsetX,
+                            offsetY
+                        )
+                        onCropApply(scaledRect)
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.edit_apply))
+                }
             }
         }
     }
@@ -346,7 +434,7 @@ fun CropOverlay(
 /**
  * Масштабирует координаты обрезки из координат UI в координаты bitmap.
  */
-private fun scaleCropRectToBitmap(
+internal fun scaleCropRectToBitmap(
     uiRect: Rect,
     bitmapWidth: Int,
     bitmapHeight: Int,
@@ -374,13 +462,14 @@ private fun scaleCropRectToBitmap(
 }
 
 /**
- * Определяет, какой угол прямоугольника обрезки был захвачен для перетаскивания.
+ * Определяет, какой угол или граница прямоугольника обрезки была захвачена для перетаскивания.
  */
 private fun getCropHandle(offset: Offset, cropRect: Rect): CropHandle? {
-    val handleSize = 50f // Размер области захвата в пикселях (увеличен для удобства)
+    val handleSize = 30f // Размер области захвата для углов в пикселях
+    val edgeSize = 20f // Размер области захвата для границ в пикселях
     
     // Проверяем углы в первую очередь (приоритет)
-    val handles = listOf(
+    val cornerHandles = listOf(
         CropHandle.TOP_LEFT to Offset(cropRect.left.toFloat(), cropRect.top.toFloat()),
         CropHandle.TOP_RIGHT to Offset(cropRect.right.toFloat(), cropRect.top.toFloat()),
         CropHandle.BOTTOM_LEFT to Offset(cropRect.left.toFloat(), cropRect.bottom.toFloat()),
@@ -388,7 +477,7 @@ private fun getCropHandle(offset: Offset, cropRect: Rect): CropHandle? {
     )
     
     // Проверяем углы
-    for ((handle, position) in handles) {
+    for ((handle, position) in cornerHandles) {
         val distanceX = kotlin.math.abs(offset.x - position.x)
         val distanceY = kotlin.math.abs(offset.y - position.y)
         if (distanceX < handleSize && distanceY < handleSize) {
@@ -396,9 +485,39 @@ private fun getCropHandle(offset: Offset, cropRect: Rect): CropHandle? {
         }
     }
     
-    // Проверяем центр (для перемещения всего прямоугольника) только если не попали в угол
-    if (offset.x >= cropRect.left && offset.x <= cropRect.right &&
-        offset.y >= cropRect.top && offset.y <= cropRect.bottom) {
+    // Проверяем границы (только если не попали в угол)
+    val left = cropRect.left.toFloat()
+    val right = cropRect.right.toFloat()
+    val top = cropRect.top.toFloat()
+    val bottom = cropRect.bottom.toFloat()
+    
+    // Верхняя граница
+    if (offset.x >= left && offset.x <= right &&
+        offset.y >= top - edgeSize && offset.y <= top + edgeSize) {
+        return CropHandle.TOP
+    }
+    
+    // Нижняя граница
+    if (offset.x >= left && offset.x <= right &&
+        offset.y >= bottom - edgeSize && offset.y <= bottom + edgeSize) {
+        return CropHandle.BOTTOM
+    }
+    
+    // Левая граница
+    if (offset.y >= top && offset.y <= bottom &&
+        offset.x >= left - edgeSize && offset.x <= left + edgeSize) {
+        return CropHandle.LEFT
+    }
+    
+    // Правая граница
+    if (offset.y >= top && offset.y <= bottom &&
+        offset.x >= right - edgeSize && offset.x <= right + edgeSize) {
+        return CropHandle.RIGHT
+    }
+    
+    // Проверяем центр (для перемещения всего прямоугольника) только если не попали в угол или границу
+    if (offset.x >= left && offset.x <= right &&
+        offset.y >= top && offset.y <= bottom) {
         return CropHandle.CENTER
     }
     
@@ -410,6 +529,10 @@ private enum class CropHandle {
     TOP_RIGHT,
     BOTTOM_LEFT,
     BOTTOM_RIGHT,
+    TOP,
+    BOTTOM,
+    LEFT,
+    RIGHT,
     CENTER
 }
 

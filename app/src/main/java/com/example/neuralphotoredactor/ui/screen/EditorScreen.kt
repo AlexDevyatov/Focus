@@ -156,6 +156,9 @@ fun EditorScreen(
         },
         modifier = modifier
     ) { paddingValues ->
+        // Состояние для текущего cropRect (доступно во всем Column)
+        var currentCropRect by remember { mutableStateOf<Rect?>(null) }
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -219,12 +222,20 @@ fun EditorScreen(
                 }
 
                 // Overlay для кадрирования
-                if (showCropOverlay) {
+                if (showCropOverlay && cropBitmap != null) {
                     CropOverlay(
                         bitmap = cropBitmap,
-                        onCropApply = onCropApply,
+                        onCropApply = { rect ->
+                            // Этот callback вызывается из внутренних кнопок CropOverlay (если showButtons = true)
+                            onCropApply(rect)
+                        },
                         onCropCancel = onCropCancel,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        showButtons = false,
+                        onCropRectChange = { rect ->
+                            // rect уже масштабирован в координаты bitmap
+                            currentCropRect = rect
+                        }
                     )
                 }
 
@@ -244,23 +255,26 @@ fun EditorScreen(
                 }
             }
             
-            // Слайдер Material Design 3
-            var sliderValue by remember { mutableStateOf(0.5f) }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Slider(
-                    value = sliderValue,
-                    onValueChange = { sliderValue = it },
-                    valueRange = 0f..1f,
-                    modifier = Modifier.fillMaxWidth()
-                )
+            // Слайдер Material Design 3 (скрывается при кадрировании)
+            if (!showCropOverlay) {
+                var sliderValue by remember { mutableStateOf(0.5f) }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { sliderValue = it },
+                        valueRange = 0f..1f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
             
-            // 5 иконок в ряд: в зависимости от режима
-            Row(
+            // 5 иконок в ряд: в зависимости от режима (скрываются при кадрировании)
+            if (!showCropOverlay) {
+                Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -424,48 +438,85 @@ fun EditorScreen(
                         }
                     }
                 }
+                }
             }
             
-            // Две овальные кнопки: Настройки и Фильтры
+            // Кнопки: Настройки/Фильтры или Отмена/Применить (при кадрировании)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilledTonalButton(
-                    onClick = {
-                        if (!showEditMode) {
-                            onToggleEditMode()
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
-                    )
-                ) {
-                    Text(
-                        text = stringResource(R.string.editor_settings_button),
-                        color = Color.White
-                    )
-                }
-                FilledTonalButton(
-                    onClick = {
-                        if (showEditMode) {
-                            onToggleEditMode()
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (!showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
-                    )
-                ) {
-                    Text(
-                        text = stringResource(R.string.editor_filters_button),
-                        color = Color.White
-                    )
+                if (showCropOverlay) {
+                    // Кнопки для кадрирования: Отмена и Применить
+                    FilledTonalButton(
+                        onClick = onCropCancel,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.edit_cancel),
+                            color = Color.White
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            // currentCropRect уже содержит масштабированный Rect в координатах bitmap
+                            if (currentCropRect != null) {
+                                onCropApply(currentCropRect!!)
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.edit_apply),
+                            color = Color.White
+                        )
+                    }
+                } else {
+                    // Обычные кнопки: Настройки и Фильтры
+                    FilledTonalButton(
+                        onClick = {
+                            if (!showEditMode) {
+                                onToggleEditMode()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.editor_settings_button),
+                            color = Color.White
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            if (showEditMode) {
+                                onToggleEditMode()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (!showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.editor_filters_button),
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }
