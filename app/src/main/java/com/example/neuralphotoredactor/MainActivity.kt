@@ -318,11 +318,12 @@ class MainActivity : ComponentActivity() {
                                     editorViewModel.cancelCrop()
                                 },
                                 onBackClick = {
-                                    editorViewModel.resetAll()
+                                    // Очищаем весь стек навигации и переходим на галерею
                                     navController.navigate("gallery") {
-                                        // Очищаем back stack до gallery, чтобы избежать возврата на editor
-                                        popUpTo("gallery") { inclusive = false }
+                                        popUpTo("main") { inclusive = true } // Очищаем весь стек до main включительно
+                                        launchSingleTop = true // Предотвращаем создание нескольких экземпляров
                                     }
+                                    editorViewModel.resetAll()
                                 }
                             )
                         },

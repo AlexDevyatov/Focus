@@ -32,7 +32,8 @@ class EditorViewModel @Inject constructor(
     
     private var currentFilterJob: Job? = null // Для отмены предыдущих запросов
     private var currentPreviewJob: Job? = null // Для отмены предыдущих предпросмотров
-    private var cachedOriginalBitmap: Bitmap? = null // Кэш исходного изображения
+    private var cachedOriginalBitmap: Bitmap? = null // Кэш исходного изображения (может быть изменен после кадрирования)
+    private var trueOriginalBitmap: Bitmap? = null // Истинно оригинальное изображение (не изменяется)
     
     // Callback для обновления галереи после сохранения
     var onImageSaved: (() -> Unit)? = null
@@ -71,6 +72,7 @@ class EditorViewModel @Inject constructor(
         )
         // Очищаем кэш при смене изображения
         cachedOriginalBitmap = null
+        trueOriginalBitmap = null
         currentPreviewJob?.cancel()
         currentFilterJob?.cancel()
         
@@ -357,6 +359,10 @@ class EditorViewModel @Inject constructor(
         return try {
             val bitmap = processingRepository.loadBitmapFromUri(imageData.uri)
             if (bitmap != null) {
+                // Сохраняем истинно оригинальное изображение (если еще не сохранено)
+                if (trueOriginalBitmap == null || trueOriginalBitmap!!.isRecycled) {
+                    trueOriginalBitmap = bitmap
+                }
                 // Кэшируем для последующих использований
                 cachedOriginalBitmap = bitmap
                 android.util.Log.d("EditorViewModel", "Bitmap закэширован: ${bitmap.width}x${bitmap.height}")
@@ -368,6 +374,41 @@ class EditorViewModel @Inject constructor(
             android.util.Log.e("EditorViewModel", "Ошибка загрузки Bitmap: ${e.message}", e)
             null
         }
+    }
+    
+    /**
+     * Получить bitmap для кадрирования с учетом геометрических изменений, но без цветовых настроек и фильтров.
+     */
+    private suspend fun getBitmapForCropWithGeometry(): Bitmap? {
+        val baseBitmap = trueOriginalBitmap ?: getOrLoadOriginalBitmap()
+        if (baseBitmap == null || baseBitmap.isRecycled) {
+            return null
+        }
+        
+        // Применяем только геометрические изменения (повороты, отражения)
+        var workingBitmap: Bitmap? = baseBitmap
+        val bitmapsToRecycle = mutableListOf<Bitmap>()
+        
+        for ((geometricEditType, _) in _uiState.value.appliedEdits) {
+            if (workingBitmap == null || workingBitmap.isRecycled) break
+            if (geometricEditType == EditType.CROP) continue
+            val result = processingRepository.applyEdit(workingBitmap, geometricEditType, 0f, null)
+            if (result != null && result != workingBitmap) {
+                if (workingBitmap != baseBitmap) {
+                    bitmapsToRecycle.add(workingBitmap)
+                }
+                workingBitmap = result
+            }
+        }
+        
+        // Освобождаем промежуточные bitmaps
+        bitmapsToRecycle.forEach { bitmap ->
+            if (!bitmap.isRecycled && bitmap != workingBitmap) {
+                bitmap.recycle()
+            }
+        }
+        
+        return workingBitmap
     }
     
     fun clearFilters() {
@@ -406,6 +447,7 @@ class EditorViewModel @Inject constructor(
         )
         // Очищаем кэш
         cachedOriginalBitmap = null
+        trueOriginalBitmap = null
     }
     
     fun clearError() {
@@ -511,14 +553,15 @@ class EditorViewModel @Inject constructor(
     }
     
     /**
-     * Получить bitmap для кадрирования (previewBitmap или загрузить из imageUri).
+     * Получить bitmap для кадрирования с учетом геометрических изменений, но без цветовых настроек и фильтров.
      */
     suspend fun getBitmapForCrop(): Bitmap? {
-        return _uiState.value.previewBitmap ?: getOrLoadOriginalBitmap()
+        return getBitmapForCropWithGeometry()
     }
     
     /**
      * Применить кадрирование с указанным прямоугольником.
+     * Координаты cropRect должны быть в координатах bitmap, переданного в CropOverlay.
      */
     fun applyCrop(cropRect: Rect) {
         currentPreviewJob?.cancel()
@@ -527,8 +570,9 @@ class EditorViewModel @Inject constructor(
         currentPreviewJob = viewModelScope.launch {
             delay(100)
             
-            val originalBitmap = getOrLoadOriginalBitmap()
-            if (originalBitmap == null || originalBitmap.isRecycled) {
+            // Получаем bitmap для кадрирования (с геометрическими изменениями, но без цветовых настроек и фильтров)
+            val bitmapForCrop = getBitmapForCropWithGeometry()
+            if (bitmapForCrop == null || bitmapForCrop.isRecycled) {
                 _uiState.value = _uiState.value.copy(
                     error = "Не удалось загрузить изображение"
                 )
@@ -536,11 +580,32 @@ class EditorViewModel @Inject constructor(
             }
             
             try {
+                // Проверяем, нужно ли масштабировать координаты
+                val cropBitmap = _uiState.value.cropBitmap
+                val needsScaling = cropBitmap != null && 
+                                   (cropBitmap.width != bitmapForCrop.width || 
+                                    cropBitmap.height != bitmapForCrop.height)
+                
+                val finalCropRect = if (needsScaling && cropBitmap != null) {
+                    // Масштабируем координаты из cropBitmap в bitmapForCrop
+                    val scaleX = bitmapForCrop.width.toFloat() / cropBitmap.width.toFloat()
+                    val scaleY = bitmapForCrop.height.toFloat() / cropBitmap.height.toFloat()
+                    Rect(
+                        (cropRect.left * scaleX).toInt().coerceIn(0, bitmapForCrop.width),
+                        (cropRect.top * scaleY).toInt().coerceIn(0, bitmapForCrop.height),
+                        (cropRect.right * scaleX).toInt().coerceIn(0, bitmapForCrop.width),
+                        (cropRect.bottom * scaleY).toInt().coerceIn(0, bitmapForCrop.height)
+                    )
+                } else {
+                    // Координаты уже в правильном масштабе
+                    cropRect
+                }
+                
                 val croppedBitmap = processingRepository.applyEdit(
-                    originalBitmap,
+                    bitmapForCrop,
                     EditType.CROP,
                     0f,
-                    cropRect
+                    finalCropRect
                 )
                 
                 if (isActive && croppedBitmap != null) {
