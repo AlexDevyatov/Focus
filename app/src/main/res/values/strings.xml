@@ -50,6 +50,8 @@
     <!-- Edit Mode -->
     <string name="edit_mode_filters">Фильтры</string>
     <string name="edit_mode_editing">Редактирование</string>
+    <string name="editor_settings_button">Настройки</string>
+    <string name="editor_filters_button">Фильтры</string>
     
     <!-- History Screen -->
     <string name="history_empty">История пуста</string>

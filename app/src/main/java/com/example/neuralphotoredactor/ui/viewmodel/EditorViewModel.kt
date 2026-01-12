@@ -784,7 +784,7 @@ data class EditorUiState(
     val selectedFilters: List<Pair<FilterType, Float?>> = emptyList(), // Список выбранных фильтров с интенсивностями (null для нейросетевых)
     val currentFilterIntensity: Float = 0.5f, // Интенсивность для текущего редактируемого фильтра
     val showNeuralFilters: Boolean = false, // Показывать нейросетевые фильтры (false = обычные)
-    val showEditMode: Boolean = false, // Показывать режим редактирования (false = фильтры)
+    val showEditMode: Boolean = true, // Показывать режим редактирования (true = настройки, false = фильтры)
     val brightness: Float = 0f,
     val contrast: Float = 0f,
     val colorBalanceRed: Float = 0f,

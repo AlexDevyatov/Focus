@@ -15,8 +15,9 @@ import androidx.core.view.WindowCompat
  * Светлая цветовая схема Material Design 3.
  */
 private val ColorScheme = lightColorScheme(
-    primary = BackgroundDark,
+    primary = SurfaceLight,
     secondary = SecondaryLight,
+    secondaryContainer = SecondaryDark,
     tertiary = TertiaryLight,
     surface = SurfaceLight,
     background = BackgroundDark,
@@ -26,7 +27,7 @@ private val ColorScheme = lightColorScheme(
     onTertiary = Color(0xFFFFFFFF),
     onSurface = Color(0xFF212121), // Темно-серый текст на светлых поверхностях для лучшей читаемости
     onBackground = Color(0xFF212121),
-    onError = Color(0xFFFFFFFF)
+    onError = Color(0xFFFFFFFF),
 )
 
 /**
@@ -49,8 +50,8 @@ fun AppTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
+            window.statusBarColor = colorScheme.background.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }
 

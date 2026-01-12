@@ -5,8 +5,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -14,6 +19,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Tonality
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.FilterBAndW
+import androidx.compose.material.icons.filled.PhotoFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -165,11 +179,15 @@ fun EditorScreen(
                     filterType in neuralFilterTypes
                 }
                 val isNeuralFilterProcessing = isLoading && hasSelectedNeuralFilters
-                
+
                 when {
                     // Для нейрофильтров показываем изображение с overlay, для остальных - LoadingIndicator
                     isLoading && !isNeuralFilterProcessing -> LoadingIndicator()
-                    error != null -> ErrorMessage(error, defaultMessageId = R.string.error_process_image)
+                    error != null -> ErrorMessage(
+                        error,
+                        defaultMessageId = R.string.error_process_image
+                    )
+
                     previewBitmap != null -> {
                         // Отображаем быстрый предпросмотр
                         Image(
@@ -179,6 +197,7 @@ fun EditorScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
+
                     processedImageUri != null -> {
                         AsyncImage(
                             model = processedImageUri,
@@ -187,6 +206,7 @@ fun EditorScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
+
                     imageUri != null -> {
                         // При обработке нейрофильтров показываем исходное изображение под overlay
                         AsyncImage(
@@ -197,7 +217,7 @@ fun EditorScreen(
                         )
                     }
                 }
-                
+
                 // Overlay для кадрирования
                 if (showCropOverlay) {
                     CropOverlay(
@@ -207,7 +227,7 @@ fun EditorScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-                
+
                 // Overlay с progress bar для нейрофильтров
                 if (isNeuralFilterProcessing) {
                     Box(
@@ -224,136 +244,228 @@ fun EditorScreen(
                 }
             }
             
-            // Переключатель режимов (фильтры/редактирование)
+            // Слайдер Material Design 3
+            var sliderValue by remember { mutableStateOf(0.5f) }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = it },
+                    valueRange = 0f..1f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            
+            // 5 иконок в ряд: в зависимости от режима
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                FilterChip(
-                    selected = !showEditMode,
-                    onClick = onToggleEditMode,
-                    label = { Text(stringResource(R.string.edit_mode_filters)) }
-                )
-                FilterChip(
-                    selected = showEditMode,
-                    onClick = onToggleEditMode,
-                    label = { Text(stringResource(R.string.edit_mode_editing)) }
-                )
-            }
-            
-            if (showEditMode) {
-                // Режим редактирования - компактное меню
-                EditControls(
-                    currentCategory = currentEditCategory,
-                    onCategoryChange = onEditCategoryChange,
-                    onEditClick = onEditClick,
-                    onBrightnessChange = onBrightnessChange,
-                    onContrastChange = onContrastChange,
-                    onColorBalanceChange = onColorBalanceChange,
-                    brightness = brightness,
-                    contrast = contrast,
-                    colorBalanceRed = colorBalanceRed,
-                    colorBalanceGreen = colorBalanceGreen,
-                    colorBalanceBlue = colorBalanceBlue,
-                    appliedEdits = appliedEdits,
-                    onClearGeometricEdits = onClearGeometricEdits,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                )
-            } else {
-                // Режим фильтров
-                // Переключатель категорий фильтров
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilterChip(
-                        selected = !showNeuralFilters,
-                        onClick = onToggleFilterCategory,
-                        label = { Text(stringResource(R.string.filter_category_regular)) }
-                    )
-                    FilterChip(
-                        selected = showNeuralFilters,
-                        onClick = onToggleFilterCategory,
-                        label = { Text(stringResource(R.string.filter_category_neural)) }
-                    )
-                }
-                
-                // Список фильтров текущей категории
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(filters) { filter ->
-                        val isSelected = selectedFilters.any { it.first == filter }
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { onFilterToggle(filter) },
-                            label = { Text(getFilterName(filter)) }
-                        )
-                    }
-                }
-                
-                // Список выбранных фильтров с их слайдерами
-                if (selectedFilters.isNotEmpty()) {
+                if (showEditMode) {
+                    // Режим настроек: яркость, контрастность, баланс цветов, кадрирование, отражение
+                    val lastAppliedEdit = appliedEdits.lastOrNull()?.first
+                    val isFlipActive = lastAppliedEdit == EditType.FLIP_HORIZONTAL || lastAppliedEdit == EditType.FLIP_VERTICAL
+                    
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = stringResource(R.string.editor_selected_filters, selectedFilters.size),
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        
-                        // Слайдеры только для обычных фильтров (нейросетевые применяются сразу без настроек)
-                        selectedFilters.forEach { (filterType, intensity) ->
-                            val isNeuralFilter = filterType in listOf(
-                                FilterType.STYLE_TRANSFER,
-                                FilterType.DENOISE,
-                                FilterType.UPSCALE,
-                                FilterType.COLOR_CORRECTION
+                        IconButton(
+                            onClick = { onEditCategoryChange(EditCategory.BRIGHTNESS) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.WbSunny,
+                                contentDescription = stringResource(R.string.edit_brightness),
+                                tint = Color.White
                             )
-                            
-                            if (isNeuralFilter) {
-                                // Для нейросетевых фильтров показываем только название без слайдера
+                        }
+                        if (currentEditCategory == EditCategory.BRIGHTNESS && !showCropOverlay && !isFlipActive) {
+                            Text(
+                                text = stringResource(R.string.edit_brightness),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        IconButton(
+                            onClick = { onEditCategoryChange(EditCategory.CONTRAST) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Tonality,
+                                contentDescription = stringResource(R.string.edit_contrast),
+                                tint = Color.White
+                            )
+                        }
+                        if (currentEditCategory == EditCategory.CONTRAST && !showCropOverlay && !isFlipActive) {
+                            Text(
+                                text = stringResource(R.string.edit_contrast),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        IconButton(
+                            onClick = { onEditCategoryChange(EditCategory.COLOR_BALANCE) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Palette,
+                                contentDescription = stringResource(R.string.edit_color_balance),
+                                tint = Color.White
+                            )
+                        }
+                        if (currentEditCategory == EditCategory.COLOR_BALANCE && !showCropOverlay && !isFlipActive) {
+                            Text(
+                                text = stringResource(R.string.edit_color_balance),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        IconButton(
+                            onClick = { onEditClick(EditType.CROP) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Crop,
+                                contentDescription = stringResource(R.string.edit_crop),
+                                tint = Color.White
+                            )
+                        }
+                        if (showCropOverlay) {
+                            Text(
+                                text = stringResource(R.string.edit_crop),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        IconButton(
+                            onClick = { onEditClick(EditType.FLIP_HORIZONTAL) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.SwapHoriz,
+                                contentDescription = stringResource(R.string.edit_flip),
+                                tint = Color.White
+                            )
+                        }
+                        if (isFlipActive && !showCropOverlay) {
+                            Text(
+                                text = stringResource(R.string.edit_flip),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                } else {
+                    // Режим фильтров: Размытие, Резкость, Виньетка, Черно-белый, Сепия
+                    val filterTypes = listOf(
+                        FilterType.GAUSSIAN_BLUR,
+                        FilterType.SHARPEN,
+                        FilterType.VIGNETTE,
+                        FilterType.GRAYSCALE,
+                        FilterType.SEPIA
+                    )
+                    val lastSelectedFilter = selectedFilters.lastOrNull()?.first
+                    filterTypes.forEach { filterType ->
+                        val isLastSelected = filterType == lastSelectedFilter
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            IconButton(
+                                onClick = { onFilterToggle(filterType) }
+                            ) {
+                                Icon(
+                                    imageVector = when (filterType) {
+                                        FilterType.GAUSSIAN_BLUR -> Icons.Filled.BlurOn
+                                        FilterType.SHARPEN -> Icons.Filled.AutoFixHigh
+                                        FilterType.VIGNETTE -> Icons.Filled.CenterFocusStrong
+                                        FilterType.GRAYSCALE -> Icons.Filled.FilterBAndW
+                                        FilterType.SEPIA -> Icons.Filled.PhotoFilter
+                                        else -> Icons.Filled.BlurOn
+                                    },
+                                    contentDescription = getFilterName(filterType),
+                                    tint = Color.White
+                                )
+                            }
+                            if (isLastSelected) {
                                 Text(
                                     text = getFilterName(filterType),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(vertical = 8.dp)
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp
                                 )
-                            } else {
-                                // Для обычных фильтров показываем слайдер
-                                val currentIntensity = intensity ?: currentFilterIntensity
-                                Column(
-                                    modifier = Modifier.padding(vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "${getFilterName(filterType)}: ${(currentIntensity * 100).toInt()}%",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                    Slider(
-                                        value = currentIntensity,
-                                        onValueChange = { newIntensity ->
-                                            onIntensityChange(filterType, newIntensity)
-                                        },
-                                        valueRange = 0f..1f,
-                                        steps = 99,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
                             }
                         }
                     }
+                }
+            }
+            
+            // Две овальные кнопки: Настройки и Фильтры
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        if (!showEditMode) {
+                            onToggleEditMode()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
+                    )
+                ) {
+                    Text(
+                        text = stringResource(R.string.editor_settings_button),
+                        color = Color.White
+                    )
+                }
+                FilledTonalButton(
+                    onClick = {
+                        if (showEditMode) {
+                            onToggleEditMode()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (!showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
+                    )
+                ) {
+                    Text(
+                        text = stringResource(R.string.editor_filters_button),
+                        color = Color.White
+                    )
                 }
             }
         }

@@ -12,7 +12,7 @@ val ErrorLight = Color(0xFFE53935) // Яркий красный
 
 // Dark theme colors (адаптированные для темной темы)
 val PrimaryDark = Color(0xFF34495E) // Более светлый оттенок для темной темы
-val SecondaryDark = Color(0xFF95A5A6) // Более светлый для читаемости
+val SecondaryDark = Color(0xFF3A4B3A) // Более светлый для читаемости
 val TertiaryDark = Color(0xFF5DADE2) // Более светлый синий
 val SurfaceDark = Color(0xFF1E1E1E) // Темный фон
 val BackgroundDark = Color(0xFF101010) // Стандартный темный фон Material
