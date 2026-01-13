@@ -1,6 +1,7 @@
 package com.example.neuralphotoredactor.di
 
 import android.content.Context
+import com.example.neuralphotoredactor.data.storage.ShareHelper
 import com.example.neuralphotoredactor.domain.usecase.InitializeFiltersUseCase
 import com.example.neuralphotoredactor.domain.usecase.InitializeNeuralModelsUseCase
 import dagger.hilt.EntryPoint
@@ -25,5 +26,14 @@ interface AppEntryPoint {
             )
         }
     }
+}
+
+/**
+ * EntryPoint для доступа к ShareHelper в Compose функциях.
+ */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface ShareHelperEntryPoint {
+    fun shareHelper(): ShareHelper
 }
 

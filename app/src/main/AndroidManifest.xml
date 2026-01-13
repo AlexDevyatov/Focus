@@ -14,6 +14,20 @@
     <!-- Camera features -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    
+    <!-- Queries для обнаружения установленных приложений (Android 11+) -->
+    <queries>
+        <!-- ВКонтакте -->
+        <package android:name="com.vk.katana" />
+        <package android:name="com.vkontakte.android" />
+        <!-- Telegram -->
+        <package android:name="org.telegram.messenger" />
+        <!-- Общий Intent для шаринга изображений -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="image/*" />
+        </intent>
+    </queries>
 
     <application
         android:name=".di.App"

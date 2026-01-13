@@ -110,4 +110,10 @@
     <string name="ai_preview_compare">Сравнить</string>
     <string name="ai_preview_saving">Сохранение...</string>
     <string name="ai_preview_no_image">Нет изображения</string>
+    <string name="ai_preview_share">Поделиться</string>
+    <string name="ai_preview_share_vk">Поделиться в ВКонтакте</string>
+    <string name="ai_preview_share_telegram">Поделиться в Telegram</string>
+    <string name="ai_preview_share_dialog_title">Выберите приложение</string>
+    <string name="ai_preview_share_error">Ошибка при открытии приложения</string>
+    <string name="ai_preview_share_app_not_installed">Приложение не установлено</string>
 </resources>

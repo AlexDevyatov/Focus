@@ -1,34 +1,49 @@
 package com.example.neuralphotoredactor.ui.screen
 
+import android.content.Intent
 import android.graphics.Bitmap
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.neuralphotoredactor.R
+import com.example.neuralphotoredactor.data.storage.ShareHelper
+import com.example.neuralphotoredactor.di.ShareHelperEntryPoint
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 import com.example.neuralphotoredactor.ui.viewmodel.AiPreviewViewModel
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Экран предпросмотра AI фильтра.
@@ -42,14 +57,52 @@ fun AiPreviewScreen(
     onSaveClick: () -> Unit,
     onCancelClick: () -> Unit,
     viewModel: AiPreviewViewModel = viewModel(),
+    shareHelper: ShareHelper? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Получаем ShareHelper через EntryPointAccessors, если не передан
+    val shareHelperInstance = shareHelper ?: remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            ShareHelperEntryPoint::class.java
+        ).shareHelper()
+    }
+    
+    // Launcher для запуска Intent шаринга
+    val shareLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { }
     
     // Устанавливаем изображение и фильтр при первом открытии экрана или при изменении
     LaunchedEffect(imageData.uri.toString(), filterType.name) {
         // Всегда устанавливаем заново, чтобы гарантировать обработку
         viewModel.setImageAndFilter(imageData, filterType)
+    }
+    
+    // Функция для стандартного шаринга через системный диалог
+    val shareImage = {
+        val bitmap = uiState.processedBitmap
+        if (bitmap != null) {
+            coroutineScope.launch {
+                val intent = withContext(Dispatchers.IO) {
+                    shareHelperInstance.createShareIntent(
+                        bitmap,
+                        context.getString(R.string.ai_preview_share_dialog_title)
+                    )
+                }
+                if (intent != null) {
+                    try {
+                        shareLauncher.launch(intent)
+                    } catch (e: Exception) {
+                        android.util.Log.e("AiPreviewScreen", "Ошибка открытия диалога шаринга: ${e.message}", e)
+                    }
+                }
+            }
+        }
     }
     
     Scaffold(
@@ -92,18 +145,39 @@ fun AiPreviewScreen(
                     }
                 },
                 actions = {
-                    // Маленькая кнопка-иконка для сравнения - показываем только после успешной обработки
-                    if (!uiState.isLoading && uiState.processedBitmap != null && uiState.originalBitmap != null && uiState.error == null) {
-                        IconButton(
-                            onClick = { viewModel.toggleImageComparison() },
-                            modifier = Modifier.size(40.dp)
+                    // Показываем кнопки только после успешной обработки
+                    if (!uiState.isLoading && uiState.processedBitmap != null && uiState.error == null) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.split_scene),
-                                contentDescription = stringResource(R.string.ai_preview_compare),
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            // Кнопка сравнения - показываем только если есть исходное изображение
+                            if (uiState.originalBitmap != null) {
+                                IconButton(
+                                    onClick = { viewModel.toggleImageComparison() },
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.split_scene),
+                                        contentDescription = stringResource(R.string.ai_preview_compare),
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            
+                            // Кнопка шаринга
+                            IconButton(
+                                onClick = shareImage,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Share,
+                                    contentDescription = stringResource(R.string.ai_preview_share),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
