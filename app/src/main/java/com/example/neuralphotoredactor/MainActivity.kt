@@ -33,11 +33,13 @@ import com.example.neuralphotoredactor.ui.navigation.AppNavigation
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import com.example.neuralphotoredactor.ui.screen.AiFiltersScreen
+import com.example.neuralphotoredactor.ui.screen.AiPreviewScreen
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
 import com.example.neuralphotoredactor.ui.screen.MainScreen
 import com.example.neuralphotoredactor.ui.screen.ProcessedImagesScreen
+import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.ui.theme.AppTheme
 import com.example.neuralphotoredactor.R
 import com.example.neuralphotoredactor.ui.viewmodel.EditorViewModel
@@ -89,6 +91,7 @@ class MainActivity : ComponentActivity() {
                     val editorViewModel: EditorViewModel = viewModel()
                     val historyViewModel: HistoryViewModel = viewModel()
                     val processedImagesViewModel: ProcessedImagesViewModel = viewModel()
+                    val aiPreviewViewModel: com.example.neuralphotoredactor.ui.viewmodel.AiPreviewViewModel = viewModel()
                     
                     // Закрываем splash screen после инициализации ViewModels
                     // Используем LaunchedEffect для гарантированного закрытия после первого композиции
@@ -100,6 +103,12 @@ class MainActivity : ComponentActivity() {
                     
                     // Настраиваем callback для обновления галереи и обработанных изображений после сохранения
                     editorViewModel.onImageSaved = {
+                        galleryViewModel.refreshImages()
+                        processedImagesViewModel.refreshImages()
+                    }
+                    
+                    // Настраиваем callback для обновления галереи после сохранения в AiPreviewScreen
+                    aiPreviewViewModel.onImageSaved = {
                         galleryViewModel.refreshImages()
                         processedImagesViewModel.refreshImages()
                     }
@@ -234,15 +243,29 @@ class MainActivity : ComponentActivity() {
                                 mainScreen = {
                                     MainScreen(viewModel = mainViewModel)
                                 },
-                                galleryScreen = {
+                                galleryScreen = { selectedFilter ->
                             GalleryScreen(
                                 images = galleryUiState.images,
                                 isLoading = galleryUiState.isLoading,
                                 isRefreshing = galleryUiState.isRefreshing,
                                 error = galleryUiState.error,
-                                onImageClick = { image ->
-                                    editorViewModel.setImage(image)
-                                    navController.navigate("editor")
+                                onImageClick = { image, filter ->
+                                    if (filter != null) {
+                                        // Переходим на экран предпросмотра AI фильтра
+                                        val filterType = when (filter.lowercase()) {
+                                            "upscale" -> FilterType.UPSCALE
+                                            "denoise" -> FilterType.DENOISE
+                                            "style_transfer" -> FilterType.STYLE_TRANSFER
+                                            else -> null
+                                        }
+                                        if (filterType != null) {
+                                            navController.navigate("ai_preview?imageUri=${Uri.encode(image.uri.toString())}&filterType=${filterType.name}")
+                                        }
+                                    } else {
+                                        // Обычный переход в редактор
+                                        editorViewModel.setImage(image)
+                                        navController.navigate("editor")
+                                    }
                                 },
                                 onRefresh = {
                                     galleryViewModel.refreshImages()
@@ -255,7 +278,8 @@ class MainActivity : ComponentActivity() {
                                         popUpTo("main") { inclusive = false }
                                         launchSingleTop = true
                                     }
-                                }
+                                },
+                                selectedFilter = selectedFilter
                             )
                         },
                         editorScreen = {
@@ -389,9 +413,43 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onFilterClick = { filterType ->
-                                    // TODO: Реализовать обработку выбора фильтра
+                                    // Переходим на галерею с выбранным фильтром
+                                    navController.navigate("gallery?selectedFilter=$filterType")
                                 }
                             )
+                        },
+                        aiPreviewScreen = { imageUriString, filterTypeString ->
+                            if (imageUriString != null && filterTypeString != null) {
+                                val imageUri = Uri.parse(imageUriString)
+                                val filterType = try {
+                                    FilterType.valueOf(filterTypeString)
+                                } catch (e: IllegalArgumentException) {
+                                    null
+                                }
+                                
+                                if (filterType != null) {
+                                    val imageData = com.example.neuralphotoredactor.domain.model.ImageData(imageUri)
+                                    AiPreviewScreen(
+                                        imageData = imageData,
+                                        filterType = filterType,
+                                        onSaveClick = {
+                                            // После сохранения переходим на экран обработанных изображений
+                                            processedImagesViewModel.refreshImages()
+                                            navController.navigate("processed") {
+                                                popUpTo("ai_filters") { inclusive = false }
+                                            }
+                                        },
+                                        onCancelClick = {
+                                            // Отмена - возвращаемся на экран AI фильтров
+                                            navController.navigate("ai_filters") {
+                                                popUpTo("ai_filters") { inclusive = false }
+                                            }
+                                            aiPreviewViewModel.clearState()
+                                        },
+                                        viewModel = aiPreviewViewModel
+                                    )
+                                }
+                            }
                         }
                     )
                         }

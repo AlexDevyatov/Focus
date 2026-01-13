@@ -7,6 +7,7 @@
     <string name="screen_history">История обработки</string>
     <string name="screen_processed_images">Обработанные</string>
     <string name="screen_ai_filters">ИИ фильтры</string>
+    <string name="screen_ai_preview">Предпросмотр</string>
     
     <!-- Gallery Screen -->
     <string name="gallery_permission_title">Необходимо разрешение на доступ к галерее</string>
@@ -100,4 +101,11 @@
     
     <!-- Navigation -->
     <string name="navigate_back">Назад</string>
+    
+    <!-- AI Preview Screen -->
+    <string name="ai_preview_cancel">Отмена</string>
+    <string name="ai_preview_save">Сохранить</string>
+    <string name="ai_preview_processed_image">Обработанное изображение</string>
+    <string name="ai_preview_saving">Сохранение...</string>
+    <string name="ai_preview_no_image">Нет изображения</string>
 </resources>

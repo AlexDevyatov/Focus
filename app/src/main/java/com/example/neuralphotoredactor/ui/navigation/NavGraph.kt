@@ -2,9 +2,12 @@ package com.example.neuralphotoredactor.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.neuralphotoredactor.ui.screen.AiFiltersScreen
+import com.example.neuralphotoredactor.ui.screen.AiPreviewScreen
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
@@ -17,11 +20,12 @@ import com.example.neuralphotoredactor.ui.screen.MainScreen
 fun AppNavigation(
     navController: NavHostController,
     mainScreen: @Composable () -> Unit,
-    galleryScreen: @Composable () -> Unit,
+    galleryScreen: @Composable (String?) -> Unit,
     editorScreen: @Composable () -> Unit,
     historyScreen: @Composable () -> Unit,
     processedImagesScreen: @Composable () -> Unit,
-    aiFiltersScreen: @Composable () -> Unit
+    aiFiltersScreen: @Composable () -> Unit,
+    aiPreviewScreen: @Composable (String?, String?) -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -30,8 +34,18 @@ fun AppNavigation(
         composable("main") {
             mainScreen()
         }
-        composable("gallery") {
-            galleryScreen()
+        composable(
+            route = "gallery?selectedFilter={selectedFilter}",
+            arguments = listOf(
+                navArgument("selectedFilter") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                    nullable = true
+                }
+            )
+        ) { backStackEntry ->
+            val selectedFilter = backStackEntry.arguments?.getString("selectedFilter")
+            galleryScreen(if (selectedFilter.isNullOrEmpty()) null else selectedFilter)
         }
         composable("editor") {
             editorScreen()
@@ -44,6 +58,21 @@ fun AppNavigation(
         }
         composable("ai_filters") {
             aiFiltersScreen()
+        }
+        composable(
+            route = "ai_preview?imageUri={imageUri}&filterType={filterType}",
+            arguments = listOf(
+                navArgument("imageUri") {
+                    type = NavType.StringType
+                },
+                navArgument("filterType") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val imageUriString = backStackEntry.arguments?.getString("imageUri")
+            val filterTypeString = backStackEntry.arguments?.getString("filterType")
+            aiPreviewScreen(imageUriString, filterTypeString)
         }
     }
 }

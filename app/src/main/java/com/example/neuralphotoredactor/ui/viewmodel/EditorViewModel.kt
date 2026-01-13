@@ -96,6 +96,47 @@ class EditorViewModel @Inject constructor(
         }
     }
     
+    /**
+     * Установить изображение с автоматическим применением фильтра.
+     * Используется при переходе из AiFiltersScreen.
+     */
+    fun setImageWithFilter(imageData: ImageData, filterTypeName: String?) {
+        // Сбрасываем все настройки к дефолтным значениям
+        setImage(imageData)
+        
+        // Применяем фильтр, если он указан
+        filterTypeName?.let { filterName ->
+            // Маппинг строковых названий из AiFiltersScreen в FilterType
+            val filterType = when (filterName.lowercase()) {
+                "upscale" -> FilterType.UPSCALE
+                "denoise" -> FilterType.DENOISE
+                "style_transfer" -> FilterType.STYLE_TRANSFER
+                else -> {
+                    // Пытаемся преобразовать напрямую в enum
+                    try {
+                        FilterType.valueOf(filterName.uppercase())
+                    } catch (e: IllegalArgumentException) {
+                        android.util.Log.e("EditorViewModel", "Неизвестный тип фильтра: $filterName", e)
+                        return@let
+                    }
+                }
+            }
+            
+            // Добавляем фильтр в выбранные (для нейросетевых фильтров intensity = null)
+            val intensity = if (filterType in neuralFilters) {
+                null
+            } else {
+                0.5f
+            }
+            _uiState.value = _uiState.value.copy(
+                selectedFilters = listOf(Pair(filterType, intensity)),
+                showNeuralFilters = filterType in neuralFilters
+            )
+            // Пересчитываем предпросмотр с примененным фильтром
+            recalculatePreview()
+        }
+    }
+    
     fun toggleFilter(filterType: FilterType) {
         val currentFilters = _uiState.value.selectedFilters.toMutableList()
         val existingIndex = currentFilters.indexOfFirst { it.first == filterType }

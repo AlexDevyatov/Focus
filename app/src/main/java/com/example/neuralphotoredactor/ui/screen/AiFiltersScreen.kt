@@ -30,7 +30,7 @@ import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 @Composable
 fun AiFiltersScreen(
     onBackClick: () -> Unit,
-    onFilterClick: (String) -> Unit = {},
+    onFilterClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(

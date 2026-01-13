@@ -49,10 +49,11 @@ fun GalleryScreen(
     isLoading: Boolean,
     isRefreshing: Boolean,
     error: String?,
-    onImageClick: (com.example.neuralphotoredactor.domain.model.ImageData) -> Unit,
+    onImageClick: (com.example.neuralphotoredactor.domain.model.ImageData, String?) -> Unit,
     onRefresh: () -> Unit,
     onPermissionGranted: () -> Unit = {},
     onBackClick: (() -> Unit)? = null,
+    selectedFilter: String? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -207,7 +208,7 @@ fun GalleryScreen(
                                 GalleryImageItem(
                                     image = image,
                                     itemSize = itemSize,
-                                    onClick = { onImageClick(image) }
+                                    onClick = { onImageClick(image, selectedFilter) }
                                 )
                             }
                         }
