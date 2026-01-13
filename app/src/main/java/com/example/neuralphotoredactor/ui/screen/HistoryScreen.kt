@@ -337,12 +337,6 @@ private fun HistoryDetailsBottomSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = stringResource(R.string.history_applied_filters),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White
-                )
-                
                 if (operations.isEmpty()) {
                     // Если операций нет, показываем fallback
                     Card(
