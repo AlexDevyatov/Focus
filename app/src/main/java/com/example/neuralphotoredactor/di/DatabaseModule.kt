@@ -2,8 +2,6 @@ package com.example.neuralphotoredactor.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.neuralphotoredactor.data.local.dao.NeuralModelDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingOperationDao
@@ -25,54 +23,11 @@ import javax.inject.Singleton
  * - NeuralModelDao через @Provides
  * 
  * Миграции БД:
- * - Версия 2: Добавлены таблицы processing_operations, neural_models
- * - Версия 1: Начальная схема с таблицей processing_history
+ * - Миграции не используются, текущая схема является первоначальной
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-    
-    /**
-     * Миграция с версии 1 на версию 2.
-     * Создает новые таблицы для операций обработки и моделей.
-     */
-    private val MIGRATION_1_2 = object : Migration(1, 2) {
-        override fun migrate(database: SupportSQLiteDatabase) {
-            // Создание таблицы neural_models
-            database.execSQL("""
-                CREATE TABLE IF NOT EXISTS neural_models (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    name TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    version TEXT NOT NULL,
-                    filePath TEXT NOT NULL,
-                    fileSize INTEGER NOT NULL,
-                    isActive INTEGER NOT NULL,
-                    compatibilityLevel TEXT NOT NULL
-                )
-            """.trimIndent())
-            
-            // Создание таблицы processing_operations
-            database.execSQL("""
-                CREATE TABLE IF NOT EXISTS processing_operations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    sessionId INTEGER NOT NULL,
-                    modelId INTEGER,
-                    operationType TEXT NOT NULL,
-                    parameters TEXT NOT NULL,
-                    inputImageUri TEXT NOT NULL,
-                    outputImageUri TEXT NOT NULL,
-                    processingTimeMs INTEGER NOT NULL,
-                    sequenceNumber INTEGER NOT NULL,
-                    FOREIGN KEY(modelId) REFERENCES neural_models(id) ON DELETE SET NULL
-                )
-            """.trimIndent())
-            
-            // Создание индексов
-            database.execSQL("CREATE INDEX IF NOT EXISTS index_processing_operations_sessionId ON processing_operations(sessionId)")
-            database.execSQL("CREATE INDEX IF NOT EXISTS index_processing_operations_modelId ON processing_operations(modelId)")
-        }
-    }
     
     /**
      * Предоставить экземпляр AppDatabase.
@@ -85,12 +40,28 @@ object DatabaseModule {
     fun provideAppDatabase(
         @ApplicationContext context: Context
     ): AppDatabase {
+        // Удаляем старую базу данных ai_image_editor_db, если она существует
+        val oldDbFile = context.getDatabasePath("ai_image_editor_db")
+        if (oldDbFile.exists()) {
+            try {
+                oldDbFile.delete()
+                android.util.Log.d("DatabaseModule", "Удалена старая база данных: ai_image_editor_db")
+            } catch (e: Exception) {
+                android.util.Log.e("DatabaseModule", "Ошибка удаления старой БД: ${e.message}", e)
+            }
+        }
+        
+        // Удаляем также связанные файлы старой БД (WAL, SHM)
+        val oldDbWal = context.getDatabasePath("ai_image_editor_db-wal")
+        val oldDbShm = context.getDatabasePath("ai_image_editor_db-shm")
+        oldDbWal.takeIf { it.exists() }?.delete()
+        oldDbShm.takeIf { it.exists() }?.delete()
+        
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
             "neural_photo_redactor_db"
         )
-            .addMigrations(MIGRATION_1_2)
             .fallbackToDestructiveMigration() // Для разработки
             .build()
     }

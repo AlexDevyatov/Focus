@@ -12,11 +12,10 @@ import com.example.neuralphotoredactor.data.local.entity.ProcessingOperationEnti
 /**
  * База данных Room для приложения.
  * 
- * Версия 2 - добавлены новые сущности:
- * - ProcessingOperationEntity (операции обработки)
+ * Первоначальная схема БД включает:
+ * - ProcessingHistoryEntity (история обработки с ссылкой на операции)
+ * - ProcessingOperationEntity (детальные операции обработки)
  * - NeuralModelEntity (нейросетевые модели)
- * 
- * Версия 1 - начальная версия схемы БД (ProcessingHistoryEntity).
  * 
  * При изменении схемы необходимо:
  * 1. Увеличить версию БД
@@ -29,7 +28,7 @@ import com.example.neuralphotoredactor.data.local.entity.ProcessingOperationEnti
         ProcessingOperationEntity::class,
         NeuralModelEntity::class
     ],
-    version = 2,
+    version = 1,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

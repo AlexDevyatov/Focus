@@ -19,6 +19,8 @@ interface ProcessingHistoryDao {
     /**
      * Получить всю историю обработок, отсортированную по времени (новые первыми).
      * 
+     * История теперь связана с processing_operations через operationId.
+     * 
      * @return Flow со списком всех записей истории
      */
     @Query("SELECT * FROM processing_history ORDER BY timestamp DESC")

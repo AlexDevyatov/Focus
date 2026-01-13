@@ -4,7 +4,7 @@
 
 База данных построена на основе реляционного подхода и оптимизирована для работы в среде мобильных устройств с использованием локальной базы данных SQLite через Android Room.
 
-**Текущая версия БД:** 2  
+**Текущая версия БД:** 1  
 **Имя файла БД:** `neural_photo_redactor_db`
 
 ---
@@ -26,8 +26,15 @@
 | `processedUri` | String | NOT NULL | URI обработанного изображения |
 | `filterType` | String | NOT NULL | Тип примененного фильтра |
 | `timestamp` | Long | NOT NULL | Время обработки в миллисекундах |
+| `operationId` | Long? | NULLABLE, INDEXED, FOREIGN KEY → processing_operations.id | Ссылка на операцию обработки |
 
 **Примечание:** Bitmap не хранится в БД, только URI изображений и метаданные.
+
+**Индексы:**
+- `index_processing_history_operationId` - на поле `operationId` (для быстрого поиска связанных операций)
+
+**Foreign Keys:**
+- `operationId` → `processing_operations.id` (ON DELETE SET NULL)
 
 **DAO:** `ProcessingHistoryDao`
 
@@ -113,24 +120,41 @@
 
 ## Отношения между сущностями
 
-### 1. ProcessingHistoryEntity (независимая таблица)
+### 1. ProcessingHistory → ProcessingOperation (один к одному)
 
-**Тип связи:** Нет Foreign Keys, независимая таблица
+**Тип связи:** Необязательная (nullable Foreign Key)
 
 **Описание:**
-- `ProcessingHistoryEntity` **не имеет Foreign Keys** и не связана напрямую с другими сущностями на уровне базы данных
-- Это независимая таблица, которая хранит финальные результаты обработки изображений
-- Используется для отображения истории обработок в UI (`HistoryScreen`)
-- Хранит упрощенную информацию: URI исходного и обработанного изображения, тип фильтра и timestamp
+- Каждая запись истории обработки может ссылаться на одну операцию обработки через поле `operationId`
+- Поле `operationId` может быть NULL (для обратной совместимости со старыми записями)
+- При удалении операции (`ProcessingOperationEntity`) поле `operationId` в связанной истории устанавливается в NULL (ON DELETE SET NULL)
+- Связь позволяет получать детальную информацию об операции обработки из таблицы `processing_operations`
 
 **Особенности:**
-- Нет связей с `ProcessingOperationEntity` или `NeuralModelEntity` на уровне БД
-- Может содержать похожую информацию с `ProcessingOperationEntity`, но с другой структурой данных
-- Предназначена для быстрого доступа к истории обработок без сложных JOIN-запросов
+- `ProcessingHistoryEntity` хранит упрощенную информацию для быстрого отображения в UI
+- `ProcessingOperationEntity` хранит детальную информацию о каждой операции (параметры, время обработки, модель и т.д.)
+- При обработке изображения сначала создается операция в `processing_operations`, затем запись в `processing_history` со ссылкой на операцию
 
 **Использование:**
-- Основная рабочая таблица для отображения истории в приложении
+- Основная рабочая таблица для отображения истории в UI (`HistoryScreen`)
 - Сохраняется после каждой обработки изображения через `ProcessingRepositoryImpl`
+- При необходимости можно получить детальную информацию об операции через `operationId`
+
+**Пример использования:**
+```kotlin
+// При обработке изображения
+val operation = ProcessingOperation(...)
+val operationId = processingOperationRepository.addOperation(operation)
+
+val history = ProcessingHistoryEntity(
+    originalUri = originalUri.toString(),
+    processedUri = processedUri.toString(),
+    filterType = filterType.name,
+    timestamp = System.currentTimeMillis(),
+    operationId = operationId // Ссылка на операцию
+)
+processingHistoryDao.insert(history)
+```
 
 ---
 
@@ -222,33 +246,74 @@ ProcessingOperationEntity(
 │ processedUri            │
 │ filterType              │
 │ timestamp               │
+│ operationId (FK)        │
+└───────────┬─────────────┘
+            │
+            │ (1)
+            │
+            │ (ON DELETE SET NULL)
+            │
+            │ (0..1)
+┌───────────▼──────────────────────────────┐
+│   ProcessingOperationEntity              │
+│   (processing_operations)                │
+│──────────────────────────────────────────│
+│ id (PK)                                  │
+│ sessionId (INDEXED, логическая связь)   │
+│ modelId (FK → neural_models.id)         │
+│ operationType                            │
+│ parameters                               │
+│ inputImageUri                            │
+│ outputImageUri                           │
+│ processingTimeMs                         │
+│ sequenceNumber                           │
+└──────────────────────────────────────────┘
+            │
+            │ (0..*)
+            │
+            │ (ON DELETE SET NULL)
+            │
+            │ (0..1)
+┌───────────▼─────────────┐
+│   NeuralModelEntity     │
+│   (neural_models)       │
+│─────────────────────────│
+│ id (PK)                 │
+│ name                    │
+│ type                    │
+│ version                 │
+│ filePath                │
+│ fileSize                │
+│ isActive                │
+│ compatibilityLevel      │
 └─────────────────────────┘
-
-(независимая таблица, нет Foreign Keys)
 ```
 
 ---
 
 ## Версии базы данных
 
-### Версия 2 (текущая)
+### Версия 1 (текущая, первоначальная)
 
 **Дата:** Текущая версия
 
-**Изменения:**
-- Добавлена таблица `neural_models` для хранения метаинформации о нейросетевых моделях
-- Добавлена таблица `processing_operations` для детального отслеживания операций обработки
-- Добавлены индексы на `sessionId` и `modelId` в таблице `processing_operations`
-- Создан Foreign Key между `processing_operations.modelId` и `neural_models.id`
-
-**Миграция:** `MIGRATION_1_2` в `DatabaseModule`
-
-### Версия 1
-
-**Описание:** Начальная схема базы данных
+**Описание:** Первоначальная схема базы данных
 
 **Таблицы:**
-- `processing_history` - история обработки изображений (основная рабочая таблица)
+- `processing_history` - история обработки изображений с ссылкой на операции через `operationId`
+- `processing_operations` - детальные операции обработки изображений
+- `neural_models` - метаинформация о нейросетевых моделях
+
+**Связи:**
+- `processing_history.operationId` → `processing_operations.id` (Foreign Key, ON DELETE SET NULL)
+- `processing_operations.modelId` → `neural_models.id` (Foreign Key, ON DELETE SET NULL)
+
+**Индексы:**
+- `index_processing_history_operationId` на `processing_history.operationId`
+- `index_processing_operations_sessionId` на `processing_operations.sessionId`
+- `index_processing_operations_modelId` на `processing_operations.modelId`
+
+**Миграции:** Миграции не используются, схема является первоначальной
 
 ---
 
@@ -345,6 +410,39 @@ app/src/main/java/com/example/neuralphotoredactor/
 
 ## Примеры использования
 
+### Сохранение операции обработки и истории
+
+```kotlin
+// При обработке изображения создается операция, затем запись в истории
+val sessionId = System.currentTimeMillis()
+val operation = ProcessingOperation(
+    sessionId = sessionId,
+    modelId = modelId, // ID модели или null
+    operationType = filterType.name,
+    parameters = OperationParameters(
+        filterType = filterType.name,
+        intensity = intensity ?: 1.0f
+    ),
+    inputImageUri = originalUri,
+    outputImageUri = processedUri,
+    processingTimeMs = processingTime,
+    sequenceNumber = 1
+)
+
+// Сначала сохраняем операцию
+val operationId = processingOperationRepository.addOperation(operation)
+
+// Затем сохраняем запись в истории со ссылкой на операцию
+val history = ProcessingHistoryEntity(
+    originalUri = originalUri.toString(),
+    processedUri = processedUri.toString(),
+    filterType = filterType.name,
+    timestamp = System.currentTimeMillis(),
+    operationId = operationId // Ссылка на операцию
+)
+processingHistoryDao.insert(history)
+```
+
 ### Получение операций сессии
 
 ```kotlin
@@ -353,6 +451,20 @@ val operations = processingOperationDao.getOperationsBySessionId(sessionId)
     .collect { operationsList ->
         // Обработка операций
     }
+```
+
+### Получение детальной информации об операции из истории
+
+```kotlin
+// Получаем запись истории
+val history = processingHistoryDao.findByUriAndTimestamp(processedUri, timestamp)
+
+// Если есть ссылка на операцию, получаем детальную информацию
+history?.operationId?.let { operationId ->
+    val operation = processingOperationRepository.getOperationById(operationId)
+    // Используем детальную информацию об операции
+    // (параметры, время обработки, модель и т.д.)
+}
 ```
 
 ### Создание операции с моделью
@@ -391,8 +503,10 @@ val styleModels = neuralModelDao.getModelsByType("style_transfer")
    - Используется для группировки операций одной сессии редактирования
 
 2. **Использование таблиц**
-   - Таблица `processing_history` - основная рабочая таблица, активно используется в приложении для отображения истории обработок
-   - Таблица `processing_operations` - дополнительная таблица для детального отслеживания операций (инфраструктура готова, но пока не интегрирована в основной UI)
+   - Таблица `processing_history` - основная рабочая таблица, активно используется в приложении для отображения истории обработок в UI (`HistoryScreen`)
+   - Таблица `processing_operations` - таблица для детального отслеживания операций, интегрирована в бизнес-логику приложения
+   - При каждой обработке изображения создается запись в `processing_operations`, затем запись в `processing_history` со ссылкой на операцию через `operationId`
+   - Это позволяет получать как упрощенную информацию для UI, так и детальную информацию об операциях при необходимости
 
 3. **JSON параметры**
    - Поле `parameters` в `ProcessingOperationEntity` хранит JSON
