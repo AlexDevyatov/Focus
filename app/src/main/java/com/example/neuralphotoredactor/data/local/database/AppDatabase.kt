@@ -25,7 +25,7 @@ import com.example.neuralphotoredactor.data.local.entity.ProcessingOperationEnti
  */
 @Database(
     entities = [
-        ProcessingHistoryEntity::class, // Старая таблица для обратной совместимости
+        ProcessingHistoryEntity::class, // Основная таблица для истории обработки
         ProcessingOperationEntity::class,
         NeuralModelEntity::class
     ],
@@ -35,7 +35,7 @@ import com.example.neuralphotoredactor.data.local.entity.ProcessingOperationEnti
 abstract class AppDatabase : RoomDatabase() {
     
     /**
-     * Получить DAO для работы с историей обработок (старая таблица).
+     * Получить DAO для работы с историей обработок (основная таблица).
      */
     abstract fun processingHistoryDao(): ProcessingHistoryDao
     
