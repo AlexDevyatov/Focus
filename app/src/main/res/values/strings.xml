@@ -4,7 +4,7 @@
     <!-- Screen Titles -->
     <string name="screen_gallery">Все фото</string>
     <string name="screen_editor">Редактор</string>
-    <string name="screen_history">История</string>
+    <string name="screen_history">История обработки</string>
     <string name="screen_processed_images">Обработанные</string>
     
     <!-- Gallery Screen -->
@@ -56,6 +56,10 @@
     <!-- History Screen -->
     <string name="history_empty">История пуста</string>
     <string name="error_load_history">Ошибка загрузки истории</string>
+    <string name="history_edit_button">Редактировать</string>
+    <string name="history_applied_filters">Примененные фильтры</string>
+    <string name="history_applied_settings">Примененные настройки</string>
+    <string name="history_processing_date">Дата обработки</string>
     
     <!-- Processed Images Screen -->
     <string name="processed_images_empty">Нет обработанных изображений</string>

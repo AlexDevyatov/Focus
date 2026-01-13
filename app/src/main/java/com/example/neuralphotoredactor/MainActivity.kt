@@ -333,6 +333,9 @@ class MainActivity : ComponentActivity() {
                                 isLoading = historyUiState.isLoading,
                                 error = historyUiState.error,
                                 onItemClick = { result ->
+                                    // Открытие BottomSheet обрабатывается внутри HistoryScreen
+                                },
+                                onEditClick = { result ->
                                     editorViewModel.setImage(
                                         com.example.neuralphotoredactor.domain.model.ImageData(
                                             result.processedUri
