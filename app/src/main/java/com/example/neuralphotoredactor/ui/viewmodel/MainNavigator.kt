@@ -16,6 +16,11 @@ interface MainNavigator {
     fun navigateToProcessedImages()
     
     /**
+     * Навигация на экран AI фильтров.
+     */
+    fun navigateToAiFilters()
+    
+    /**
      * Навигация на экран истории.
      */
     fun navigateToHistory()

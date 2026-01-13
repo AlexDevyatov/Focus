@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import com.example.neuralphotoredactor.ui.navigation.AppNavigation
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import com.example.neuralphotoredactor.ui.screen.AiFiltersScreen
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
@@ -207,6 +208,10 @@ class MainActivity : ComponentActivity() {
                             navController.navigate("processed")
                         }
                         
+                        override fun navigateToAiFilters() {
+                            navController.navigate("ai_filters")
+                        }
+                        
                         override fun navigateToHistory() {
                             navController.navigate("history")
                         }
@@ -372,6 +377,19 @@ class MainActivity : ComponentActivity() {
                                         popUpTo("main") { inclusive = false }
                                         launchSingleTop = true
                                     }
+                                }
+                            )
+                        },
+                        aiFiltersScreen = {
+                            AiFiltersScreen(
+                                onBackClick = {
+                                    navController.navigate("main") {
+                                        popUpTo("main") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onFilterClick = { filterType ->
+                                    // TODO: Реализовать обработку выбора фильтра
                                 }
                             )
                         }

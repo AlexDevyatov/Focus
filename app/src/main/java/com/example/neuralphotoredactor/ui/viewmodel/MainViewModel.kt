@@ -48,6 +48,13 @@ class MainViewModel @Inject constructor() : ViewModel() {
     }
     
     /**
+     * Навигация на экран AI фильтров.
+     */
+    fun navigateToAiFilters() {
+        navigator?.navigateToAiFilters()
+    }
+    
+    /**
      * Навигация на экран истории.
      */
     fun navigateToHistory() {

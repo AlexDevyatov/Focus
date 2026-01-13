@@ -6,6 +6,7 @@
     <string name="screen_editor">Редактор</string>
     <string name="screen_history">История обработки</string>
     <string name="screen_processed_images">Обработанные</string>
+    <string name="screen_ai_filters">ИИ фильтры</string>
     
     <!-- Gallery Screen -->
     <string name="gallery_permission_title">Необходимо разрешение на доступ к галерее</string>
@@ -41,6 +42,11 @@
     <string name="filter_denoise">Удаление шумов (ML)</string>
     <string name="filter_upscale">Увеличение разрешения</string>
     <string name="filter_color_correction">Цветокоррекция</string>
+    
+    <!-- AI Filters Screen -->
+    <string name="ai_filter_upscale">Суперразрешение</string>
+    <string name="ai_filter_denoise">Умное шумоподавление</string>
+    <string name="ai_filter_style_transfer">Художественный стиль</string>
     
     <!-- Filter Categories -->
     <string name="filter_category_regular">Обычные фильтры</string>

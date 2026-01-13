@@ -105,7 +105,7 @@ fun MainScreen(
                 horizontalArrangement = Arrangement.spacedBy(11.dp)
             ) {
                 FilledTonalButton(
-                    onClick = { viewModel.navigateToProcessedImages() },
+                    onClick = { viewModel.navigateToAiFilters() },
                     modifier = Modifier
                         .weight(0.66f)
                         .height(60.dp),

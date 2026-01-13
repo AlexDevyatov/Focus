@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.neuralphotoredactor.ui.screen.AiFiltersScreen
 import com.example.neuralphotoredactor.ui.screen.EditorScreen
 import com.example.neuralphotoredactor.ui.screen.GalleryScreen
 import com.example.neuralphotoredactor.ui.screen.HistoryScreen
@@ -19,7 +20,8 @@ fun AppNavigation(
     galleryScreen: @Composable () -> Unit,
     editorScreen: @Composable () -> Unit,
     historyScreen: @Composable () -> Unit,
-    processedImagesScreen: @Composable () -> Unit
+    processedImagesScreen: @Composable () -> Unit,
+    aiFiltersScreen: @Composable () -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -39,6 +41,9 @@ fun AppNavigation(
         }
         composable("processed") {
             processedImagesScreen()
+        }
+        composable("ai_filters") {
+            aiFiltersScreen()
         }
     }
 }
