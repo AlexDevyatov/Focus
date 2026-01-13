@@ -964,6 +964,11 @@ class EditorViewModel @Inject constructor(
             }
         }
     }
+
+    override fun onCleared() {
+        _uiState.value = EditorUiState()
+        super.onCleared()
+    }
 }
 
 /**
