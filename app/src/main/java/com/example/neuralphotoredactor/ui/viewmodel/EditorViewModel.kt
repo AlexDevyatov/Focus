@@ -62,13 +62,27 @@ class EditorViewModel @Inject constructor(
     val availableFilters = FilterType.entries
     
     fun setImage(imageData: ImageData) {
-        _uiState.value = _uiState.value.copy(
+        // Сбрасываем все настройки к дефолтным значениям при открытии нового изображения
+        _uiState.value = EditorUiState(
             imageData = imageData,
             processedResult = null,
             previewBitmap = null,
             fullSizeBitmap = null,
+            cropBitmap = null,
+            isLoading = false,
+            error = null,
             selectedFilters = emptyList(),
-            currentFilterIntensity = 0.5f
+            currentFilterIntensity = 0.5f,
+            showNeuralFilters = false,
+            showEditMode = true,
+            brightness = 0f,
+            contrast = 0f,
+            colorBalanceRed = 0f,
+            colorBalanceGreen = 0f,
+            colorBalanceBlue = 0f,
+            appliedEdits = emptyList(),
+            currentEditCategory = EditCategory.BRIGHTNESS,
+            showCropOverlay = false
         )
         // Очищаем кэш при смене изображения
         cachedOriginalBitmap = null
