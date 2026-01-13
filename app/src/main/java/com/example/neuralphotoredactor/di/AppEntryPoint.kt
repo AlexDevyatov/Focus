@@ -1,6 +1,7 @@
 package com.example.neuralphotoredactor.di
 
 import android.content.Context
+import com.example.neuralphotoredactor.domain.usecase.InitializeFiltersUseCase
 import com.example.neuralphotoredactor.domain.usecase.InitializeNeuralModelsUseCase
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -14,6 +15,7 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 interface AppEntryPoint {
     fun initializeNeuralModelsUseCase(): InitializeNeuralModelsUseCase
+    fun initializeFiltersUseCase(): InitializeFiltersUseCase
     
     companion object {
         fun get(context: Context): AppEntryPoint {

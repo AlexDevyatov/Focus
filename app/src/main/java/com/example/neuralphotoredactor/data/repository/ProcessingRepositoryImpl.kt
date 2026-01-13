@@ -3,6 +3,7 @@ package com.example.neuralphotoredactor.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.example.neuralphotoredactor.data.local.dao.FilterDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.mapper.ProcessingHistoryMapper
 import com.example.neuralphotoredactor.data.storage.ImageStorage
@@ -44,7 +45,8 @@ class ProcessingRepositoryImpl @Inject constructor(
     private val imageStorage: ImageStorage,
     private val processingHistoryDao: ProcessingHistoryDao,
     private val processingOperationRepository: ProcessingOperationRepository,
-    private val neuralModelRepository: NeuralModelRepository
+    private val neuralModelRepository: NeuralModelRepository,
+    private val filterDao: FilterDao
 ) : ProcessingRepository {
     
     override suspend fun processImage(
@@ -85,18 +87,30 @@ class ProcessingRepositoryImpl @Inject constructor(
             } ?: return@withContext null
             
             val processingTime = System.currentTimeMillis() - startTime
+            val timestamp = System.currentTimeMillis()
             
             // Сохраняем обработанное изображение
-            val fileName = "processed_${System.currentTimeMillis()}_${filterType.name}.jpg"
+            val fileName = "processed_${timestamp}_${filterType.name}.jpg"
             val processedUri = imageStorage.saveBitmap(processedBitmap, fileName)
                 ?: return@withContext null
             
-            // Создаем операцию обработки
-            val sessionId = System.currentTimeMillis() // Используем timestamp как sessionId
-            val modelId = findModelIdByFilterType(filterType)
+            // Создаем запись в истории обработки
+            val result = ProcessingResult(
+                originalUri = imageData.uri,
+                processedUri = processedUri,
+                filterType = filterType.name,
+                timestamp = timestamp
+            )
+            val historyEntity = ProcessingHistoryMapper.toEntity(result)
+            val historyId = processingHistoryDao.insert(historyEntity)
+            
+            // Создаем операцию обработки с ссылкой на историю
+            val sessionId = timestamp // Используем timestamp как sessionId
+            val filterId = findFilterIdByFilterType(filterType)
             val operation = ProcessingOperation(
+                historyId = historyId,
                 sessionId = sessionId,
-                modelId = modelId,
+                filterId = filterId,
                 operationType = filterType.name,
                 parameters = OperationParameters(
                     filterType = filterType.name,
@@ -107,17 +121,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                 processingTimeMs = processingTime,
                 sequenceNumber = 1
             )
-            val operationId = processingOperationRepository.addOperation(operation)
-            
-            val result = ProcessingResult(
-                originalUri = imageData.uri,
-                processedUri = processedUri,
-                filterType = filterType.name
-            )
-            
-            // Сохраняем в базу данных с ссылкой на операцию
-            val entity = ProcessingHistoryMapper.toEntity(result, operationId)
-            processingHistoryDao.insert(entity)
+            processingOperationRepository.addOperation(operation)
             
             result
         } catch (e: Exception) {
@@ -437,9 +441,9 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             // Сохраняем обработанное изображение в отдельный файл
             val filterNames = filters.joinToString("_") { it.first.name }
-            val sessionId = System.currentTimeMillis()
+            val timestamp = System.currentTimeMillis()
             val processingStartTime = System.currentTimeMillis()
-            val fileName = "processed_${sessionId}_${filterNames}.jpg"
+            val fileName = "processed_${timestamp}_${filterNames}.jpg"
             
             android.util.Log.d("ProcessingRepository", "Сохранение обработанного изображения: $fileName")
             val processedUri = imageStorage.saveBitmap(processedBitmap, fileName)
@@ -447,36 +451,45 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             android.util.Log.d("ProcessingRepository", "Изображение сохранено: $processedUri")
             
-            // Создаем операцию обработки для множественных фильтров
-            val processingTime = System.currentTimeMillis() - processingStartTime
-            val operation = ProcessingOperation(
-                sessionId = sessionId,
-                modelId = null, // Для множественных фильтров модель не указываем
-                operationType = "multiple_filters",
-                parameters = OperationParameters(
-                    filterType = filterNames,
-                    intensity = 1.0f,
-                    additionalParams = mapOf(
-                        "filters" to filters.map { it.first.name },
-                        "intensities" to filters.mapNotNull { it.second }
-                    )
-                ),
-                inputImageUri = imageData.uri,
-                outputImageUri = processedUri,
-                processingTimeMs = processingTime,
-                sequenceNumber = 1
-            )
-            val operationId = processingOperationRepository.addOperation(operation)
-            
+            // Создаем запись в истории обработки
             val result = ProcessingResult(
                 originalUri = imageData.uri,
                 processedUri = processedUri,
-                filterType = filterNames // Сохраняем все примененные фильтры
+                filterType = filterNames, // Сохраняем все примененные фильтры
+                timestamp = timestamp
             )
+            val historyEntity = ProcessingHistoryMapper.toEntity(result)
+            val historyId = processingHistoryDao.insert(historyEntity)
             
-            // Сохраняем в базу данных с ссылкой на операцию
-            val entity = ProcessingHistoryMapper.toEntity(result, operationId)
-            processingHistoryDao.insert(entity)
+            // Создаем операции обработки для каждого фильтра
+            val processingTime = System.currentTimeMillis() - processingStartTime
+            val sessionId = timestamp
+            filters.forEachIndexed { index, (filterType, intensity) ->
+                val filterId = findFilterIdByFilterType(filterType)
+                val operation = ProcessingOperation(
+                    historyId = historyId,
+                    sessionId = sessionId,
+                    filterId = filterId,
+                    operationType = filterType.name,
+                    parameters = OperationParameters(
+                        filterType = filterType.name,
+                        intensity = intensity ?: 1.0f,
+                        additionalParams = if (filters.size > 1) {
+                            mapOf(
+                                "filters" to filters.map { it.first.name },
+                                "intensities" to filters.mapNotNull { it.second }
+                            )
+                        } else {
+                            emptyMap()
+                        }
+                    ),
+                    inputImageUri = if (index == 0) imageData.uri else processedUri,
+                    outputImageUri = processedUri,
+                    processingTimeMs = processingTime / filters.size, // Распределяем время между фильтрами
+                    sequenceNumber = index + 1
+                )
+                processingOperationRepository.addOperation(operation)
+            }
             
             android.util.Log.d("ProcessingRepository", "Результат сохранен в базу данных")
             
@@ -534,27 +547,16 @@ class ProcessingRepositoryImpl @Inject constructor(
     }
     
     /**
-     * Найти ID модели по типу фильтра.
+     * Найти ID фильтра по типу фильтра.
      * 
      * @param filterType Тип фильтра
-     * @return ID модели или null, если модель не найдена
+     * @return ID фильтра или null, если фильтр не найден
      */
-    private suspend fun findModelIdByFilterType(filterType: FilterType): Long? {
+    private suspend fun findFilterIdByFilterType(filterType: FilterType): Long? {
         return try {
-            val modelName = when (filterType) {
-                FilterType.STYLE_TRANSFER -> "AnimeGAN2 Paprika"
-                FilterType.UPSCALE -> "ESRGAN"
-                FilterType.DENOISE -> "SplitterNet"
-                else -> null
-            }
-            
-            if (modelName != null) {
-                neuralModelRepository.getModelByName(modelName)?.id
-            } else {
-                null
-            }
+            filterDao.getFilterByName(filterType.name)?.id
         } catch (e: Exception) {
-            android.util.Log.e("ProcessingRepository", "Ошибка поиска модели для $filterType: ${e.message}", e)
+            android.util.Log.e("ProcessingRepository", "Ошибка поиска фильтра для $filterType: ${e.message}", e)
             null
         }
     }
@@ -592,7 +594,8 @@ class ProcessingRepositoryImpl @Inject constructor(
         bitmap: android.graphics.Bitmap,
         fileName: String,
         originalUri: android.net.Uri?,
-        filterType: String?
+        filterType: String?,
+        editSettings: Map<String, Any>?
     ): android.net.Uri? = withContext(Dispatchers.IO) {
         try {
             val timestamp = System.currentTimeMillis()
@@ -619,31 +622,44 @@ class ProcessingRepositoryImpl @Inject constructor(
             if (processedUri != null) {
                 android.util.Log.d("ProcessingRepository", "Изображение сохранено в processed: $processedUri")
                 
-                // Создаем операцию редактирования
+                // Создаем запись в истории обработки
+                val result = ProcessingResult(
+                    originalUri = originalUri ?: android.net.Uri.EMPTY,
+                    processedUri = processedUri,
+                    filterType = filterType ?: "edited",
+                    timestamp = timestamp
+                )
+                val historyEntity = ProcessingHistoryMapper.toEntity(result)
+                val historyId = processingHistoryDao.insert(historyEntity)
+                
+                // Создаем операцию редактирования с детальными настройками
                 val sessionId = timestamp
+                val operationType = if (filterType == "edited" || filterType == null) "edit" else "multiple_filters"
+                val filterId = filterType?.let { filterTypeName ->
+                    try {
+                        val ft = FilterType.valueOf(filterTypeName)
+                        findFilterIdByFilterType(ft)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                
                 val operation = ProcessingOperation(
+                    historyId = historyId,
                     sessionId = sessionId,
-                    modelId = null,
-                    operationType = "edit",
+                    filterId = filterId,
+                    operationType = operationType,
                     parameters = OperationParameters(
                         filterType = filterType,
-                        intensity = 1.0f
+                        intensity = 1.0f,
+                        additionalParams = editSettings ?: emptyMap()
                     ),
                     inputImageUri = originalUri ?: android.net.Uri.EMPTY,
                     outputImageUri = processedUri,
                     processingTimeMs = 0L, // Время редактирования не измеряем
                     sequenceNumber = 1
                 )
-                val operationId = processingOperationRepository.addOperation(operation)
-                
-                // Сохраняем в базу данных для истории
-                val result = ProcessingResult(
-                    originalUri = originalUri ?: android.net.Uri.EMPTY,
-                    processedUri = processedUri,
-                    filterType = filterType ?: "edited"
-                )
-                val entity = ProcessingHistoryMapper.toEntity(result, operationId)
-                processingHistoryDao.insert(entity)
+                processingOperationRepository.addOperation(operation)
                 android.util.Log.d("ProcessingRepository", "Результат сохранен в базу данных")
             } else {
                 android.util.Log.e("ProcessingRepository", "Не удалось сохранить изображение в processed")

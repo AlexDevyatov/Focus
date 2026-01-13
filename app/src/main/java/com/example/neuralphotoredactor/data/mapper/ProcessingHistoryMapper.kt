@@ -23,7 +23,9 @@ object ProcessingHistoryMapper {
             originalUri = Uri.parse(entity.originalUri),
             processedUri = Uri.parse(entity.processedUri),
             filterType = entity.filterType,
-            timestamp = entity.timestamp
+            timestamp = entity.timestamp,
+            historyId = entity.id, // Используем id записи истории для получения операций
+            operationId = null // Deprecated, используйте historyId
         )
     }
     
@@ -31,16 +33,14 @@ object ProcessingHistoryMapper {
      * Преобразовать Domain модель в Entity.
      * 
      * @param result Domain модель ProcessingResult
-     * @param operationId ID операции обработки (может быть null)
      * @return Entity для базы данных
      */
-    fun toEntity(result: ProcessingResult, operationId: Long? = null): ProcessingHistoryEntity {
+    fun toEntity(result: ProcessingResult): ProcessingHistoryEntity {
         return ProcessingHistoryEntity(
             originalUri = result.originalUri.toString(),
             processedUri = result.processedUri.toString(),
             filterType = result.filterType,
-            timestamp = result.timestamp,
-            operationId = operationId
+            timestamp = result.timestamp
         )
     }
     

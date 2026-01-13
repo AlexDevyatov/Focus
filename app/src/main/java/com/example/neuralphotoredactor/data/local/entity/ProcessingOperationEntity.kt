@@ -11,8 +11,9 @@ import androidx.room.PrimaryKey
  * Фиксирует каждое отдельное действие, выполненное пользователем.
  * 
  * @param id Уникальный идентификатор операции
+ * @param historyId Идентификатор записи в истории обработки (Foreign Key)
  * @param sessionId Идентификатор сессии (без Foreign Key)
- * @param modelId Ссылка на использованную нейросетевую модель (Foreign Key)
+ * @param filterId Ссылка на использованный фильтр (Foreign Key)
  * @param operationType Тип операции
  * @param parameters Параметры выполнения в формате JSON
  * @param inputImageUri URI входного изображения
@@ -24,22 +25,30 @@ import androidx.room.PrimaryKey
     tableName = "processing_operations",
     foreignKeys = [
         ForeignKey(
-            entity = NeuralModelEntity::class,
+            entity = ProcessingHistoryEntity::class,
             parentColumns = ["id"],
-            childColumns = ["modelId"],
+            childColumns = ["historyId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = FilterEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["filterId"],
             onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
+        Index(value = ["historyId"]),
         Index(value = ["sessionId"]),
-        Index(value = ["modelId"])
+        Index(value = ["filterId"])
     ]
 )
 data class ProcessingOperationEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val historyId: Long, // Ссылка на запись в processing_history
     val sessionId: Long,
-    val modelId: Long?,
+    val filterId: Long?,
     val operationType: String,
     val parameters: String, // JSON строка с параметрами
     val inputImageUri: String,

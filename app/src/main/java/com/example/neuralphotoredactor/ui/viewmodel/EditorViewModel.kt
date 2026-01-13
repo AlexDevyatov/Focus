@@ -285,11 +285,18 @@ class EditorViewModel @Inject constructor(
                     val fileName = "processed_${timestamp}_${filterNames}.jpg"
                     
                     // Сохраняем в галерею и в папку processed
+                    // Собираем все настройки для сохранения
+                    val editSettings = mapOf(
+                        "filters" to selectedFilters.map { it.first.name },
+                        "intensities" to selectedFilters.mapNotNull { it.second }
+                    )
+                    
                     val uri = processingRepository.saveEditedImageToGallery(
                         bitmapToSave, 
                         fileName,
                         originalUri = currentImage.uri,
-                        filterType = filterNames
+                        filterType = filterNames,
+                        editSettings = editSettings
                     )
                     
                     if (uri != null) {
@@ -896,11 +903,35 @@ class EditorViewModel @Inject constructor(
                 // Сохраняем и в галерею, и в папку processed
                 android.util.Log.d("EditorViewModel", 
                     "Сохраняем ${if (_uiState.value.fullSizeBitmap != null) "fullSizeBitmap" else "previewBitmap"}: ${bitmapToSave.width}x${bitmapToSave.height}")
+                // Собираем все настройки редактирования для сохранения
+                val editSettings = mutableMapOf<String, Any>()
+                if (_uiState.value.brightness != 0f) {
+                    editSettings["brightness"] = _uiState.value.brightness
+                }
+                if (_uiState.value.contrast != 0f) {
+                    editSettings["contrast"] = _uiState.value.contrast
+                }
+                if (_uiState.value.colorBalanceRed != 0f || 
+                    _uiState.value.colorBalanceGreen != 0f || 
+                    _uiState.value.colorBalanceBlue != 0f) {
+                    editSettings["colorBalanceRed"] = _uiState.value.colorBalanceRed
+                    editSettings["colorBalanceGreen"] = _uiState.value.colorBalanceGreen
+                    editSettings["colorBalanceBlue"] = _uiState.value.colorBalanceBlue
+                }
+                if (_uiState.value.appliedEdits.isNotEmpty()) {
+                    editSettings["appliedEdits"] = _uiState.value.appliedEdits.map { it.first.name to it.second }
+                }
+                if (_uiState.value.selectedFilters.isNotEmpty()) {
+                    editSettings["filters"] = _uiState.value.selectedFilters.map { it.first.name }
+                    editSettings["filterIntensities"] = _uiState.value.selectedFilters.mapNotNull { it.second }
+                }
+                
                 val uri = processingRepository.saveEditedImageToGallery(
                     bitmapToSave, 
                     fileName,
                     originalUri = _uiState.value.imageData?.uri,
-                    filterType = "edited"
+                    filterType = "edited",
+                    editSettings = editSettings
                 )
                 
                 if (isActive && uri != null) {

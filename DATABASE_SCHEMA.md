@@ -26,15 +26,8 @@
 | `processedUri` | String | NOT NULL | URI обработанного изображения |
 | `filterType` | String | NOT NULL | Тип примененного фильтра |
 | `timestamp` | Long | NOT NULL | Время обработки в миллисекундах |
-| `operationId` | Long? | NULLABLE, INDEXED, FOREIGN KEY → processing_operations.id | Ссылка на операцию обработки |
 
 **Примечание:** Bitmap не хранится в БД, только URI изображений и метаданные.
-
-**Индексы:**
-- `index_processing_history_operationId` - на поле `operationId` (для быстрого поиска связанных операций)
-
-**Foreign Keys:**
-- `operationId` → `processing_operations.id` (ON DELETE SET NULL)
 
 **DAO:** `ProcessingHistoryDao`
 
@@ -43,6 +36,7 @@
 - Вставка новой записи
 - Удаление записи по ID
 - Поиск по URI и timestamp
+- Получение записи по ID
 
 ---
 
@@ -50,15 +44,16 @@
 
 **Таблица:** `processing_operations`
 
-Фиксирует каждое отдельное действие, выполненное пользователем в рамках сессии редактирования.
+Фиксирует каждое отдельное действие, выполненное пользователем в рамках сессии редактирования. Связана с записью истории через `historyId`.
 
 **Поля:**
 
 | Поле | Тип | Ограничения | Описание |
 |------|-----|-------------|----------|
 | `id` | Long | PRIMARY KEY, AUTOINCREMENT | Уникальный идентификатор операции |
+| `historyId` | Long | NOT NULL, INDEXED, FOREIGN KEY → processing_history.id | Ссылка на запись в истории обработки |
 | `sessionId` | Long | NOT NULL, INDEXED | Идентификатор сессии редактирования (логическая связь, без Foreign Key) |
-| `modelId` | Long? | NULLABLE, INDEXED, FOREIGN KEY → neural_models.id | Ссылка на использованную нейросетевую модель |
+| `filterId` | Long? | NULLABLE, INDEXED, FOREIGN KEY → filters.id | Ссылка на использованный фильтр |
 | `operationType` | String | NOT NULL | Тип операции (например: "style_transfer", "super_resolution") |
 | `parameters` | String | NOT NULL | Параметры выполнения в формате JSON |
 | `inputImageUri` | String | NOT NULL | URI входного изображения |
@@ -67,15 +62,18 @@
 | `sequenceNumber` | Int | NOT NULL | Порядковый номер операции в истории изменений (для сортировки) |
 
 **Индексы:**
+- `index_processing_operations_historyId` - на поле `historyId` (для быстрого поиска операций записи истории)
 - `index_processing_operations_sessionId` - на поле `sessionId` (для быстрого поиска операций сессии)
-- `index_processing_operations_modelId` - на поле `modelId` (для связей с моделями)
+- `index_processing_operations_filterId` - на поле `filterId` (для связей с фильтрами)
 
 **Foreign Keys:**
-- `modelId` → `neural_models.id` (ON DELETE SET NULL)
+- `historyId` → `processing_history.id` (ON DELETE CASCADE)
+- `filterId` → `filters.id` (ON DELETE SET NULL)
 
 **DAO:** `ProcessingOperationDao`
 
 **Основные операции:**
+- Получение всех операций для записи истории (отсортированных по sequenceNumber)
 - Получение всех операций для сессии (отсортированных по sequenceNumber)
 - Получение операции по ID
 - Получение последней операции для сессии
@@ -85,7 +83,50 @@
 
 ---
 
-### 3. NeuralModelEntity (Нейросетевая модель)
+### 3. FilterEntity (Фильтр)
+
+**Таблица:** `filters`
+
+Содержит информацию о доступных фильтрах для обработки изображений. Фильтры могут быть алгоритмическими (без модели) или использовать нейросетевые модели.
+
+**Поля:**
+
+| Поле | Тип | Ограничения | Описание |
+|------|-----|-------------|----------|
+| `id` | Long | PRIMARY KEY, AUTOINCREMENT | Уникальный идентификатор фильтра |
+| `name` | String | NOT NULL, UNIQUE | Название фильтра (соответствует FilterType enum) |
+| `modelId` | Long? | NULLABLE, INDEXED, FOREIGN KEY → neural_models.id | Ссылка на нейросетевую модель (если фильтр использует модель) |
+
+**Индексы:**
+- `index_filters_modelId` - на поле `modelId` (для связей с моделями)
+- `index_filters_name` - на поле `name` (уникальный индекс)
+
+**Foreign Keys:**
+- `modelId` → `neural_models.id` (ON DELETE SET NULL)
+
+**DAO:** `FilterDao`
+
+**Основные операции:**
+- Получение всех фильтров
+- Получение фильтра по ID или имени
+- Вставка фильтра(ов)
+
+**Инициализация:**
+Фильтры автоматически заполняются при первом запуске приложения через `InitializeFiltersUseCase`. Список фильтров:
+- GAUSSIAN_BLUR (алгоритмический)
+- NOISE_REDUCTION (алгоритмический)
+- SHARPEN (алгоритмический)
+- VIGNETTE (алгоритмический)
+- GRAYSCALE (алгоритмический)
+- SEPIA (алгоритмический)
+- STYLE_TRANSFER (использует модель "AnimeGAN2 Paprika")
+- DENOISE (использует модель "SplitterNet")
+- UPSCALE (использует модель "ESRGAN")
+- COLOR_CORRECTION (алгоритмический)
+
+---
+
+### 4. NeuralModelEntity (Нейросетевая модель)
 
 **Таблица:** `neural_models`
 
@@ -96,7 +137,7 @@
 | Поле | Тип | Ограничения | Описание |
 |------|-----|-------------|----------|
 | `id` | Long | PRIMARY KEY, AUTOINCREMENT | Уникальный идентификатор модели |
-| `name` | String | NOT NULL | Название модели (например: "AnimeGAN2", "ESRGAN") |
+| `name` | String | NOT NULL | Название модели (например: "AnimeGAN2 Paprika", "ESRGAN") |
 | `type` | String | NOT NULL | Тип модели ("style_transfer", "super_resolution", "filter" и т.д.) |
 | `version` | String | NOT NULL | Версия модели |
 | `filePath` | String | NOT NULL | Путь к файлу модели (.tflite) в хранилище устройства |
@@ -120,73 +161,113 @@
 
 ## Отношения между сущностями
 
-### 1. ProcessingHistory → ProcessingOperation (один к одному)
+### 1. ProcessingHistory → ProcessingOperation (один ко многим)
 
-**Тип связи:** Необязательная (nullable Foreign Key)
+**Тип связи:** Обязательная (Foreign Key с CASCADE)
 
 **Описание:**
-- Каждая запись истории обработки может ссылаться на одну операцию обработки через поле `operationId`
-- Поле `operationId` может быть NULL (для обратной совместимости со старыми записями)
-- При удалении операции (`ProcessingOperationEntity`) поле `operationId` в связанной истории устанавливается в NULL (ON DELETE SET NULL)
-- Связь позволяет получать детальную информацию об операции обработки из таблицы `processing_operations`
+- Каждая запись истории обработки может иметь несколько операций обработки
+- Поле `historyId` в `ProcessingOperationEntity` обязательно и ссылается на `processing_history.id`
+- При удалении записи истории все связанные операции автоматически удаляются (ON DELETE CASCADE)
+- Связь позволяет получать все операции обработки для конкретной записи истории
 
 **Особенности:**
 - `ProcessingHistoryEntity` хранит упрощенную информацию для быстрого отображения в UI
-- `ProcessingOperationEntity` хранит детальную информацию о каждой операции (параметры, время обработки, модель и т.д.)
-- При обработке изображения сначала создается операция в `processing_operations`, затем запись в `processing_history` со ссылкой на операцию
+- `ProcessingOperationEntity` хранит детальную информацию о каждой операции (параметры, время обработки, фильтр и т.д.)
+- При сохранении изображения сначала создается запись в `processing_history`, затем операции в `processing_operations` с ссылкой на историю
 
 **Использование:**
 - Основная рабочая таблица для отображения истории в UI (`HistoryScreen`)
 - Сохраняется после каждой обработки изображения через `ProcessingRepositoryImpl`
-- При необходимости можно получить детальную информацию об операции через `operationId`
+- Все операции для записи истории можно получить через `ProcessingOperationDao.getOperationsByHistoryId(historyId)`
 
 **Пример использования:**
 ```kotlin
-// При обработке изображения
-val operation = ProcessingOperation(...)
-val operationId = processingOperationRepository.addOperation(operation)
-
+// При обработке изображения сначала создается запись в истории
 val history = ProcessingHistoryEntity(
     originalUri = originalUri.toString(),
     processedUri = processedUri.toString(),
     filterType = filterType.name,
-    timestamp = System.currentTimeMillis(),
-    operationId = operationId // Ссылка на операцию
+    timestamp = System.currentTimeMillis()
 )
-processingHistoryDao.insert(history)
+val historyId = processingHistoryDao.insert(history)
+
+// Затем создаются операции с ссылкой на историю
+val operation = ProcessingOperation(
+    historyId = historyId,
+    sessionId = sessionId,
+    filterId = filterId,
+    operationType = filterType.name,
+    parameters = OperationParameters(...),
+    inputImageUri = originalUri,
+    outputImageUri = processedUri,
+    processingTimeMs = processingTime,
+    sequenceNumber = 1
+)
+processingOperationRepository.addOperation(operation)
 ```
 
 ---
 
-### 2. ProcessingOperation → NeuralModel (многие к одному)
+### 2. ProcessingOperation → Filter (многие к одному)
 
 **Тип связи:** Необязательная (nullable Foreign Key)
 
 **Описание:**
-- Каждая операция обработки может ссылаться на одну нейросетевую модель
-- Поле `modelId` в `ProcessingOperationEntity` может быть NULL (если операция не использует модель)
-- При удалении модели (`NeuralModelEntity`) поле `modelId` в связанных операциях устанавливается в NULL (ON DELETE SET NULL)
+- Каждая операция обработки может ссылаться на один фильтр
+- Поле `filterId` в `ProcessingOperationEntity` может быть NULL (если операция не использует фильтр)
+- При удалении фильтра поле `filterId` в связанных операциях устанавливается в NULL (ON DELETE SET NULL)
 
 **Пример использования:**
 ```kotlin
-// Операция обработки связана с моделью
+// Операция обработки связана с фильтром
 ProcessingOperationEntity(
+    historyId = 1L,
     sessionId = 1L,
-    modelId = 5L, // Ссылка на NeuralModelEntity с id=5
-    operationType = "style_transfer",
+    filterId = 5L, // Ссылка на FilterEntity с id=5
+    operationType = "STYLE_TRANSFER",
     ...
 )
 
-// Операция обработки без модели
+// Операция обработки без фильтра
 ProcessingOperationEntity(
+    historyId = 1L,
     sessionId = 1L,
-    modelId = null, // Операция не использует модель
-    operationType = "rotate",
+    filterId = null, // Операция не использует фильтр
+    operationType = "edit",
     ...
 )
 ```
 
-### 3. ProcessingOperation.sessionId (логическая связь)
+---
+
+### 3. Filter → NeuralModel (многие к одному)
+
+**Тип связи:** Необязательная (nullable Foreign Key)
+
+**Описание:**
+- Каждый фильтр может ссылаться на одну нейросетевую модель
+- Поле `modelId` в `FilterEntity` может быть NULL (для алгоритмических фильтров)
+- При удалении модели поле `modelId` в связанных фильтрах устанавливается в NULL (ON DELETE SET NULL)
+
+**Пример использования:**
+```kotlin
+// Фильтр с моделью
+FilterEntity(
+    name = "STYLE_TRANSFER",
+    modelId = 1L // Ссылка на NeuralModelEntity с id=1 (AnimeGAN2 Paprika)
+)
+
+// Алгоритмический фильтр без модели
+FilterEntity(
+    name = "GAUSSIAN_BLUR",
+    modelId = null // Алгоритмический фильтр, не использует модель
+)
+```
+
+---
+
+### 4. ProcessingOperation.sessionId (логическая связь)
 
 **Тип связи:** Логическая (без Foreign Key на уровне БД)
 
@@ -222,45 +303,28 @@ ProcessingOperationEntity(
             │ (ON DELETE SET NULL)
             │
             │ (0..*)
-┌───────────▼──────────────────────────────┐
-│   ProcessingOperationEntity              │
-│   (processing_operations)                │
-│──────────────────────────────────────────│
-│ id (PK)                                  │
-│ sessionId (INDEXED, логическая связь)   │
-│ modelId (FK → neural_models.id)         │
-│ operationType                            │
-│ parameters                               │
-│ inputImageUri                            │
-│ outputImageUri                           │
-│ processingTimeMs                         │
-│ sequenceNumber                           │
-└──────────────────────────────────────────┘
-
-┌─────────────────────────┐
-│ ProcessingHistoryEntity │
-│ (processing_history)     │
+┌───────────▼─────────────┐
+│   FilterEntity          │
+│   (filters)             │
 │─────────────────────────│
 │ id (PK)                 │
-│ originalUri             │
-│ processedUri            │
-│ filterType              │
-│ timestamp               │
-│ operationId (FK)        │
+│ name (UNIQUE)           │
+│ modelId (FK)            │
 └───────────┬─────────────┘
             │
             │ (1)
             │
             │ (ON DELETE SET NULL)
             │
-            │ (0..1)
+            │ (0..*)
 ┌───────────▼──────────────────────────────┐
 │   ProcessingOperationEntity              │
 │   (processing_operations)                │
 │──────────────────────────────────────────│
 │ id (PK)                                  │
+│ historyId (FK → processing_history.id)  │
 │ sessionId (INDEXED, логическая связь)   │
-│ modelId (FK → neural_models.id)         │
+│ filterId (FK → filters.id)              │
 │ operationType                            │
 │ parameters                               │
 │ inputImageUri                            │
@@ -271,21 +335,18 @@ ProcessingOperationEntity(
             │
             │ (0..*)
             │
-            │ (ON DELETE SET NULL)
+            │ (ON DELETE CASCADE)
             │
-            │ (0..1)
+            │ (1)
 ┌───────────▼─────────────┐
-│   NeuralModelEntity     │
-│   (neural_models)       │
+│ ProcessingHistoryEntity │
+│ (processing_history)     │
 │─────────────────────────│
 │ id (PK)                 │
-│ name                    │
-│ type                    │
-│ version                 │
-│ filePath                │
-│ fileSize                │
-│ isActive                │
-│ compatibilityLevel      │
+│ originalUri             │
+│ processedUri            │
+│ filterType              │
+│ timestamp               │
 └─────────────────────────┘
 ```
 
@@ -300,18 +361,22 @@ ProcessingOperationEntity(
 **Описание:** Первоначальная схема базы данных
 
 **Таблицы:**
-- `processing_history` - история обработки изображений с ссылкой на операции через `operationId`
-- `processing_operations` - детальные операции обработки изображений
+- `processing_history` - история обработки изображений
+- `processing_operations` - детальные операции обработки изображений, связанные с историей через `historyId`
+- `filters` - фильтры с ссылкой на модели
 - `neural_models` - метаинформация о нейросетевых моделях
 
 **Связи:**
-- `processing_history.operationId` → `processing_operations.id` (Foreign Key, ON DELETE SET NULL)
-- `processing_operations.modelId` → `neural_models.id` (Foreign Key, ON DELETE SET NULL)
+- `processing_operations.historyId` → `processing_history.id` (Foreign Key, ON DELETE CASCADE)
+- `processing_operations.filterId` → `filters.id` (Foreign Key, ON DELETE SET NULL)
+- `filters.modelId` → `neural_models.id` (Foreign Key, ON DELETE SET NULL)
 
 **Индексы:**
-- `index_processing_history_operationId` на `processing_history.operationId`
+- `index_processing_operations_historyId` на `processing_operations.historyId`
 - `index_processing_operations_sessionId` на `processing_operations.sessionId`
-- `index_processing_operations_modelId` на `processing_operations.modelId`
+- `index_processing_operations_filterId` на `processing_operations.filterId`
+- `index_filters_modelId` на `filters.modelId`
+- `index_filters_name` на `filters.name` (уникальный)
 
 **Миграции:** Миграции не используются, схема является первоначальной
 
@@ -329,12 +394,15 @@ ProcessingOperationEntity(
 - `delete(entity: ProcessingHistoryEntity)`
 - `deleteById(id: Long)`
 - `findByUriAndTimestamp(processedUri: String, timestamp: Long): ProcessingHistoryEntity?`
+- `getHistoryById(id: Long): ProcessingHistoryEntity?`
 
 ### ProcessingOperationDao
 
 Работа с операциями обработки.
 
 **Основные методы:**
+- `getOperationsByHistoryId(historyId: Long): Flow<List<ProcessingOperationEntity>>`
+- `getOperationsByHistoryIdSuspend(historyId: Long): List<ProcessingOperationEntity>`
 - `getOperationsBySessionId(sessionId: Long): Flow<List<ProcessingOperationEntity>>`
 - `getOperationById(id: Long): ProcessingOperationEntity?`
 - `getLastOperationBySessionId(sessionId: Long): ProcessingOperationEntity?`
@@ -344,6 +412,17 @@ ProcessingOperationEntity(
 - `delete(operation: ProcessingOperationEntity)`
 - `deleteById(id: Long)`
 - `deleteBySessionId(sessionId: Long)`
+
+### FilterDao
+
+Работа с фильтрами.
+
+**Основные методы:**
+- `getAllFilters(): Flow<List<FilterEntity>>`
+- `getFilterById(id: Long): FilterEntity?`
+- `getFilterByName(name: String): FilterEntity?`
+- `insert(filter: FilterEntity): Long`
+- `insertAll(filters: List<FilterEntity>)`
 
 ### NeuralModelDao
 
@@ -377,10 +456,12 @@ app/src/main/java/com/example/neuralphotoredactor/
 │       ├── dao/
 │       │   ├── ProcessingHistoryDao.kt
 │       │   ├── ProcessingOperationDao.kt
+│       │   ├── FilterDao.kt
 │       │   └── NeuralModelDao.kt
 │       └── entity/
 │           ├── ProcessingHistoryEntity.kt
 │           ├── ProcessingOperationEntity.kt
+│           ├── FilterEntity.kt
 │           └── NeuralModelEntity.kt
 └── di/
     └── DatabaseModule.kt                # DI модуль для БД
@@ -413,11 +494,22 @@ app/src/main/java/com/example/neuralphotoredactor/
 ### Сохранение операции обработки и истории
 
 ```kotlin
-// При обработке изображения создается операция, затем запись в истории
-val sessionId = System.currentTimeMillis()
+// При обработке изображения сначала создается запись в истории
+val timestamp = System.currentTimeMillis()
+val history = ProcessingHistoryEntity(
+    originalUri = originalUri.toString(),
+    processedUri = processedUri.toString(),
+    filterType = filterType.name,
+    timestamp = timestamp
+)
+val historyId = processingHistoryDao.insert(history)
+
+// Затем создаются операции с ссылкой на историю
+val filterId = filterDao.getFilterByName(filterType.name)?.id
 val operation = ProcessingOperation(
-    sessionId = sessionId,
-    modelId = modelId, // ID модели или null
+    historyId = historyId,
+    sessionId = timestamp,
+    filterId = filterId,
     operationType = filterType.name,
     parameters = OperationParameters(
         filterType = filterType.name,
@@ -428,19 +520,20 @@ val operation = ProcessingOperation(
     processingTimeMs = processingTime,
     sequenceNumber = 1
 )
+processingOperationRepository.addOperation(operation)
+```
 
-// Сначала сохраняем операцию
-val operationId = processingOperationRepository.addOperation(operation)
+### Получение всех операций для записи истории
 
-// Затем сохраняем запись в истории со ссылкой на операцию
-val history = ProcessingHistoryEntity(
-    originalUri = originalUri.toString(),
-    processedUri = processedUri.toString(),
-    filterType = filterType.name,
-    timestamp = System.currentTimeMillis(),
-    operationId = operationId // Ссылка на операцию
-)
-processingHistoryDao.insert(history)
+```kotlin
+// Получаем запись истории
+val history = processingHistoryDao.getHistoryById(historyId)
+
+// Получаем все операции для этой записи истории
+val operations = processingOperationDao.getOperationsByHistoryId(historyId)
+    .collect { operationsList ->
+        // Обработка всех операций для записи истории
+    }
 ```
 
 ### Получение операций сессии
@@ -453,28 +546,16 @@ val operations = processingOperationDao.getOperationsBySessionId(sessionId)
     }
 ```
 
-### Получение детальной информации об операции из истории
+### Создание операции с фильтром
 
 ```kotlin
-// Получаем запись истории
-val history = processingHistoryDao.findByUriAndTimestamp(processedUri, timestamp)
-
-// Если есть ссылка на операцию, получаем детальную информацию
-history?.operationId?.let { operationId ->
-    val operation = processingOperationRepository.getOperationById(operationId)
-    // Используем детальную информацию об операции
-    // (параметры, время обработки, модель и т.д.)
-}
-```
-
-### Создание операции с моделью
-
-```kotlin
+val filterId = filterDao.getFilterByName("STYLE_TRANSFER")?.id
 val operation = ProcessingOperationEntity(
+    historyId = historyId,
     sessionId = currentSessionId,
-    modelId = model.id,
-    operationType = "style_transfer",
-    parameters = """{"strength": 0.8}""",
+    filterId = filterId,
+    operationType = "STYLE_TRANSFER",
+    parameters = """{"intensity": 0.8}""",
     inputImageUri = inputUri.toString(),
     outputImageUri = outputUri.toString(),
     processingTimeMs = 1234L,
@@ -505,14 +586,20 @@ val styleModels = neuralModelDao.getModelsByType("style_transfer")
 2. **Использование таблиц**
    - Таблица `processing_history` - основная рабочая таблица, активно используется в приложении для отображения истории обработок в UI (`HistoryScreen`)
    - Таблица `processing_operations` - таблица для детального отслеживания операций, интегрирована в бизнес-логику приложения
-   - При каждой обработке изображения создается запись в `processing_operations`, затем запись в `processing_history` со ссылкой на операцию через `operationId`
+   - При сохранении изображения сначала создается запись в `processing_history`, затем операции в `processing_operations` с ссылкой на историю через `historyId`
    - Это позволяет получать как упрощенную информацию для UI, так и детальную информацию об операциях при необходимости
 
-3. **JSON параметры**
+3. **Таблица filters**
+   - Таблица `filters` содержит информацию о всех доступных фильтрах
+   - Фильтры автоматически заполняются при первом запуске приложения через `InitializeFiltersUseCase`
+   - Фильтры могут быть алгоритмическими (без модели) или использовать нейросетевые модели
+   - Связь между фильтрами и моделями позволяет легко определить, какой фильтр использует какую модель
+
+4. **JSON параметры**
    - Поле `parameters` в `ProcessingOperationEntity` хранит JSON
    - Поле `compatibilityLevel` в `NeuralModelEntity` также может быть JSON
    - Парсинг JSON выполняется на уровне Repository или Domain
 
-4. **Индексы**
-   - Индексы на `sessionId` и `modelId` оптимизируют запросы по связям
+5. **Индексы**
+   - Индексы на `historyId`, `sessionId` и `filterId` оптимизируют запросы по связям
    - Индексы создаются автоматически Room через аннотации

@@ -27,6 +27,13 @@ class ProcessingOperationRepositoryImpl @Inject constructor(
             }
     }
     
+    override fun getOperationsByHistoryId(historyId: Long): Flow<List<ProcessingOperation>> {
+        return processingOperationDao.getOperationsByHistoryId(historyId)
+            .map { entities ->
+                ProcessingOperationMapper.toDomainList(entities)
+            }
+    }
+    
     override suspend fun getOperationById(id: Long): ProcessingOperation? = withContext(Dispatchers.IO) {
         val entity = processingOperationDao.getOperationById(id)
         entity?.let { ProcessingOperationMapper.toDomain(it) }

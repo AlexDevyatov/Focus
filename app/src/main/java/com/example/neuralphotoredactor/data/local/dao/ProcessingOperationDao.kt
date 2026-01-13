@@ -35,6 +35,24 @@ interface ProcessingOperationDao {
     suspend fun getOperationsBySessionIdSuspend(sessionId: Long): List<ProcessingOperationEntity>
     
     /**
+     * Получить все операции для конкретной записи истории, отсортированные по порядковому номеру.
+     * 
+     * @param historyId ID записи в истории обработки
+     * @return Flow со списком операций
+     */
+    @Query("SELECT * FROM processing_operations WHERE historyId = :historyId ORDER BY sequenceNumber ASC")
+    fun getOperationsByHistoryId(historyId: Long): Flow<List<ProcessingOperationEntity>>
+    
+    /**
+     * Получить все операции для конкретной записи истории (suspend версия).
+     * 
+     * @param historyId ID записи в истории обработки
+     * @return Список операций
+     */
+    @Query("SELECT * FROM processing_operations WHERE historyId = :historyId ORDER BY sequenceNumber ASC")
+    suspend fun getOperationsByHistoryIdSuspend(historyId: Long): List<ProcessingOperationEntity>
+    
+    /**
      * Получить операцию по ID.
      * 
      * @param id ID операции

@@ -118,7 +118,8 @@ interface ProcessingRepository {
         bitmap: android.graphics.Bitmap,
         fileName: String,
         originalUri: android.net.Uri? = null,
-        filterType: String? = null
+        filterType: String? = null,
+        editSettings: Map<String, Any>? = null
     ): android.net.Uri?
 }
 

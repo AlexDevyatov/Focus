@@ -18,6 +18,14 @@ interface ProcessingOperationRepository {
     fun getOperationsBySessionId(sessionId: Long): Flow<List<ProcessingOperation>>
     
     /**
+     * Получить все операции для записи истории.
+     * 
+     * @param historyId ID записи в истории обработки
+     * @return Flow со списком операций
+     */
+    fun getOperationsByHistoryId(historyId: Long): Flow<List<ProcessingOperation>>
+    
+    /**
      * Получить операцию по ID.
      * 
      * @param id ID операции

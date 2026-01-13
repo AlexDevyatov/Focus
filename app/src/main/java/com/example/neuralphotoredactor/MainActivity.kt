@@ -246,7 +246,10 @@ class MainActivity : ComponentActivity() {
                                     galleryViewModel.loadImages()
                                 },
                                 onBackClick = {
-                                    navController.popBackStack()
+                                    navController.navigate("main") {
+                                        popUpTo("main") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
                                 }
                             )
                         },
@@ -318,10 +321,9 @@ class MainActivity : ComponentActivity() {
                                     editorViewModel.cancelCrop()
                                 },
                                 onBackClick = {
-                                    // Очищаем весь стек навигации и переходим на галерею
-                                    navController.navigate("gallery") {
-                                        popUpTo("main") { inclusive = true } // Очищаем весь стек до main включительно
-                                        launchSingleTop = true // Предотвращаем создание нескольких экземпляров
+                                    navController.navigate("main") {
+                                        popUpTo("main") { inclusive = false }
+                                        launchSingleTop = true
                                     }
                                     editorViewModel.resetAll()
                                 }
@@ -344,8 +346,12 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("editor")
                                 },
                                 onBackClick = {
-                                    navController.popBackStack()
-                                }
+                                    navController.navigate("main") {
+                                        popUpTo("main") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                },
+                                viewModel = historyViewModel
                             )
                         },
                         processedImagesScreen = {
@@ -362,7 +368,10 @@ class MainActivity : ComponentActivity() {
                                     processedImagesViewModel.refreshImages()
                                 },
                                 onBackClick = {
-                                    navController.popBackStack()
+                                    navController.navigate("main") {
+                                        popUpTo("main") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
                                 }
                             )
                         }

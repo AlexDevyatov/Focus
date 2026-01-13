@@ -9,8 +9,9 @@ import android.net.Uri
  * в рамках сессии редактирования.
  * 
  * @param id Уникальный идентификатор операции
+ * @param historyId ID записи в истории обработки
  * @param sessionId ID сессии редактирования
- * @param modelId ID использованной нейросетевой модели (может быть null)
+ * @param filterId ID использованного фильтра (может быть null)
  * @param operationType Тип операции
  * @param parameters Параметры выполнения операции
  * @param inputImageUri URI входного изображения
@@ -20,8 +21,9 @@ import android.net.Uri
  */
 data class ProcessingOperation(
     val id: Long = 0,
+    val historyId: Long,
     val sessionId: Long,
-    val modelId: Long?,
+    val filterId: Long?,
     val operationType: String,
     val parameters: OperationParameters,
     val inputImageUri: Uri,

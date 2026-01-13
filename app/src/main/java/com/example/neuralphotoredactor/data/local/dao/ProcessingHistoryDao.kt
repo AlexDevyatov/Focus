@@ -19,7 +19,8 @@ interface ProcessingHistoryDao {
     /**
      * Получить всю историю обработок, отсортированную по времени (новые первыми).
      * 
-     * История теперь связана с processing_operations через operationId.
+     * История связана с processing_operations через historyId (один-ко-многим).
+     * Все операции для записи истории можно получить через ProcessingOperationDao.getOperationsByHistoryId().
      * 
      * @return Flow со списком всех записей истории
      */
@@ -60,5 +61,14 @@ interface ProcessingHistoryDao {
      */
     @Query("SELECT * FROM processing_history WHERE processedUri = :processedUri AND timestamp = :timestamp LIMIT 1")
     suspend fun findByUriAndTimestamp(processedUri: String, timestamp: Long): ProcessingHistoryEntity?
+    
+    /**
+     * Получить запись истории по ID.
+     * 
+     * @param id ID записи истории
+     * @return Entity или null, если не найдено
+     */
+    @Query("SELECT * FROM processing_history WHERE id = :id LIMIT 1")
+    suspend fun getHistoryById(id: Long): ProcessingHistoryEntity?
 }
 

@@ -2,7 +2,9 @@ package com.example.neuralphotoredactor.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.neuralphotoredactor.domain.model.ProcessingOperation
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
+import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
 import com.example.neuralphotoredactor.domain.usecase.GetProcessingHistoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,8 +18,29 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
-    private val getProcessingHistoryUseCase: GetProcessingHistoryUseCase
+    private val getProcessingHistoryUseCase: GetProcessingHistoryUseCase,
+    private val processingOperationRepository: ProcessingOperationRepository
 ) : ViewModel() {
+    
+    /**
+     * Получить детальную информацию об операции обработки (deprecated).
+     * Используйте getOperationsByHistoryId для получения всех операций записи истории.
+     */
+    suspend fun getOperationDetails(operationId: Long?): ProcessingOperation? {
+        return if (operationId != null) {
+            processingOperationRepository.getOperationById(operationId)
+        } else {
+            null
+        }
+    }
+    
+    /**
+     * Получить все операции для записи истории обработки.
+     * 
+     * @param historyId ID записи в истории обработки
+     * @return Список операций обработки
+     */
+    fun getOperationsByHistoryId(historyId: Long) = processingOperationRepository.getOperationsByHistoryId(historyId)
     
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()

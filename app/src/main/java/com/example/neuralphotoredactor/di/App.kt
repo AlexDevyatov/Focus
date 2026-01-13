@@ -18,14 +18,16 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Инициализируем модели при первом запуске
+        // Инициализируем модели и фильтры при первом запуске
         // Используем EntryPoint для получения зависимостей в Application
         applicationScope.launch {
             try {
                 val entryPoint = AppEntryPoint.get(this@App)
+                // Сначала инициализируем модели, затем фильтры (фильтры зависят от моделей)
                 entryPoint.initializeNeuralModelsUseCase().invoke()
+                entryPoint.initializeFiltersUseCase().invoke()
             } catch (e: Exception) {
-                android.util.Log.e("App", "Ошибка инициализации моделей: ${e.message}", e)
+                android.util.Log.e("App", "Ошибка инициализации: ${e.message}", e)
             }
         }
     }

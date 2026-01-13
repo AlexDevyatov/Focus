@@ -23,8 +23,9 @@ object ProcessingOperationMapper {
     fun toDomain(entity: ProcessingOperationEntity): ProcessingOperation {
         return ProcessingOperation(
             id = entity.id,
+            historyId = entity.historyId,
             sessionId = entity.sessionId,
-            modelId = entity.modelId,
+            filterId = entity.filterId,
             operationType = entity.operationType,
             parameters = parseParameters(entity.parameters),
             inputImageUri = Uri.parse(entity.inputImageUri),
@@ -43,8 +44,9 @@ object ProcessingOperationMapper {
     fun toEntity(operation: ProcessingOperation): ProcessingOperationEntity {
         return ProcessingOperationEntity(
             id = operation.id,
+            historyId = operation.historyId,
             sessionId = operation.sessionId,
-            modelId = operation.modelId,
+            filterId = operation.filterId,
             operationType = operation.operationType,
             parameters = serializeParameters(operation.parameters),
             inputImageUri = operation.inputImageUri.toString(),

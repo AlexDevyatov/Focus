@@ -2,6 +2,7 @@ package com.example.neuralphotoredactor.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.neuralphotoredactor.data.local.dao.FilterDao
 import com.example.neuralphotoredactor.data.local.dao.NeuralModelDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingOperationDao
@@ -92,6 +93,20 @@ object DatabaseModule {
         database: AppDatabase
     ): ProcessingOperationDao {
         return database.processingOperationDao()
+    }
+    
+    /**
+     * Предоставить DAO для работы с фильтрами.
+     * 
+     * @param database Экземпляр базы данных
+     * @return DAO для фильтров
+     */
+    @Provides
+    @Singleton
+    fun provideFilterDao(
+        database: AppDatabase
+    ): FilterDao {
+        return database.filterDao()
     }
     
     /**
