@@ -918,8 +918,9 @@ class EditorViewModel @Inject constructor(
                     editSettings["colorBalanceGreen"] = _uiState.value.colorBalanceGreen
                     editSettings["colorBalanceBlue"] = _uiState.value.colorBalanceBlue
                 }
+                // Сохраняем appliedEdits как список пар (String, Float) для сериализации
                 if (_uiState.value.appliedEdits.isNotEmpty()) {
-                    editSettings["appliedEdits"] = _uiState.value.appliedEdits.map { it.first.name to it.second }
+                    editSettings["appliedEdits"] = _uiState.value.appliedEdits.map { Pair(it.first.name, it.second) }
                 }
                 if (_uiState.value.selectedFilters.isNotEmpty()) {
                     editSettings["filters"] = _uiState.value.selectedFilters.map { it.first.name }

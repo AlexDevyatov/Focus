@@ -80,7 +80,8 @@ fun HistoryScreen(
             onEditClick = {
                 selectedResult = null
                 onEditClick(result)
-            }
+            },
+            viewModel = viewModel
         )
     }
     Scaffold(
@@ -243,11 +244,27 @@ private fun HistoryDetailsBottomSheet(
     result: com.example.neuralphotoredactor.domain.model.ProcessingResult,
     operations: List<com.example.neuralphotoredactor.domain.model.ProcessingOperation>,
     onDismiss: () -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    viewModel: com.example.neuralphotoredactor.ui.viewmodel.HistoryViewModel? = null
 ) {
-    // Используем первую операцию для обратной совместимости (если есть)
-    val operationDetails = operations.firstOrNull()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    // Получаем названия всех операций
+    var operationNames by remember { mutableStateOf<Map<Long, String?>>(emptyMap()) }
+    
+    // Загружаем названия операций
+    androidx.compose.runtime.LaunchedEffect(operations) {
+        if (viewModel != null && operations.isNotEmpty()) {
+            val namesMap = mutableMapOf<Long, String?>()
+            operations.forEach { operation ->
+                if (!namesMap.containsKey(operation.filterId)) {
+                    val name = viewModel.getOperationName(operation.filterId)
+                    namesMap[operation.filterId] = name
+                }
+            }
+            operationNames = namesMap
+        }
+    }
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -315,7 +332,7 @@ private fun HistoryDetailsBottomSheet(
                 }
             }
             
-            // Примененные фильтры, настройки и геометрия
+            // Примененные операции
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -326,143 +343,62 @@ private fun HistoryDetailsBottomSheet(
                     color = Color.White
                 )
                 
-                // Получаем детальную информацию из ProcessingOperation, если доступна
-                val filtersList = remember(result.filterType, operationDetails) {
-                    if (operationDetails != null) {
-                        // Используем детальную информацию из операции
-                        val filtersFromParams = operationDetails.parameters.additionalParams["filters"] as? List<*>
-                        filtersFromParams?.mapNotNull { filterName ->
-                            try {
-                                FilterType.valueOf(filterName.toString())
-                            } catch (e: IllegalArgumentException) {
-                                null
-                            }
-                        } ?: emptyList()
-                    } else {
-                        // Fallback: парсим filterType - может содержать несколько фильтров через "_"
-                        result.filterType.split("_").mapNotNull { filterName ->
-                            try {
-                                FilterType.valueOf(filterName)
-                            } catch (e: IllegalArgumentException) {
-                                null
-                            }
-                        }
-                    }
-                }
-                
-                // Получаем интенсивности фильтров из операции
-                val filterIntensities = remember(operationDetails) {
-                    operationDetails?.parameters?.additionalParams?.get("intensities") as? List<*>
-                }
-                
-                // Проверяем, применены ли настройки редактирования
-                val hasEdits = remember(operationDetails) {
-                    if (operationDetails != null) {
-                        val params = operationDetails.parameters.additionalParams
-                        params.containsKey("brightness") || 
-                        params.containsKey("contrast") || 
-                        params.containsKey("colorBalanceRed") ||
-                        params.containsKey("appliedEdits")
-                    } else {
-                        result.filterType == "edited" || filtersList.isEmpty()
-                    }
-                }
-                
-                // Получаем настройки редактирования из операции
-                val brightness = remember(operationDetails) {
-                    operationDetails?.parameters?.additionalParams?.get("brightness") as? Float ?: 0f
-                }
-                val contrast = remember(operationDetails) {
-                    operationDetails?.parameters?.additionalParams?.get("contrast") as? Float ?: 0f
-                }
-                val colorBalanceRed = remember(operationDetails) {
-                    operationDetails?.parameters?.additionalParams?.get("colorBalanceRed") as? Float ?: 0f
-                }
-                val colorBalanceGreen = remember(operationDetails) {
-                    operationDetails?.parameters?.additionalParams?.get("colorBalanceGreen") as? Float ?: 0f
-                }
-                val colorBalanceBlue = remember(operationDetails) {
-                    operationDetails?.parameters?.additionalParams?.get("colorBalanceBlue") as? Float ?: 0f
-                }
-                val appliedEdits = remember(operationDetails) {
-                    operationDetails?.parameters?.additionalParams?.get("appliedEdits") as? List<*>
-                }
-                
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Фильтры с интенсивностями
-                    items(filtersList.size) { index ->
-                        val filterType = filtersList[index]
-                        val intensity = filterIntensities?.getOrNull(index) as? Float
-                        FilterItemCard(
-                            filterType = filterType,
-                            intensity = intensity
+                if (operations.isEmpty()) {
+                    // Если операций нет, показываем fallback
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF313630)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = result.filterType.ifEmpty { stringResource(R.string.history_applied_filters) },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White,
+                            modifier = Modifier.padding(16.dp)
                         )
                     }
-                    
-                    // Настройки редактирования (brightness, contrast, color balance)
-                    if (brightness != 0f) {
-                        item {
-                            FilterItemCard(
-                                icon = Icons.Filled.Brightness1,
-                                name = "${stringResource(R.string.edit_brightness)}: ${String.format("%.1f", brightness)}"
+                } else {
+                    // Фильтруем операции: показываем только те операции цветового баланса, которые были изменены (intensity != 0f)
+                    val filteredOperations = remember(operations, operationNames) {
+                        operations.filter { operation ->
+                            val operationName = operationNames[operation.filterId] 
+                                ?: operation.parameters.filterType
+                                ?: "Unknown"
+                            
+                            // Проверяем, является ли это операцией цветового баланса
+                            val isColorBalance = operationName in listOf(
+                                EditType.COLOR_BALANCE_RED.name,
+                                EditType.COLOR_BALANCE_GREEN.name,
+                                EditType.COLOR_BALANCE_BLUE.name
                             )
-                        }
-                    }
-                    if (contrast != 0f) {
-                        item {
-                            FilterItemCard(
-                                icon = Icons.Filled.Contrast,
-                                name = "${stringResource(R.string.edit_contrast)}: ${String.format("%.1f", contrast)}"
-                            )
-                        }
-                    }
-                    if (colorBalanceRed != 0f || colorBalanceGreen != 0f || colorBalanceBlue != 0f) {
-                        item {
-                            FilterItemCard(
-                                icon = Icons.Filled.Palette,
-                                name = stringResource(R.string.edit_color_balance)
-                            )
-                        }
-                    }
-                    // Геометрия (crop, flip, rotate)
-                    appliedEdits?.forEach { edit ->
-                        val editPair = edit as? Pair<*, *>
-                        editPair?.let {
-                            val editTypeName = it.first.toString()
-                            item {
-                                FilterItemCard(
-                                    icon = when {
-                                        editTypeName.contains("CROP", ignoreCase = true) -> Icons.Filled.CropRotate
-                                        editTypeName.contains("FLIP", ignoreCase = true) -> Icons.Filled.Flip
-                                        editTypeName.contains("ROTATE", ignoreCase = true) -> Icons.Filled.CropRotate
-                                        else -> Icons.Filled.CropRotate
-                                    },
-                                    name = editTypeName
-                                )
+                            
+                            // Если это операция цветового баланса, показываем только если intensity != 0f
+                            if (isColorBalance) {
+                                operation.parameters.intensity != 0f
+                            } else {
+                                // Для всех остальных операций показываем всегда
+                                true
                             }
                         }
                     }
                     
-                    // Если не удалось распарсить и это не "edited", показываем просто текст
-                    if (filtersList.isEmpty() && !hasEdits) {
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = Color(0xFF313630)
-                                ),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(
-                                    text = result.filterType,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
+                    // Показываем отфильтрованные операции
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(filteredOperations.size) { index ->
+                            val operation = filteredOperations[index]
+                            // Получаем название операции из базы данных или из параметров
+                            val operationName = operationNames[operation.filterId] 
+                                ?: operation.parameters.filterType
+                                ?: "Unknown"
+                            OperationItemCard(
+                                operation = operation,
+                                operationName = operationName
+                            )
                         }
                     }
                 }
@@ -490,6 +426,64 @@ private fun HistoryDetailsBottomSheet(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+/**
+ * Карточка элемента операции обработки.
+ */
+@Composable
+private fun OperationItemCard(
+    operation: com.example.neuralphotoredactor.domain.model.ProcessingOperation,
+    operationName: String?
+) {
+    // Пытаемся определить тип операции (FilterType или EditType)
+    val filterType = remember(operationName) {
+        operationName?.let { name ->
+            try {
+                FilterType.valueOf(name)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+        }
+    }
+    
+    val editType = remember(operationName) {
+        if (filterType == null) {
+            operationName?.let { name ->
+                try {
+                    EditType.valueOf(name)
+                } catch (e: IllegalArgumentException) {
+                    null
+                }
+            }
+        } else {
+            null
+        }
+    }
+    
+    // Получаем локализованное название (вызываем @Composable функции напрямую)
+    val displayName = when {
+        filterType != null -> getFilterName(filterType)
+        editType != null -> getEditName(editType)
+        else -> operationName ?: stringResource(R.string.history_applied_filters)
+    }
+    
+    // Получаем иконку (вызываем @Composable функции напрямую)
+    val displayIcon = when {
+        filterType != null -> getFilterIcon(filterType)
+        editType != null -> getEditIcon(editType)
+        else -> Icons.Filled.BlurOn
+    }
+    
+    // Получаем интенсивность
+    val intensity = operation.parameters.intensity.takeIf { it != 1.0f && it != 0f }
+    
+    FilterItemCard(
+        filterType = filterType,
+        icon = displayIcon,
+        name = displayName,
+        intensity = intensity
+    )
 }
 
 /**
@@ -600,6 +594,46 @@ private fun getFilterIcon(filterType: FilterType): androidx.compose.ui.graphics.
         FilterType.UPSCALE -> Icons.Filled.ZoomIn
         FilterType.COLOR_CORRECTION -> Icons.Filled.Palette
         else -> Icons.Filled.BlurOn
+    }
+}
+
+/**
+ * Получить локализованное название операции редактирования.
+ */
+@Composable
+private fun getEditName(editType: EditType): String {
+    return when (editType) {
+        EditType.CROP -> stringResource(R.string.edit_crop)
+        EditType.ROTATE_90 -> stringResource(R.string.edit_rotate_90)
+        EditType.ROTATE_180 -> stringResource(R.string.edit_rotate_180)
+        EditType.ROTATE_270 -> stringResource(R.string.edit_rotate_270)
+        EditType.FLIP_HORIZONTAL -> stringResource(R.string.edit_flip_horizontal)
+        EditType.FLIP_VERTICAL -> stringResource(R.string.edit_flip_vertical)
+        EditType.BRIGHTNESS -> stringResource(R.string.edit_brightness)
+        EditType.CONTRAST -> stringResource(R.string.edit_contrast)
+        EditType.COLOR_BALANCE_RED -> stringResource(R.string.edit_color_balance_red)
+        EditType.COLOR_BALANCE_GREEN -> stringResource(R.string.edit_color_balance_green)
+        EditType.COLOR_BALANCE_BLUE -> stringResource(R.string.edit_color_balance_blue)
+    }
+}
+
+/**
+ * Получить иконку для операции редактирования.
+ */
+@Composable
+private fun getEditIcon(editType: EditType): androidx.compose.ui.graphics.vector.ImageVector {
+    return when (editType) {
+        EditType.CROP,
+        EditType.ROTATE_90,
+        EditType.ROTATE_180,
+        EditType.ROTATE_270 -> Icons.Filled.CropRotate
+        EditType.FLIP_HORIZONTAL,
+        EditType.FLIP_VERTICAL -> Icons.Filled.Flip
+        EditType.BRIGHTNESS -> Icons.Filled.Brightness1
+        EditType.CONTRAST -> Icons.Filled.Contrast
+        EditType.COLOR_BALANCE_RED,
+        EditType.COLOR_BALANCE_GREEN,
+        EditType.COLOR_BALANCE_BLUE -> Icons.Filled.Palette
     }
 }
 

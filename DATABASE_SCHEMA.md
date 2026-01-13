@@ -24,10 +24,11 @@
 | `id` | Long | PRIMARY KEY, AUTOINCREMENT | Уникальный идентификатор записи |
 | `originalUri` | String | NOT NULL | URI исходного изображения |
 | `processedUri` | String | NOT NULL | URI обработанного изображения |
-| `filterType` | String | NOT NULL | Тип примененного фильтра |
 | `timestamp` | Long | NOT NULL | Время обработки в миллисекундах |
 
-**Примечание:** Bitmap не хранится в БД, только URI изображений и метаданные.
+**Примечание:** 
+- Bitmap не хранится в БД, только URI изображений и метаданные.
+- Информация о примененных фильтрах хранится в таблице `processing_operations` и может быть получена через `historyId`.
 
 **DAO:** `ProcessingHistoryDao`
 
@@ -53,8 +54,7 @@
 | `id` | Long | PRIMARY KEY, AUTOINCREMENT | Уникальный идентификатор операции |
 | `historyId` | Long | NOT NULL, INDEXED, FOREIGN KEY → processing_history.id | Ссылка на запись в истории обработки |
 | `sessionId` | Long | NOT NULL, INDEXED | Идентификатор сессии редактирования (логическая связь, без Foreign Key) |
-| `filterId` | Long? | NULLABLE, INDEXED, FOREIGN KEY → filters.id | Ссылка на использованный фильтр |
-| `operationType` | String | NOT NULL | Тип операции (например: "style_transfer", "super_resolution") |
+| `filterId` | Long | NOT NULL, INDEXED, FOREIGN KEY → filters.id | Ссылка на использованный фильтр или операцию редактирования |
 | `parameters` | String | NOT NULL | Параметры выполнения в формате JSON |
 | `inputImageUri` | String | NOT NULL | URI входного изображения |
 | `outputImageUri` | String | NOT NULL | URI выходного изображения |
@@ -68,7 +68,7 @@
 
 **Foreign Keys:**
 - `historyId` → `processing_history.id` (ON DELETE CASCADE)
-- `filterId` → `filters.id` (ON DELETE SET NULL)
+- `filterId` → `filters.id` (ON DELETE RESTRICT) - фильтр нельзя удалить, если он используется в операциях
 
 **DAO:** `ProcessingOperationDao`
 
@@ -187,17 +187,16 @@
 val history = ProcessingHistoryEntity(
     originalUri = originalUri.toString(),
     processedUri = processedUri.toString(),
-    filterType = filterType.name,
     timestamp = System.currentTimeMillis()
 )
 val historyId = processingHistoryDao.insert(history)
 
 // Затем создаются операции с ссылкой на историю
+// filterId должен быть NOT NULL - ссылается на фильтр из таблицы filters
 val operation = ProcessingOperation(
     historyId = historyId,
     sessionId = sessionId,
-    filterId = filterId,
-    operationType = filterType.name,
+    filterId = filterId, // NOT NULL - всегда должен быть фильтр или операция редактирования
     parameters = OperationParameters(...),
     inputImageUri = originalUri,
     outputImageUri = processedUri,
@@ -345,7 +344,6 @@ FilterEntity(
 │ id (PK)                 │
 │ originalUri             │
 │ processedUri            │
-│ filterType              │
 │ timestamp               │
 └─────────────────────────┘
 ```
@@ -499,18 +497,18 @@ val timestamp = System.currentTimeMillis()
 val history = ProcessingHistoryEntity(
     originalUri = originalUri.toString(),
     processedUri = processedUri.toString(),
-    filterType = filterType.name,
     timestamp = timestamp
 )
 val historyId = processingHistoryDao.insert(history)
 
 // Затем создаются операции с ссылкой на историю
+// filterId должен быть NOT NULL - ссылается на фильтр из таблицы filters
 val filterId = filterDao.getFilterByName(filterType.name)?.id
+    ?: throw IllegalStateException("Фильтр ${filterType.name} не найден в базе данных")
 val operation = ProcessingOperation(
     historyId = historyId,
     sessionId = timestamp,
-    filterId = filterId,
-    operationType = filterType.name,
+    filterId = filterId, // NOT NULL - всегда должен быть фильтр или операция редактирования
     parameters = OperationParameters(
         filterType = filterType.name,
         intensity = intensity ?: 1.0f

@@ -17,8 +17,7 @@ class AddProcessingOperationUseCase @Inject constructor(
      * 
      * @param historyId ID записи в истории обработки
      * @param sessionId ID сессии редактирования
-     * @param filterId ID использованного фильтра (может быть null)
-     * @param operationType Тип операции
+     * @param filterId ID использованного фильтра или операции редактирования (NOT NULL)
      * @param parameters Параметры операции
      * @param inputImageUri URI входного изображения
      * @param outputImageUri URI выходного изображения
@@ -28,8 +27,7 @@ class AddProcessingOperationUseCase @Inject constructor(
     suspend fun invoke(
         historyId: Long,
         sessionId: Long,
-        filterId: Long?,
-        operationType: String,
+        filterId: Long,
         parameters: OperationParameters,
         inputImageUri: Uri,
         outputImageUri: Uri,
@@ -43,7 +41,6 @@ class AddProcessingOperationUseCase @Inject constructor(
             historyId = historyId,
             sessionId = sessionId,
             filterId = filterId,
-            operationType = operationType,
             parameters = parameters,
             inputImageUri = inputImageUri,
             outputImageUri = outputImageUri,

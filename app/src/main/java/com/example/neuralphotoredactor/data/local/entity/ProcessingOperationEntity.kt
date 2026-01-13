@@ -13,8 +13,7 @@ import androidx.room.PrimaryKey
  * @param id Уникальный идентификатор операции
  * @param historyId Идентификатор записи в истории обработки (Foreign Key)
  * @param sessionId Идентификатор сессии (без Foreign Key)
- * @param filterId Ссылка на использованный фильтр (Foreign Key)
- * @param operationType Тип операции
+ * @param filterId Ссылка на использованный фильтр или операцию редактирования (Foreign Key, NOT NULL)
  * @param parameters Параметры выполнения в формате JSON
  * @param inputImageUri URI входного изображения
  * @param outputImageUri URI выходного изображения
@@ -34,7 +33,7 @@ import androidx.room.PrimaryKey
             entity = FilterEntity::class,
             parentColumns = ["id"],
             childColumns = ["filterId"],
-            onDelete = ForeignKey.SET_NULL
+            onDelete = ForeignKey.RESTRICT // Нельзя удалить фильтр, если он используется в операциях
         )
     ],
     indices = [
@@ -48,8 +47,7 @@ data class ProcessingOperationEntity(
     val id: Long = 0,
     val historyId: Long, // Ссылка на запись в processing_history
     val sessionId: Long,
-    val filterId: Long?,
-    val operationType: String,
+    val filterId: Long, // Ссылка на фильтр или операцию редактирования (NOT NULL)
     val parameters: String, // JSON строка с параметрами
     val inputImageUri: String,
     val outputImageUri: String,

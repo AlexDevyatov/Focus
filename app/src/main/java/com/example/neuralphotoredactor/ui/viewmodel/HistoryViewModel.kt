@@ -2,6 +2,7 @@ package com.example.neuralphotoredactor.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.neuralphotoredactor.data.local.dao.FilterDao
 import com.example.neuralphotoredactor.domain.model.ProcessingOperation
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
@@ -19,7 +20,8 @@ import javax.inject.Inject
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     private val getProcessingHistoryUseCase: GetProcessingHistoryUseCase,
-    private val processingOperationRepository: ProcessingOperationRepository
+    private val processingOperationRepository: ProcessingOperationRepository,
+    private val filterDao: FilterDao
 ) : ViewModel() {
     
     /**
@@ -41,6 +43,16 @@ class HistoryViewModel @Inject constructor(
      * @return Список операций обработки
      */
     fun getOperationsByHistoryId(historyId: Long) = processingOperationRepository.getOperationsByHistoryId(historyId)
+    
+    /**
+     * Получить название операции по filterId.
+     * 
+     * @param filterId ID фильтра или операции редактирования
+     * @return Название операции или null, если не найдено
+     */
+    suspend fun getOperationName(filterId: Long): String? {
+        return filterDao.getFilterById(filterId)?.name
+    }
     
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()

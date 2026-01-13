@@ -5,10 +5,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.example.neuralphotoredactor.data.local.dao.FilterDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
+import com.example.neuralphotoredactor.data.local.database.AppDatabase
 import com.example.neuralphotoredactor.data.mapper.ProcessingHistoryMapper
+import com.example.neuralphotoredactor.data.mapper.ProcessingOperationMapper
 import com.example.neuralphotoredactor.data.storage.ImageStorage
 import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
+import kotlin.collections.buildList
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.OperationParameters
 import com.example.neuralphotoredactor.domain.model.ProcessingOperation
@@ -46,7 +49,8 @@ class ProcessingRepositoryImpl @Inject constructor(
     private val processingHistoryDao: ProcessingHistoryDao,
     private val processingOperationRepository: ProcessingOperationRepository,
     private val neuralModelRepository: NeuralModelRepository,
-    private val filterDao: FilterDao
+    private val filterDao: FilterDao,
+    private val appDatabase: AppDatabase
 ) : ProcessingRepository {
     
     override suspend fun processImage(
@@ -94,24 +98,21 @@ class ProcessingRepositoryImpl @Inject constructor(
             val processedUri = imageStorage.saveBitmap(processedBitmap, fileName)
                 ?: return@withContext null
             
-            // Создаем запись в истории обработки
+            // Создаем запись в истории обработки и операцию в транзакции
             val result = ProcessingResult(
                 originalUri = imageData.uri,
                 processedUri = processedUri,
-                filterType = filterType.name,
+                filterType = filterType.name, // Для обратной совместимости, но не сохраняется в БД
                 timestamp = timestamp
             )
             val historyEntity = ProcessingHistoryMapper.toEntity(result)
-            val historyId = processingHistoryDao.insert(historyEntity)
-            
-            // Создаем операцию обработки с ссылкой на историю
             val sessionId = timestamp // Используем timestamp как sessionId
-            val filterId = findFilterIdByFilterType(filterType)
+            val filterId = findFilterIdByName(filterType.name) 
+                ?: throw IllegalStateException("Фильтр ${filterType.name} не найден в базе данных")
             val operation = ProcessingOperation(
-                historyId = historyId,
+                historyId = 0, // Будет установлен в транзакции
                 sessionId = sessionId,
                 filterId = filterId,
-                operationType = filterType.name,
                 parameters = OperationParameters(
                     filterType = filterType.name,
                     intensity = intensity ?: 1.0f
@@ -121,7 +122,12 @@ class ProcessingRepositoryImpl @Inject constructor(
                 processingTimeMs = processingTime,
                 sequenceNumber = 1
             )
-            processingOperationRepository.addOperation(operation)
+            val operationEntity = ProcessingOperationMapper.toEntity(operation)
+            android.util.Log.d("ProcessingRepository", "Создана операция: filterId=${operationEntity.filterId}, historyId=${operationEntity.historyId}")
+            
+            // Сохраняем в транзакции
+            val savedHistoryId = appDatabase.saveHistoryWithOperations(historyEntity, listOf(operationEntity))
+            android.util.Log.d("ProcessingRepository", "Транзакция завершена, historyId=$savedHistoryId")
             
             result
         } catch (e: Exception) {
@@ -451,47 +457,50 @@ class ProcessingRepositoryImpl @Inject constructor(
             
             android.util.Log.d("ProcessingRepository", "Изображение сохранено: $processedUri")
             
-            // Создаем запись в истории обработки
+            // Создаем запись в истории обработки и операции для каждого фильтра в транзакции
             val result = ProcessingResult(
                 originalUri = imageData.uri,
                 processedUri = processedUri,
-                filterType = filterNames, // Сохраняем все примененные фильтры
+                filterType = filterNames, // Для обратной совместимости, но не сохраняется в БД
                 timestamp = timestamp
             )
             val historyEntity = ProcessingHistoryMapper.toEntity(result)
-            val historyId = processingHistoryDao.insert(historyEntity)
-            
-            // Создаем операции обработки для каждого фильтра
             val processingTime = System.currentTimeMillis() - processingStartTime
             val sessionId = timestamp
-            filters.forEachIndexed { index, (filterType, intensity) ->
-                val filterId = findFilterIdByFilterType(filterType)
+            
+            // Создаем операции для каждого фильтра
+            val operations = filters.mapIndexed { index, (filterType, intensity) ->
+                val filterId = findFilterIdByName(filterType.name)
+                    ?: throw IllegalStateException("Фильтр ${filterType.name} не найден в базе данных")
                 val operation = ProcessingOperation(
-                    historyId = historyId,
+                    historyId = 0, // Будет установлен в транзакции
                     sessionId = sessionId,
                     filterId = filterId,
-                    operationType = filterType.name,
                     parameters = OperationParameters(
                         filterType = filterType.name,
                         intensity = intensity ?: 1.0f,
-                        additionalParams = if (filters.size > 1) {
-                            mapOf(
-                                "filters" to filters.map { it.first.name },
-                                "intensities" to filters.mapNotNull { it.second }
-                            )
-                        } else {
-                            emptyMap()
-                        }
+                        additionalParams = emptyMap() // Каждая операция относится только к одному фильтру
                     ),
                     inputImageUri = if (index == 0) imageData.uri else processedUri,
                     outputImageUri = processedUri,
                     processingTimeMs = processingTime / filters.size, // Распределяем время между фильтрами
                     sequenceNumber = index + 1
                 )
-                processingOperationRepository.addOperation(operation)
+                ProcessingOperationMapper.toEntity(operation)
             }
             
-            android.util.Log.d("ProcessingRepository", "Результат сохранен в базу данных")
+            android.util.Log.d("ProcessingRepository", "Создано операций: ${operations.size}")
+            if (operations.isEmpty()) {
+                android.util.Log.e("ProcessingRepository", "ОШИБКА: Список операций пуст!")
+            } else {
+                operations.forEachIndexed { index, op ->
+                    android.util.Log.d("ProcessingRepository", "Операция $index: filterId=${op.filterId}, sequenceNumber=${op.sequenceNumber}, historyId=${op.historyId}")
+                }
+            }
+            
+            // Сохраняем в транзакции
+            val savedHistoryId = appDatabase.saveHistoryWithOperations(historyEntity, operations)
+            android.util.Log.d("ProcessingRepository", "Транзакция завершена, historyId=$savedHistoryId, результат сохранен в базу данных")
             
             result
         } catch (e: OutOfMemoryError) {
@@ -547,16 +556,16 @@ class ProcessingRepositoryImpl @Inject constructor(
     }
     
     /**
-     * Найти ID фильтра по типу фильтра.
+     * Найти ID фильтра или операции редактирования по имени.
      * 
-     * @param filterType Тип фильтра
-     * @return ID фильтра или null, если фильтр не найден
+     * @param name Имя фильтра (FilterType.name) или операции редактирования (EditType.name)
+     * @return ID фильтра или null, если не найден
      */
-    private suspend fun findFilterIdByFilterType(filterType: FilterType): Long? {
+    private suspend fun findFilterIdByName(name: String): Long? {
         return try {
-            filterDao.getFilterByName(filterType.name)?.id
+            filterDao.getFilterByName(name)?.id
         } catch (e: Exception) {
-            android.util.Log.e("ProcessingRepository", "Ошибка поиска фильтра для $filterType: ${e.message}", e)
+            android.util.Log.e("ProcessingRepository", "Ошибка поиска фильтра для $name: ${e.message}", e)
             null
         }
     }
@@ -626,41 +635,199 @@ class ProcessingRepositoryImpl @Inject constructor(
                 val result = ProcessingResult(
                     originalUri = originalUri ?: android.net.Uri.EMPTY,
                     processedUri = processedUri,
-                    filterType = filterType ?: "edited",
+                    filterType = filterType ?: "edited", // Для обратной совместимости, но не сохраняется в БД
                     timestamp = timestamp
                 )
                 val historyEntity = ProcessingHistoryMapper.toEntity(result)
-                val historyId = processingHistoryDao.insert(historyEntity)
-                
-                // Создаем операцию редактирования с детальными настройками
                 val sessionId = timestamp
-                val operationType = if (filterType == "edited" || filterType == null) "edit" else "multiple_filters"
-                val filterId = filterType?.let { filterTypeName ->
-                    try {
-                        val ft = FilterType.valueOf(filterTypeName)
-                        findFilterIdByFilterType(ft)
-                    } catch (e: Exception) {
-                        null
+                
+                // Создаем операции обработки
+                val operations = buildList<ProcessingOperation> {
+                    if (filterType == null || filterType == "edited") {
+                        // Если это редактирование без фильтров, создаем операции для каждого примененного редактирования
+                        val editSettingsMap = editSettings ?: emptyMap()
+                        
+                        // Извлекаем примененные редактирования из editSettings
+                        // editSettings может содержать ключи типа "brightness", "contrast", "appliedEdits" и т.д.
+                        @Suppress("UNCHECKED_CAST")
+                        val appliedEdits = (editSettingsMap["appliedEdits"] as? List<*>) ?: emptyList<Any>()
+                        
+                        if (appliedEdits.isNotEmpty()) {
+                            // Создаем операцию для каждого редактирования
+                            appliedEdits.forEachIndexed { index, editItem ->
+                                val editPair = editItem as? Pair<*, *>
+                                if (editPair != null) {
+                                    // editPair.first может быть String (имя EditType) или EditType
+                                    val editTypeName = when (val first = editPair.first) {
+                                        is EditType -> first.name
+                                        is String -> first
+                                        else -> null
+                                    }
+                                    if (editTypeName != null) {
+                                        val filterId = findFilterIdByName(editTypeName)
+                                        if (filterId != null) {
+                                            add(
+                                                ProcessingOperation(
+                                                    historyId = 0, // Будет установлен в транзакции
+                                                    sessionId = sessionId,
+                                                    filterId = filterId,
+                                                    parameters = OperationParameters(
+                                                        filterType = null,
+                                                        intensity = (editPair.second as? Float) ?: 0f,
+                                                        additionalParams = editSettingsMap
+                                                    ),
+                                                    inputImageUri = if (index == 0) (originalUri ?: android.net.Uri.EMPTY) else processedUri,
+                                                    outputImageUri = processedUri,
+                                                    processingTimeMs = 0L,
+                                                    sequenceNumber = index + 1
+                                                )
+                                            )
+                                        } else {
+                                            android.util.Log.w("ProcessingRepository", "Фильтр не найден для операции редактирования: $editTypeName")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Всегда проверяем отдельные настройки (brightness, contrast и т.д.), даже если appliedEdits не пуст
+                        // Это нужно для случаев, когда настройки передаются отдельно
+                        var sequenceNum = if (appliedEdits.isNotEmpty()) appliedEdits.size + 1 else 1
+                        listOf("brightness", "contrast", "colorBalanceRed", "colorBalanceGreen", "colorBalanceBlue").forEach { settingKey ->
+                            if (editSettingsMap.containsKey(settingKey)) {
+                                val intensity = (editSettingsMap[settingKey] as? Float) ?: 0f
+                                
+                                // Пропускаем операции с нулевой интенсивностью (не были изменены)
+                                if (intensity == 0f) {
+                                    return@forEach
+                                }
+                                
+                                val editTypeName = when (settingKey) {
+                                    "brightness" -> EditType.BRIGHTNESS.name
+                                    "contrast" -> EditType.CONTRAST.name
+                                    "colorBalanceRed" -> EditType.COLOR_BALANCE_RED.name
+                                    "colorBalanceGreen" -> EditType.COLOR_BALANCE_GREEN.name
+                                    "colorBalanceBlue" -> EditType.COLOR_BALANCE_BLUE.name
+                                    else -> null
+                                }
+                                if (editTypeName != null) {
+                                    val filterId = findFilterIdByName(editTypeName)
+                                    if (filterId != null) {
+                                        add(
+                                            ProcessingOperation(
+                                                historyId = 0,
+                                                sessionId = sessionId,
+                                                filterId = filterId,
+                                                parameters = OperationParameters(
+                                                    filterType = null,
+                                                    intensity = intensity,
+                                                    additionalParams = editSettingsMap
+                                                ),
+                                                inputImageUri = if (sequenceNum == 1) (originalUri ?: android.net.Uri.EMPTY) else processedUri,
+                                                outputImageUri = processedUri,
+                                                processingTimeMs = 0L,
+                                                sequenceNumber = sequenceNum++
+                                            )
+                                        )
+                                    } else {
+                                        android.util.Log.w("ProcessingRepository", "Фильтр не найден для настройки: $editTypeName")
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (isEmpty()) {
+                            // Если нет appliedEdits, но есть отдельные настройки (brightness, contrast и т.д.)
+                            // Создаем операции для каждой настройки
+                            var sequenceNum = 1
+                            listOf("brightness", "contrast", "colorBalanceRed", "colorBalanceGreen", "colorBalanceBlue").forEach { settingKey ->
+                                if (editSettingsMap.containsKey(settingKey)) {
+                                    val editTypeName = when (settingKey) {
+                                        "brightness" -> EditType.BRIGHTNESS.name
+                                        "contrast" -> EditType.CONTRAST.name
+                                        "colorBalanceRed" -> EditType.COLOR_BALANCE_RED.name
+                                        "colorBalanceGreen" -> EditType.COLOR_BALANCE_GREEN.name
+                                        "colorBalanceBlue" -> EditType.COLOR_BALANCE_BLUE.name
+                                        else -> null
+                                    }
+                                    if (editTypeName != null) {
+                                        val filterId = findFilterIdByName(editTypeName)
+                                        if (filterId != null) {
+                                            add(
+                                                ProcessingOperation(
+                                                    historyId = 0,
+                                                    sessionId = sessionId,
+                                                    filterId = filterId,
+                                                    parameters = OperationParameters(
+                                                        filterType = null,
+                                                        intensity = (editSettingsMap[settingKey] as? Float) ?: 0f,
+                                                        additionalParams = editSettingsMap
+                                                    ),
+                                                    inputImageUri = if (sequenceNum == 1) (originalUri ?: android.net.Uri.EMPTY) else processedUri,
+                                                    outputImageUri = processedUri,
+                                                    processingTimeMs = 0L,
+                                                    sequenceNumber = sequenceNum++
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Если filterType содержит несколько фильтров (разделенных подчеркиванием),
+                        // создаем отдельную операцию для каждого фильтра
+                        val filterNames = filterType.split("_")
+                        filterNames.forEachIndexed { index, filterName ->
+                            // Пробуем найти как FilterType
+                            val filterId = try {
+                                val ft = FilterType.valueOf(filterName)
+                                findFilterIdByName(ft.name)
+                            } catch (e: IllegalArgumentException) {
+                                // Если не FilterType, пробуем как EditType
+                                try {
+                                    val et = EditType.valueOf(filterName)
+                                    findFilterIdByName(et.name)
+                                } catch (e2: IllegalArgumentException) {
+                                    android.util.Log.w("ProcessingRepository", "Неизвестный тип: $filterName")
+                                    null
+                                }
+                            }
+                            
+                            if (filterId != null) {
+                                add(
+                                    ProcessingOperation(
+                                        historyId = 0, // Будет установлен в транзакции
+                                        sessionId = sessionId,
+                                        filterId = filterId,
+                                        parameters = OperationParameters(
+                                            filterType = filterName,
+                                            intensity = 1.0f,
+                                            additionalParams = editSettings ?: emptyMap()
+                                        ),
+                                        inputImageUri = if (index == 0) (originalUri ?: android.net.Uri.EMPTY) else processedUri,
+                                        outputImageUri = processedUri,
+                                        processingTimeMs = 0L,
+                                        sequenceNumber = index + 1
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
                 
-                val operation = ProcessingOperation(
-                    historyId = historyId,
-                    sessionId = sessionId,
-                    filterId = filterId,
-                    operationType = operationType,
-                    parameters = OperationParameters(
-                        filterType = filterType,
-                        intensity = 1.0f,
-                        additionalParams = editSettings ?: emptyMap()
-                    ),
-                    inputImageUri = originalUri ?: android.net.Uri.EMPTY,
-                    outputImageUri = processedUri,
-                    processingTimeMs = 0L, // Время редактирования не измеряем
-                    sequenceNumber = 1
-                )
-                processingOperationRepository.addOperation(operation)
-                android.util.Log.d("ProcessingRepository", "Результат сохранен в базу данных")
+                // Сохраняем в транзакции
+                val operationEntities = operations.map { ProcessingOperationMapper.toEntity(it) }
+                android.util.Log.d("ProcessingRepository", "Создано операций для сохранения: ${operationEntities.size}")
+                if (operationEntities.isEmpty()) {
+                    android.util.Log.e("ProcessingRepository", "ОШИБКА: Список операций пуст!")
+                } else {
+                    operationEntities.forEachIndexed { index, op ->
+                        android.util.Log.d("ProcessingRepository", "Операция $index: filterId=${op.filterId}, sequenceNumber=${op.sequenceNumber}")
+                    }
+                }
+                val savedHistoryId = appDatabase.saveHistoryWithOperations(historyEntity, operationEntities)
+                android.util.Log.d("ProcessingRepository", "Транзакция завершена, historyId=$savedHistoryId, результат сохранен в базу данных")
             } else {
                 android.util.Log.e("ProcessingRepository", "Не удалось сохранить изображение в processed")
             }

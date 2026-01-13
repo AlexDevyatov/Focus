@@ -11,8 +11,7 @@ import android.net.Uri
  * @param id Уникальный идентификатор операции
  * @param historyId ID записи в истории обработки
  * @param sessionId ID сессии редактирования
- * @param filterId ID использованного фильтра (может быть null)
- * @param operationType Тип операции
+ * @param filterId ID использованного фильтра или операции редактирования (NOT NULL)
  * @param parameters Параметры выполнения операции
  * @param inputImageUri URI входного изображения
  * @param outputImageUri URI выходного изображения
@@ -23,8 +22,7 @@ data class ProcessingOperation(
     val id: Long = 0,
     val historyId: Long,
     val sessionId: Long,
-    val filterId: Long?,
-    val operationType: String,
+    val filterId: Long, // NOT NULL - всегда должен быть фильтр или операция редактирования
     val parameters: OperationParameters,
     val inputImageUri: Uri,
     val outputImageUri: Uri,

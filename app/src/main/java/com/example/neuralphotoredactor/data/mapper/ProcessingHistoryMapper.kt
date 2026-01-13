@@ -22,7 +22,7 @@ object ProcessingHistoryMapper {
         return ProcessingResult(
             originalUri = Uri.parse(entity.originalUri),
             processedUri = Uri.parse(entity.processedUri),
-            filterType = entity.filterType,
+            filterType = "", // filterType больше не хранится в БД, информация о фильтрах в processing_operations
             timestamp = entity.timestamp,
             historyId = entity.id, // Используем id записи истории для получения операций
             operationId = null // Deprecated, используйте historyId
@@ -39,7 +39,6 @@ object ProcessingHistoryMapper {
         return ProcessingHistoryEntity(
             originalUri = result.originalUri.toString(),
             processedUri = result.processedUri.toString(),
-            filterType = result.filterType,
             timestamp = result.timestamp
         )
     }

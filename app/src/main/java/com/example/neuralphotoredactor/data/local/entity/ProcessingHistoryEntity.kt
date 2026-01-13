@@ -8,8 +8,9 @@ import androidx.room.PrimaryKey
 /**
  * Entity для хранения истории обработки изображений в Room Database.
  * 
- * Хранит только URI изображений, метаданные и информацию о фильтре.
+ * Хранит только URI изображений и метаданные.
  * Bitmap не хранится в БД согласно правилам архитектуры.
+ * Информация о примененных фильтрах хранится в таблице processing_operations.
  * 
  * **Связи с другими сущностями:**
  * - Имеет связь один-ко-многим с ProcessingOperationEntity через historyId
@@ -19,7 +20,6 @@ import androidx.room.PrimaryKey
  * @param id Уникальный идентификатор записи
  * @param originalUri URI исходного изображения (строка)
  * @param processedUri URI обработанного изображения (строка)
- * @param filterType Тип примененного фильтра
  * @param timestamp Время обработки в миллисекундах
  */
 @Entity(
@@ -30,7 +30,6 @@ data class ProcessingHistoryEntity(
     val id: Long = 0,
     val originalUri: String,
     val processedUri: String,
-    val filterType: String,
     val timestamp: Long
 )
 
