@@ -5,10 +5,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import com.example.neuralphotoredactor.data.local.dao.FilterDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
+import com.example.neuralphotoredactor.data.local.database.AppDatabase
 import com.example.neuralphotoredactor.data.local.entity.ProcessingHistoryEntity
 import com.example.neuralphotoredactor.data.mapper.ProcessingHistoryMapper
 import com.example.neuralphotoredactor.data.storage.ImageStorage
+import com.example.neuralphotoredactor.domain.repository.NeuralModelRepository
+import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
 import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
@@ -56,6 +60,10 @@ class ProcessingRepositoryImplTest {
     private lateinit var imageEditProcessor: ImageEditProcessor
     private lateinit var imageStorage: ImageStorage
     private lateinit var processingHistoryDao: ProcessingHistoryDao
+    private lateinit var processingOperationRepository: ProcessingOperationRepository
+    private lateinit var neuralModelRepository: NeuralModelRepository
+    private lateinit var filterDao: FilterDao
+    private lateinit var appDatabase: AppDatabase
     private lateinit var repository: ProcessingRepositoryImpl
 
     private val testBitmap: Bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
@@ -73,6 +81,10 @@ class ProcessingRepositoryImplTest {
         imageEditProcessor = mockk(relaxed = true)
         imageStorage = mockk(relaxed = true)
         processingHistoryDao = mockk(relaxed = true)
+        processingOperationRepository = mockk(relaxed = true)
+        neuralModelRepository = mockk(relaxed = true)
+        filterDao = mockk(relaxed = true)
+        appDatabase = mockk(relaxed = true)
 
         // Мокируем contentResolver для тестов
         val contextSpy = mockk<Context>(relaxed = true)
@@ -86,7 +98,11 @@ class ProcessingRepositoryImplTest {
             imageFilterProcessor = imageFilterProcessor,
             imageEditProcessor = imageEditProcessor,
             imageStorage = imageStorage,
-            processingHistoryDao = processingHistoryDao
+            processingHistoryDao = processingHistoryDao,
+            processingOperationRepository = processingOperationRepository,
+            neuralModelRepository = neuralModelRepository,
+            filterDao = filterDao,
+            appDatabase = appDatabase
         )
     }
 
@@ -159,7 +175,6 @@ class ProcessingRepositoryImplTest {
             id = 1,
             originalUri = "content://test/original",
             processedUri = "content://test/processed",
-            filterType = "GAUSSIAN_BLUR",
             timestamp = System.currentTimeMillis()
         )
         every { processingHistoryDao.getAllHistory() } returns flowOf(listOf(entity))
@@ -169,7 +184,9 @@ class ProcessingRepositoryImplTest {
 
         // Then
         assertEquals(1, result.size)
-        assertEquals("GAUSSIAN_BLUR", result[0].filterType)
+        assertEquals(entity.id, result[0].historyId)
+        assertEquals(entity.originalUri, result[0].originalUri.toString())
+        assertEquals(entity.processedUri, result[0].processedUri.toString())
     }
 
     @Test
@@ -197,7 +214,6 @@ class ProcessingRepositoryImplTest {
             id = 1,
             originalUri = result.originalUri.toString(),
             processedUri = result.processedUri.toString(),
-            filterType = result.filterType,
             timestamp = result.timestamp
         )
         coEvery { processingHistoryDao.findByUriAndTimestamp(any(), any()) } returns entity

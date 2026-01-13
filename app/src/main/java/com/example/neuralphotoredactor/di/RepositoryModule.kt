@@ -2,11 +2,13 @@ package com.example.neuralphotoredactor.di
 
 import com.example.neuralphotoredactor.data.datasource.GalleryDataSource
 import com.example.neuralphotoredactor.data.datasource.GalleryDataSourceImpl
+import com.example.neuralphotoredactor.data.repository.FilterRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.ImageRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.NeuralModelRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.ProcessingOperationRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.ProcessingRepositoryImpl
 import com.example.neuralphotoredactor.data.repository.TFLiteModelRepositoryImpl
+import com.example.neuralphotoredactor.domain.repository.FilterRepository
 import com.example.neuralphotoredactor.domain.repository.ImageRepository
 import com.example.neuralphotoredactor.domain.repository.NeuralModelRepository
 import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
@@ -54,6 +56,12 @@ abstract class RepositoryModule {
     abstract fun bindTFLiteModelRepository(
         tfliteModelRepositoryImpl: TFLiteModelRepositoryImpl
     ): TFLiteModelRepository
+    
+    @Binds
+    @Singleton
+    abstract fun bindFilterRepository(
+        filterRepositoryImpl: FilterRepositoryImpl
+    ): FilterRepository
     
     @Binds
     abstract fun bindGalleryDataSource(

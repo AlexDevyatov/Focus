@@ -8,7 +8,11 @@ import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
-import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
+import com.example.neuralphotoredactor.domain.usecase.ApplyEditUseCase
+import com.example.neuralphotoredactor.domain.usecase.LoadBitmapUseCase
+import com.example.neuralphotoredactor.domain.usecase.PreviewFiltersUseCase
+import com.example.neuralphotoredactor.domain.usecase.ProcessImageWithFiltersUseCase
+import com.example.neuralphotoredactor.domain.usecase.SaveEditedImageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,7 +28,11 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class EditorViewModel @Inject constructor(
-    private val processingRepository: ProcessingRepository
+    private val previewFiltersUseCase: PreviewFiltersUseCase,
+    private val applyEditUseCase: ApplyEditUseCase,
+    private val saveEditedImageUseCase: SaveEditedImageUseCase,
+    private val loadBitmapUseCase: LoadBitmapUseCase,
+    private val processImageWithFiltersUseCase: ProcessImageWithFiltersUseCase
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -241,7 +249,7 @@ class EditorViewModel @Inject constructor(
             
             try {
                 android.util.Log.d("EditorViewModel", "Применяем ${filters.size} фильтров для предпросмотра")
-                val processedBitmap = processingRepository.previewFilters(
+                val processedBitmap = previewFiltersUseCase.invoke(
                     originalBitmap,
                     filters.map { it.first to it.second }
                 )
@@ -346,7 +354,7 @@ class EditorViewModel @Inject constructor(
                         "intensities" to selectedFilters.mapNotNull { it.second }
                     )
                     
-                    val uri = processingRepository.saveEditedImageToGallery(
+                    val uri = saveEditedImageUseCase.invoke(
                         bitmapToSave, 
                         fileName,
                         originalUri = currentImage.uri,
@@ -366,7 +374,7 @@ class EditorViewModel @Inject constructor(
                 } else {
                     // Если previewBitmap нет, обрабатываем заново (fallback)
                     android.util.Log.d("EditorViewModel", "PreviewBitmap отсутствует, обрабатываем заново")
-                    processingRepository.processImageWithFilters(
+                    processImageWithFiltersUseCase.invoke(
                         currentImage,
                         selectedFilters.map { it.first to it.second }
                     )
@@ -417,9 +425,9 @@ class EditorViewModel @Inject constructor(
         
         val imageData = _uiState.value.imageData ?: return null
         
-        // Используем репозиторий для загрузки Bitmap
+        // Используем UseCase для загрузки Bitmap
         return try {
-            val bitmap = processingRepository.loadBitmapFromUri(imageData.uri)
+            val bitmap = loadBitmapUseCase.invoke(imageData.uri)
             if (bitmap != null) {
                 // Сохраняем истинно оригинальное изображение (если еще не сохранено)
                 if (trueOriginalBitmap == null || trueOriginalBitmap!!.isRecycled) {
@@ -454,7 +462,7 @@ class EditorViewModel @Inject constructor(
         for ((geometricEditType, _) in _uiState.value.appliedEdits) {
             if (workingBitmap == null || workingBitmap.isRecycled) break
             if (geometricEditType == EditType.CROP) continue
-            val result = processingRepository.applyEdit(workingBitmap, geometricEditType, 0f, null)
+            val result = applyEditUseCase.invoke(workingBitmap, geometricEditType, 0f, null)
             if (result != null && result != workingBitmap) {
                 if (workingBitmap != baseBitmap) {
                     bitmapsToRecycle.add(workingBitmap)
@@ -663,7 +671,7 @@ class EditorViewModel @Inject constructor(
                     cropRect
                 }
                 
-                val croppedBitmap = processingRepository.applyEdit(
+                val croppedBitmap = applyEditUseCase.invoke(
                     bitmapForCrop,
                     EditType.CROP,
                     0f,
@@ -741,7 +749,7 @@ class EditorViewModel @Inject constructor(
                     if (workingBitmap == null || workingBitmap.isRecycled) break
                     // Пропускаем CROP, так как он уже применен к исходному изображению в кэше
                     if (geometricEditType == EditType.CROP) continue
-                    val result = processingRepository.applyEdit(workingBitmap, geometricEditType, 0f, null)
+                    val result = applyEditUseCase.invoke(workingBitmap, geometricEditType, 0f, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
@@ -759,7 +767,7 @@ class EditorViewModel @Inject constructor(
                 
                 // Затем применяем цветовые корректировки
                 if (_uiState.value.brightness != 0f) {
-                    val result = processingRepository.applyEdit(workingBitmap, EditType.BRIGHTNESS, _uiState.value.brightness, null)
+                    val result = applyEditUseCase.invoke(workingBitmap, EditType.BRIGHTNESS, _uiState.value.brightness, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
@@ -774,7 +782,7 @@ class EditorViewModel @Inject constructor(
                 }
                 
                 if (_uiState.value.contrast != 0f) {
-                    val result = processingRepository.applyEdit(workingBitmap, EditType.CONTRAST, _uiState.value.contrast, null)
+                    val result = applyEditUseCase.invoke(workingBitmap, EditType.CONTRAST, _uiState.value.contrast, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
@@ -790,7 +798,7 @@ class EditorViewModel @Inject constructor(
                 
                 // Применяем цветовой баланс
                 if (_uiState.value.colorBalanceRed != 0f) {
-                    val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_RED, _uiState.value.colorBalanceRed, null)
+                    val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_RED, _uiState.value.colorBalanceRed, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
@@ -805,7 +813,7 @@ class EditorViewModel @Inject constructor(
                 }
                 
                 if (_uiState.value.colorBalanceGreen != 0f) {
-                    val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_GREEN, _uiState.value.colorBalanceGreen, null)
+                    val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_GREEN, _uiState.value.colorBalanceGreen, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
@@ -820,7 +828,7 @@ class EditorViewModel @Inject constructor(
                 }
                 
                 if (_uiState.value.colorBalanceBlue != 0f) {
-                    val result = processingRepository.applyEdit(workingBitmap, EditType.COLOR_BALANCE_BLUE, _uiState.value.colorBalanceBlue, null)
+                    val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_BLUE, _uiState.value.colorBalanceBlue, null)
                     if (result != null && result != workingBitmap) {
                         if (workingBitmap != originalBitmap) {
                             bitmapsToRecycle.add(workingBitmap)
@@ -836,7 +844,7 @@ class EditorViewModel @Inject constructor(
                 
                 // Применяем фильтры, если они есть
                 if (workingBitmap != null && !workingBitmap.isRecycled && _uiState.value.selectedFilters.isNotEmpty()) {
-                    val filteredResult = processingRepository.previewFilters(
+                    val filteredResult = previewFiltersUseCase.invoke(
                         workingBitmap,
                         _uiState.value.selectedFilters.map { it.first to it.second }
                     )
@@ -982,7 +990,7 @@ class EditorViewModel @Inject constructor(
                     editSettings["filterIntensities"] = _uiState.value.selectedFilters.mapNotNull { it.second }
                 }
                 
-                val uri = processingRepository.saveEditedImageToGallery(
+                val uri = saveEditedImageUseCase.invoke(
                     bitmapToSave, 
                     fileName,
                     originalUri = _uiState.value.imageData?.uri,

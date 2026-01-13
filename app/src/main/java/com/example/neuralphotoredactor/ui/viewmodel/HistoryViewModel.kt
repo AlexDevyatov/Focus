@@ -2,10 +2,11 @@ package com.example.neuralphotoredactor.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.neuralphotoredactor.data.local.dao.FilterDao
 import com.example.neuralphotoredactor.domain.model.ProcessingOperation
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
-import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
+import com.example.neuralphotoredactor.domain.usecase.GetFilterNameByIdUseCase
+import com.example.neuralphotoredactor.domain.usecase.GetOperationByIdUseCase
+import com.example.neuralphotoredactor.domain.usecase.GetOperationsByHistoryIdUseCase
 import com.example.neuralphotoredactor.domain.usecase.GetProcessingHistoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,8 +21,9 @@ import javax.inject.Inject
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     private val getProcessingHistoryUseCase: GetProcessingHistoryUseCase,
-    private val processingOperationRepository: ProcessingOperationRepository,
-    private val filterDao: FilterDao
+    private val getOperationByIdUseCase: GetOperationByIdUseCase,
+    private val getOperationsByHistoryIdUseCase: GetOperationsByHistoryIdUseCase,
+    private val getFilterNameByIdUseCase: GetFilterNameByIdUseCase
 ) : ViewModel() {
     
     /**
@@ -30,7 +32,7 @@ class HistoryViewModel @Inject constructor(
      */
     suspend fun getOperationDetails(operationId: Long?): ProcessingOperation? {
         return if (operationId != null) {
-            processingOperationRepository.getOperationById(operationId)
+            getOperationByIdUseCase.invoke(operationId)
         } else {
             null
         }
@@ -42,7 +44,7 @@ class HistoryViewModel @Inject constructor(
      * @param historyId ID записи в истории обработки
      * @return Список операций обработки
      */
-    fun getOperationsByHistoryId(historyId: Long) = processingOperationRepository.getOperationsByHistoryId(historyId)
+    fun getOperationsByHistoryId(historyId: Long) = getOperationsByHistoryIdUseCase.invoke(historyId)
     
     /**
      * Получить название операции по filterId.
@@ -51,7 +53,7 @@ class HistoryViewModel @Inject constructor(
      * @return Название операции или null, если не найдено
      */
     suspend fun getOperationName(filterId: Long): String? {
-        return filterDao.getFilterById(filterId)?.name
+        return getFilterNameByIdUseCase.invoke(filterId)
     }
     
     private val _uiState = MutableStateFlow(HistoryUiState())

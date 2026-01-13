@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
-import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
+import com.example.neuralphotoredactor.domain.usecase.LoadBitmapUseCase
+import com.example.neuralphotoredactor.domain.usecase.PreviewFiltersUseCase
+import com.example.neuralphotoredactor.domain.usecase.SaveEditedImageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +21,9 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class AiPreviewViewModel @Inject constructor(
-    private val processingRepository: ProcessingRepository
+    private val loadBitmapUseCase: LoadBitmapUseCase,
+    private val previewFiltersUseCase: PreviewFiltersUseCase,
+    private val saveEditedImageUseCase: SaveEditedImageUseCase
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(AiPreviewUiState())
@@ -69,7 +73,7 @@ class AiPreviewViewModel @Inject constructor(
                 }
                 
                 // Загружаем Bitmap из URI
-                val originalBitmap = processingRepository.loadBitmapFromUri(imageData.uri)
+                val originalBitmap = loadBitmapUseCase.invoke(imageData.uri)
                 if (originalBitmap == null) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -93,7 +97,7 @@ class AiPreviewViewModel @Inject constructor(
                 }
                 
                 // Применяем фильтр
-                val processedBitmap = processingRepository.previewFilters(
+                val processedBitmap = previewFiltersUseCase.invoke(
                     originalBitmap,
                     listOf(filterType to null) // Нейросетевые фильтры без intensity
                 )
@@ -155,7 +159,7 @@ class AiPreviewViewModel @Inject constructor(
                     "intensities" to emptyList<Float>()
                 )
                 
-                val uri = processingRepository.saveEditedImageToGallery(
+                val uri = saveEditedImageUseCase.invoke(
                     processedBitmap,
                     fileName,
                     originalUri = imageData.uri,

@@ -2,8 +2,12 @@ package com.example.neuralphotoredactor.data.repository
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.example.neuralphotoredactor.data.local.dao.FilterDao
+import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingOperationDao
 import com.example.neuralphotoredactor.data.local.database.AppDatabase
+import com.example.neuralphotoredactor.data.local.entity.FilterEntity
+import com.example.neuralphotoredactor.data.local.entity.ProcessingHistoryEntity
 import com.example.neuralphotoredactor.domain.model.OperationParameters
 import com.example.neuralphotoredactor.domain.model.ProcessingOperation
 import kotlinx.coroutines.flow.first
@@ -33,6 +37,8 @@ class ProcessingOperationRepositoryImplTest {
 
     private lateinit var database: AppDatabase
     private lateinit var dao: ProcessingOperationDao
+    private lateinit var filterDao: FilterDao
+    private lateinit var historyDao: ProcessingHistoryDao
     private lateinit var repository: ProcessingOperationRepositoryImpl
 
     @Before
@@ -46,6 +52,8 @@ class ProcessingOperationRepositoryImplTest {
             .build()
         
         dao = database.processingOperationDao()
+        filterDao = database.filterDao()
+        historyDao = database.processingHistoryDao()
         repository = ProcessingOperationRepositoryImpl(dao)
     }
 
@@ -54,16 +62,38 @@ class ProcessingOperationRepositoryImplTest {
     fun tearDown() {
         database.close()
     }
+    
+    /**
+     * Создать фильтр в БД для тестов.
+     */
+    private suspend fun createTestFilter(name: String = "GAUSSIAN_BLUR"): Long {
+        val filter = FilterEntity(name = name)
+        return filterDao.insert(filter)
+    }
+    
+    /**
+     * Создать историю в БД для тестов.
+     */
+    private suspend fun createTestHistory(): Long {
+        val history = ProcessingHistoryEntity(
+            originalUri = "content://test/original",
+            processedUri = "content://test/processed",
+            timestamp = System.currentTimeMillis()
+        )
+        return historyDao.insert(history)
+    }
 
     @Test
     fun `getOperationsBySessionId should return mapped operations`() = runTest {
         // Given
         val sessionId = 1L
+        val historyId = createTestHistory()
+        val filterId = createTestFilter()
         val operation = ProcessingOperation(
             id = 0,
+            historyId = historyId,
             sessionId = sessionId,
-            modelId = null,
-            operationType = "FILTER",
+            filterId = filterId,
             parameters = OperationParameters(filterType = "GAUSSIAN_BLUR", intensity = 0.5f),
             inputImageUri = android.net.Uri.parse("content://test/input"),
             outputImageUri = android.net.Uri.parse("content://test/output"),
@@ -79,7 +109,8 @@ class ProcessingOperationRepositoryImplTest {
         // Then
         assertEquals(1, result.size)
         assertEquals(sessionId, result[0].sessionId)
-        assertEquals("FILTER", result[0].operationType)
+        assertEquals(filterId, result[0].filterId)
+        assertEquals("GAUSSIAN_BLUR", result[0].parameters.filterType)
     }
 
     @Test
@@ -98,11 +129,13 @@ class ProcessingOperationRepositoryImplTest {
     @Test
     fun `getOperationById should return mapped operation`() = runTest {
         // Given
+        val historyId = createTestHistory()
+        val filterId = createTestFilter()
         val operation = ProcessingOperation(
             id = 0,
+            historyId = historyId,
             sessionId = 1L,
-            modelId = null,
-            operationType = "FILTER",
+            filterId = filterId,
             parameters = OperationParameters(filterType = "GAUSSIAN_BLUR", intensity = 0.5f),
             inputImageUri = android.net.Uri.parse("content://test/input"),
             outputImageUri = android.net.Uri.parse("content://test/output"),
@@ -117,7 +150,8 @@ class ProcessingOperationRepositoryImplTest {
         // Then
         assertNotNull(result)
         assertEquals(operationId, result?.id)
-        assertEquals("FILTER", result?.operationType)
+        assertEquals(filterId, result?.filterId)
+        assertEquals("GAUSSIAN_BLUR", result?.parameters?.filterType)
     }
 
     @Test
@@ -137,11 +171,13 @@ class ProcessingOperationRepositoryImplTest {
     fun `getLastOperationBySessionId should return mapped operation`() = runTest {
         // Given
         val sessionId = 1L
+        val historyId = createTestHistory()
+        val filterId = createTestFilter()
         val operation = ProcessingOperation(
             id = 0,
+            historyId = historyId,
             sessionId = sessionId,
-            modelId = null,
-            operationType = "FILTER",
+            filterId = filterId,
             parameters = OperationParameters(filterType = "GAUSSIAN_BLUR", intensity = 0.5f),
             inputImageUri = android.net.Uri.parse("content://test/input"),
             outputImageUri = android.net.Uri.parse("content://test/output"),
@@ -156,7 +192,8 @@ class ProcessingOperationRepositoryImplTest {
         // Then
         assertNotNull(result)
         assertEquals(sessionId, result?.sessionId)
-        assertEquals("FILTER", result?.operationType)
+        assertEquals(filterId, result?.filterId)
+        assertEquals("GAUSSIAN_BLUR", result?.parameters?.filterType)
     }
 
     @Test
@@ -175,11 +212,13 @@ class ProcessingOperationRepositoryImplTest {
     @Test
     fun `addOperation should insert and return id`() = runTest {
         // Given
+        val historyId = createTestHistory()
+        val filterId = createTestFilter()
         val operation = ProcessingOperation(
             id = 0,
+            historyId = historyId,
             sessionId = 1L,
-            modelId = null,
-            operationType = "FILTER",
+            filterId = filterId,
             parameters = OperationParameters(filterType = "GAUSSIAN_BLUR", intensity = 0.5f),
             inputImageUri = android.net.Uri.parse("content://test/input"),
             outputImageUri = android.net.Uri.parse("content://test/output"),
@@ -195,17 +234,20 @@ class ProcessingOperationRepositoryImplTest {
         // Проверяем, что операция действительно сохранена
         val retrieved = repository.getOperationById(result)
         assertNotNull(retrieved)
-        assertEquals("FILTER", retrieved?.operationType)
+        assertEquals(filterId, retrieved?.filterId)
+        assertEquals("GAUSSIAN_BLUR", retrieved?.parameters?.filterType)
     }
 
     @Test
     fun `deleteOperation should delete from dao`() = runTest {
         // Given
+        val historyId = createTestHistory()
+        val filterId = createTestFilter()
         val operation = ProcessingOperation(
             id = 0,
+            historyId = historyId,
             sessionId = 1L,
-            modelId = null,
-            operationType = "FILTER",
+            filterId = filterId,
             parameters = OperationParameters(),
             inputImageUri = android.net.Uri.parse("content://test/input"),
             outputImageUri = android.net.Uri.parse("content://test/output"),
@@ -228,11 +270,13 @@ class ProcessingOperationRepositoryImplTest {
     fun `deleteOperationsBySessionId should delete from dao`() = runTest {
         // Given
         val sessionId = 1L
+        val historyId = createTestHistory()
+        val filterId = createTestFilter()
         val operation = ProcessingOperation(
             id = 0,
+            historyId = historyId,
             sessionId = sessionId,
-            modelId = null,
-            operationType = "FILTER",
+            filterId = filterId,
             parameters = OperationParameters(),
             inputImageUri = android.net.Uri.parse("content://test/input"),
             outputImageUri = android.net.Uri.parse("content://test/output"),
