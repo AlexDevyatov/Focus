@@ -106,6 +106,8 @@
     <string name="ai_preview_cancel">Отмена</string>
     <string name="ai_preview_save">Сохранить</string>
     <string name="ai_preview_processed_image">Обработанное изображение</string>
+    <string name="ai_preview_original_image">Исходное изображение</string>
+    <string name="ai_preview_compare">Сравнить</string>
     <string name="ai_preview_saving">Сохранение...</string>
     <string name="ai_preview_no_image">Нет изображения</string>
 </resources>

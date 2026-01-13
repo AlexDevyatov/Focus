@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -89,6 +90,22 @@ fun AiPreviewScreen(
                             }
                         }
                     }
+                },
+                actions = {
+                    // Маленькая кнопка-иконка для сравнения - показываем только после успешной обработки
+                    if (!uiState.isLoading && uiState.processedBitmap != null && uiState.originalBitmap != null && uiState.error == null) {
+                        IconButton(
+                            onClick = { viewModel.toggleImageComparison() },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.split_scene),
+                                contentDescription = stringResource(R.string.ai_preview_compare),
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             )
         },
@@ -135,12 +152,21 @@ fun AiPreviewScreen(
                 }
                 
                 uiState.processedBitmap != null -> {
-                    // Сохраняем в локальную переменную для smart cast
-                    val processedBitmap = uiState.processedBitmap!!
-                    // Показываем обработанное изображение
+                    // Определяем какое изображение показывать (исходное или обработанное)
+                    val bitmapToShow = if (uiState.showOriginal && uiState.originalBitmap != null) {
+                        uiState.originalBitmap!!
+                    } else {
+                        uiState.processedBitmap!!
+                    }
+                    
+                    // Показываем выбранное изображение
                     Image(
-                        bitmap = processedBitmap.asImageBitmap(),
-                        contentDescription = stringResource(R.string.ai_preview_processed_image),
+                        bitmap = bitmapToShow.asImageBitmap(),
+                        contentDescription = if (uiState.showOriginal) {
+                            stringResource(R.string.ai_preview_original_image)
+                        } else {
+                            stringResource(R.string.ai_preview_processed_image)
+                        },
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize()
                     )

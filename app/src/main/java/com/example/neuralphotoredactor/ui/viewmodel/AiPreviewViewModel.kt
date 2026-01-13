@@ -38,8 +38,10 @@ class AiPreviewViewModel @Inject constructor(
             filterType = filterType,
             isLoading = true,
             error = null,
+            originalBitmap = null,
             processedBitmap = null,
-            progress = 0f
+            progress = 0f,
+            showOriginal = false
         )
         
         // Запускаем обработку
@@ -76,6 +78,9 @@ class AiPreviewViewModel @Inject constructor(
                     )
                     return@launch
                 }
+                
+                // Сохраняем исходное изображение для сравнения
+                _uiState.value = _uiState.value.copy(originalBitmap = originalBitmap)
                 
                 // Симулируем прогресс обработки (20-95%) параллельно с реальной обработкой
                 val progressJob = launch {
@@ -186,6 +191,15 @@ class AiPreviewViewModel @Inject constructor(
     }
     
     /**
+     * Переключить отображение между исходным и обработанным изображением.
+     */
+    fun toggleImageComparison() {
+        _uiState.value = _uiState.value.copy(
+            showOriginal = !_uiState.value.showOriginal
+        )
+    }
+    
+    /**
      * Очистить состояние.
      */
     fun clearState() {
@@ -195,9 +209,11 @@ class AiPreviewViewModel @Inject constructor(
             isLoading = false,
             isSaving = false,
             error = null,
+            originalBitmap = null,
             processedBitmap = null,
             savedResult = null,
-            progress = 0f
+            progress = 0f,
+            showOriginal = false
         )
     }
 }
@@ -211,8 +227,10 @@ data class AiPreviewUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
+    val originalBitmap: Bitmap? = null, // Исходное изображение для сравнения
     val processedBitmap: Bitmap? = null,
     val savedResult: ProcessingResult? = null,
-    val progress: Float = 0f // Прогресс обработки от 0.0 до 1.0
+    val progress: Float = 0f, // Прогресс обработки от 0.0 до 1.0
+    val showOriginal: Boolean = false // Показывать исходное изображение (false = обработанное)
 )
 
