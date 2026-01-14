@@ -6,7 +6,10 @@ import com.example.neuralphotoredactor.ml.edit.ImageEditProcessorImpl
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessorImpl
 import com.example.neuralphotoredactor.ml.interpreter.AnimeGan2ImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.AnimeGanFacePaintProcessor
+import com.example.neuralphotoredactor.ml.interpreter.CelebADistillProcessor
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.HayaoProcessor
 import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessor
 import com.example.neuralphotoredactor.ml.postprocessor.ImagePostprocessorImpl
@@ -215,6 +218,66 @@ abstract class MLModule {
             @AnimeGan2Interpreter interpreter: Interpreter?
         ): AnimeGan2ImageProcessor {
             return AnimeGan2ImageProcessor(interpreter)
+        }
+        
+        /**
+         * Предоставляет AnimeGanFacePaintProcessor для модели AnimeGAN Face Paint.
+         * 
+         * Этот процессор используется для обработки изображений через модель animegan_face_paint_512_v2.tflite
+         * для стилизации лиц в аниме стиль.
+         * Применяется для фильтра STYLE_TRANSFER.
+         * 
+         * Модель загружается динамически через TFLiteModelRepository из assets.
+         * 
+         * @param tfliteModelRepository Репозиторий для загрузки TFLite моделей
+         * @return AnimeGanFacePaintProcessor для обработки изображений
+         */
+        @Provides
+        @Singleton
+        fun provideAnimeGanFacePaintProcessor(
+            tfliteModelRepository: com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository
+        ): AnimeGanFacePaintProcessor {
+            return AnimeGanFacePaintProcessor(tfliteModelRepository)
+        }
+        
+        /**
+         * Предоставляет CelebADistillProcessor для модели CelebA Distill.
+         * 
+         * Этот процессор используется для обработки изображений через модель celeba_distill.tflite
+         * для стилизации в аниме стиль.
+         * Применяется для фильтра STYLE_TRANSFER.
+         * 
+         * Модель загружается динамически через TFLiteModelRepository из assets.
+         * 
+         * @param tfliteModelRepository Репозиторий для загрузки TFLite моделей
+         * @return CelebADistillProcessor для обработки изображений
+         */
+        @Provides
+        @Singleton
+        fun provideCelebADistillProcessor(
+            tfliteModelRepository: com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository
+        ): CelebADistillProcessor {
+            return CelebADistillProcessor(tfliteModelRepository)
+        }
+        
+        /**
+         * Предоставляет HayaoProcessor для модели Hayao.
+         * 
+         * Этот процессор используется для обработки изображений через модель hayao.tflite
+         * для стилизации в аниме стиль.
+         * Применяется для фильтра STYLE_TRANSFER.
+         * 
+         * Модель загружается динамически через TFLiteModelRepository из assets.
+         * 
+         * @param tfliteModelRepository Репозиторий для загрузки TFLite моделей
+         * @return HayaoProcessor для обработки изображений
+         */
+        @Provides
+        @Singleton
+        fun provideHayaoProcessor(
+            tfliteModelRepository: com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository
+        ): HayaoProcessor {
+            return HayaoProcessor(tfliteModelRepository)
         }
     }
 }

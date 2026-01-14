@@ -109,11 +109,29 @@ class EditorViewModel @Inject constructor(
      * Используется при переходе из AiFiltersScreen.
      */
     fun setImageWithFilter(imageData: ImageData, filterTypeName: String?) {
+        // Парсим формат "style_transfer:ModelName" для выбора конкретной модели стилизации
+        val (filterNameBase, modelName) = if (filterTypeName?.contains(":") == true) {
+            val parts = filterTypeName.split(":", limit = 2)
+            parts[0] to parts.getOrNull(1)
+        } else {
+            filterTypeName to null
+        }
+        
+        // Если указано имя модели, добавляем его в URI как query параметр
+        val imageDataWithModel = if (modelName != null) {
+            val uriWithModel = imageData.uri.buildUpon()
+                .appendQueryParameter("modelName", modelName)
+                .build()
+            imageData.copy(uri = uriWithModel)
+        } else {
+            imageData
+        }
+        
         // Сбрасываем все настройки к дефолтным значениям
-        setImage(imageData)
+        setImage(imageDataWithModel)
         
         // Применяем фильтр, если он указан
-        filterTypeName?.let { filterName ->
+        filterNameBase?.let { filterName ->
             // Маппинг строковых названий из AiFiltersScreen в FilterType
             val filterType = when (filterName.lowercase()) {
                 "upscale" -> FilterType.UPSCALE
@@ -136,9 +154,12 @@ class EditorViewModel @Inject constructor(
             } else {
                 0.5f
             }
+            
+            // Сохраняем имя модели для STYLE_TRANSFER
             _uiState.value = _uiState.value.copy(
                 selectedFilters = listOf(Pair(filterType, intensity)),
-                showNeuralFilters = filterType in neuralFilters
+                showNeuralFilters = filterType in neuralFilters,
+                selectedStyleTransferModel = if (filterType == FilterType.STYLE_TRANSFER) modelName else null
             )
             // Пересчитываем предпросмотр с примененным фильтром
             recalculatePreview()
@@ -844,6 +865,9 @@ class EditorViewModel @Inject constructor(
                 
                 // Применяем фильтры, если они есть
                 if (workingBitmap != null && !workingBitmap.isRecycled && _uiState.value.selectedFilters.isNotEmpty()) {
+                    // Для предпросмотра используем стандартный метод
+                    // Имя модели будет извлечено из URI в processImage при сохранении
+                    // Для предпросмотра используем модель по умолчанию (AnimeGAN2)
                     val filteredResult = previewFiltersUseCase.invoke(
                         workingBitmap,
                         _uiState.value.selectedFilters.map { it.first to it.second }
@@ -1046,6 +1070,7 @@ data class EditorUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedFilters: List<Pair<FilterType, Float?>> = emptyList(), // Список выбранных фильтров с интенсивностями (null для нейросетевых)
+    val selectedStyleTransferModel: String? = null, // Имя модели для STYLE_TRANSFER (если указано)
     val currentFilterIntensity: Float = 0.5f, // Интенсивность для текущего редактируемого фильтра
     val showNeuralFilters: Boolean = false, // Показывать нейросетевые фильтры (false = обычные)
     val showEditMode: Boolean = true, // Показывать режим редактирования (true = настройки, false = фильтры)

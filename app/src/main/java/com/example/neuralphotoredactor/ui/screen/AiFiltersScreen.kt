@@ -3,11 +3,11 @@ package com.example.neuralphotoredactor.ui.screen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Gradient
-import androidx.compose.material.icons.filled.Hd
-import androidx.compose.material.icons.filled.Spa
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,7 +24,8 @@ import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 
 /**
  * Экран с AI фильтрами.
- * Отображает три карточки: Суперразрешение, Умное шумоподавление, Художественный стиль.
+ * Отображает карточки: Суперразрешение, Умное шумоподавление, Художественный стиль,
+ * и отдельные карточки для моделей стилизации (AnimeGAN Face Paint, CelebA Distill, Hayao).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,46 +60,81 @@ fun AiFiltersScreen(
         },
         modifier = modifier
     ) { paddingValues ->
-        Column(
+        // Список фильтров для отображения
+        val filters = listOf(
+            FilterItem(
+                title = stringResource(R.string.ai_filter_upscale),
+                icon = Icons.Filled.Hd,
+                imageResId = R.drawable.img_superresolution,
+                onClick = { onFilterClick("upscale") }
+            ),
+            FilterItem(
+                title = stringResource(R.string.ai_filter_denoise),
+                icon = Icons.Filled.Gradient,
+                imageResId = R.drawable.img_denoising,
+                onClick = { onFilterClick("denoise") }
+            ),
+            FilterItem(
+                title = stringResource(R.string.ai_filter_style_transfer),
+                icon = Icons.Filled.Spa,
+                imageResId = R.drawable.img_style_transfer,
+                onClick = { onFilterClick("style_transfer") }
+            ),
+            FilterItem(
+                title = stringResource(R.string.ai_filter_animegan_face_paint),
+                icon = Icons.Filled.Palette,
+                imageResId = R.drawable.img_style_transfer,
+                onClick = { onFilterClick("style_transfer:AnimeGAN Face Paint") }
+            ),
+            FilterItem(
+                title = stringResource(R.string.ai_filter_celeba_distill),
+                icon = Icons.Filled.Brush,
+                imageResId = R.drawable.img_style_transfer,
+                onClick = { onFilterClick("style_transfer:CelebA Distill") }
+            ),
+            FilterItem(
+                title = stringResource(R.string.ai_filter_hayao),
+                icon = Icons.Filled.ColorLens,
+                imageResId = R.drawable.img_style_transfer,
+                onClick = { onFilterClick("style_transfer:Hayao") }
+            )
+        )
+        
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
                     horizontal = 42.dp,
                     vertical = paddingValues.calculateTopPadding()
                 ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Карточка: Суперразрешение
-            AiFilterCard(
-                title = stringResource(R.string.ai_filter_upscale),
-                icon = Icons.Filled.Hd,
-                imageResId = R.drawable.img_superresolution,
-                onClick = { onFilterClick("upscale") },
-                modifier = Modifier.fillMaxWidth().height(138.dp)
-            )
-            
-            // Карточка: Умное шумоподавление
-            AiFilterCard(
-                title = stringResource(R.string.ai_filter_denoise),
-                icon = Icons.Filled.Gradient,
-                imageResId = R.drawable.img_denoising,
-                onClick = { onFilterClick("denoise") },
-                modifier = Modifier.fillMaxWidth().height(138.dp)
-            )
-            
-            // Карточка: Художественный стиль
-            AiFilterCard(
-                title = stringResource(R.string.ai_filter_style_transfer),
-                icon = Icons.Filled.Spa,
-                imageResId = R.drawable.img_style_transfer,
-                onClick = { onFilterClick("style_transfer") },
-                modifier = Modifier.fillMaxWidth().height(138.dp)
-            )
+            items(
+                items = filters,
+                key = { it.title }
+            ) { filter ->
+                AiFilterCard(
+                    title = filter.title,
+                    icon = filter.icon,
+                    imageResId = filter.imageResId,
+                    onClick = filter.onClick,
+                    modifier = Modifier.fillMaxWidth().height(138.dp)
+                )
+            }
         }
     }
 }
+
+/**
+ * Модель данных для карточки фильтра.
+ */
+private data class FilterItem(
+    val title: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val imageResId: Int,
+    val onClick: () -> Unit
+)
 
 /**
  * Карточка AI фильтра.

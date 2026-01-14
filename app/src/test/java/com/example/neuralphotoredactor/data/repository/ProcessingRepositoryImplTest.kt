@@ -20,7 +20,10 @@ import com.example.neuralphotoredactor.domain.model.ProcessingResult
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.interpreter.AnimeGan2ImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.AnimeGanFacePaintProcessor
+import com.example.neuralphotoredactor.ml.interpreter.CelebADistillProcessor
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.HayaoProcessor
 import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -56,6 +59,9 @@ class ProcessingRepositoryImplTest {
     private lateinit var esrganImageProcessor: EsrganImageProcessor
     private lateinit var splitterNetImageProcessor: SplitterNetImageProcessor
     private lateinit var animeGan2ImageProcessor: AnimeGan2ImageProcessor
+    private lateinit var animeGanFacePaintProcessor: AnimeGanFacePaintProcessor
+    private lateinit var celebaDistillProcessor: CelebADistillProcessor
+    private lateinit var hayaoProcessor: HayaoProcessor
     private lateinit var imageFilterProcessor: ImageFilterProcessor
     private lateinit var imageEditProcessor: ImageEditProcessor
     private lateinit var imageStorage: ImageStorage
@@ -77,6 +83,9 @@ class ProcessingRepositoryImplTest {
         esrganImageProcessor = mockk(relaxed = true)
         splitterNetImageProcessor = mockk(relaxed = true)
         animeGan2ImageProcessor = mockk(relaxed = true)
+        animeGanFacePaintProcessor = mockk(relaxed = true)
+        celebaDistillProcessor = mockk(relaxed = true)
+        hayaoProcessor = mockk(relaxed = true)
         imageFilterProcessor = mockk(relaxed = true)
         imageEditProcessor = mockk(relaxed = true)
         imageStorage = mockk(relaxed = true)
@@ -95,6 +104,9 @@ class ProcessingRepositoryImplTest {
             esrganImageProcessor = esrganImageProcessor,
             splitterNetImageProcessor = splitterNetImageProcessor,
             animeGan2ImageProcessor = animeGan2ImageProcessor,
+            animeGanFacePaintProcessor = animeGanFacePaintProcessor,
+            celebaDistillProcessor = celebaDistillProcessor,
+            hayaoProcessor = hayaoProcessor,
             imageFilterProcessor = imageFilterProcessor,
             imageEditProcessor = imageEditProcessor,
             imageStorage = imageStorage,
@@ -139,7 +151,11 @@ class ProcessingRepositoryImplTest {
         
         every { imageFilterProcessor.applyFilter(testBitmap, FilterType.GAUSSIAN_BLUR, null, false) } returns processedBitmap
         coEvery { imageStorage.saveBitmap(any(), any()) } returns processedUri
-        coEvery { processingHistoryDao.insert(any()) } returns 1L
+        coEvery { filterDao.getFilterByName(any()) } returns com.example.neuralphotoredactor.data.local.entity.FilterEntity(
+            id = 1,
+            name = FilterType.GAUSSIAN_BLUR.name
+        )
+        coEvery { appDatabase.saveHistoryWithOperations(any(), any()) } returns 1L
 
         // When
         val result = repository.processImage(imageData, FilterType.GAUSSIAN_BLUR)
@@ -148,7 +164,7 @@ class ProcessingRepositoryImplTest {
         assertNotNull(result)
         assertEquals(processedUri, result?.processedUri)
         coVerify { imageStorage.saveBitmap(any(), any()) }
-        coVerify { processingHistoryDao.insert(any()) }
+        coVerify { appDatabase.saveHistoryWithOperations(any(), any()) }
     }
 
     @Test
@@ -372,7 +388,7 @@ class ProcessingRepositoryImplTest {
         val processedUri = Uri.parse("content://test/processed")
         coEvery { imageStorage.saveBitmapToGallery(any(), any()) } returns galleryUri
         coEvery { imageStorage.saveBitmap(any(), any()) } returns processedUri
-        coEvery { processingHistoryDao.insert(any()) } returns 1L
+        coEvery { appDatabase.saveHistoryWithOperations(any(), any()) } returns 1L
 
         // When
         val result = repository.saveEditedImageToGallery(testBitmap, "test.jpg")
@@ -382,7 +398,7 @@ class ProcessingRepositoryImplTest {
         assertEquals(galleryUri, result)
         coVerify { imageStorage.saveBitmapToGallery(any(), any()) }
         coVerify { imageStorage.saveBitmap(any(), any()) }
-        coVerify { processingHistoryDao.insert(any()) }
+        coVerify { appDatabase.saveHistoryWithOperations(any(), any()) }
     }
 
     @Test
@@ -391,7 +407,7 @@ class ProcessingRepositoryImplTest {
         val processedUri = Uri.parse("content://test/processed")
         coEvery { imageStorage.saveBitmapToGallery(any(), any()) } returns null
         coEvery { imageStorage.saveBitmap(any(), any()) } returns processedUri
-        coEvery { processingHistoryDao.insert(any()) } returns 1L
+        coEvery { appDatabase.saveHistoryWithOperations(any(), any()) } returns 1L
 
         // When
         val result = repository.saveEditedImageToGallery(testBitmap, "test.jpg")

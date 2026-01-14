@@ -251,15 +251,30 @@ class MainActivity : ComponentActivity() {
                                 error = galleryUiState.error,
                                 onImageClick = { image, filter ->
                                     if (filter != null) {
-                                        // Переходим на экран предпросмотра AI фильтра
-                                        val filterType = when (filter.lowercase()) {
+                                        // Используем setImageWithFilter для правильной обработки формата "style_transfer:ModelName"
+                                        // Это позволит корректно обработать имя модели для новых фильтров стилизации
+                                        editorViewModel.setImageWithFilter(image, filter)
+                                        
+                                        // Парсим формат "style_transfer:ModelName" для определения FilterType
+                                        val filterNameBase = if (filter.contains(":")) {
+                                            filter.split(":", limit = 2)[0]
+                                        } else {
+                                            filter
+                                        }
+                                        
+                                        val filterType = when (filterNameBase.lowercase()) {
                                             "upscale" -> FilterType.UPSCALE
                                             "denoise" -> FilterType.DENOISE
                                             "style_transfer" -> FilterType.STYLE_TRANSFER
                                             else -> null
                                         }
+                                        
                                         if (filterType != null) {
+                                            // Переходим на экран предпросмотра AI фильтра
                                             navController.navigate("ai_preview?imageUri=${Uri.encode(image.uri.toString())}&filterType=${filterType.name}")
+                                        } else {
+                                            // Если не удалось определить тип, переходим в редактор
+                                            navController.navigate("editor")
                                         }
                                     } else {
                                         // Обычный переход в редактор

@@ -22,7 +22,10 @@ import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
 import com.example.neuralphotoredactor.ml.interpreter.AnimeGan2ImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.AnimeGanFacePaintProcessor
+import com.example.neuralphotoredactor.ml.interpreter.CelebADistillProcessor
 import com.example.neuralphotoredactor.ml.interpreter.EsrganImageProcessor
+import com.example.neuralphotoredactor.ml.interpreter.HayaoProcessor
 import com.example.neuralphotoredactor.ml.interpreter.SplitterNetImageProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +46,9 @@ class ProcessingRepositoryImpl @Inject constructor(
     private val esrganImageProcessor: EsrganImageProcessor,
     private val splitterNetImageProcessor: SplitterNetImageProcessor,
     private val animeGan2ImageProcessor: AnimeGan2ImageProcessor,
+    private val animeGanFacePaintProcessor: AnimeGanFacePaintProcessor,
+    private val celebaDistillProcessor: CelebADistillProcessor,
+    private val hayaoProcessor: HayaoProcessor,
     private val imageFilterProcessor: ImageFilterProcessor,
     private val imageEditProcessor: ImageEditProcessor,
     private val imageStorage: ImageStorage,
@@ -81,8 +87,10 @@ class ProcessingRepositoryImpl @Inject constructor(
                     splitterNetImageProcessor.processImage(bitmap, filterType)
                 }
                 FilterType.STYLE_TRANSFER -> {
-                    // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
-                    animeGan2ImageProcessor.processImage(bitmap, filterType)
+                    // Используем модель стилизации
+                    // Имя модели может быть передано через query параметр в URI (modelName=...)
+                    val modelName = imageData.uri.getQueryParameter("modelName")
+                    processStyleTransfer(bitmap, modelName)
                 }
                 else -> {
                     // Используем ErsganImageProcessor для других ML-фильтров (требуют TFLite модели)
@@ -188,7 +196,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                     splitterNetImageProcessor.processImage(bitmap, filterType)
                 }
                 FilterType.STYLE_TRANSFER -> {
-                    // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
+                    // Используем модель стилизации (по умолчанию AnimeGAN2)
                     // Масштабируем для предпросмотра для ускорения обработки
                     val maxPreviewDimension = 512 // Меньший размер для быстрого предпросмотра стилизации
                     val scaledBitmap = if (bitmap.width > maxPreviewDimension || bitmap.height > maxPreviewDimension) {
@@ -205,7 +213,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                         null // Не масштабируем, используем оригинал
                     }
                     val bitmapToProcess = scaledBitmap ?: bitmap
-                    animeGan2ImageProcessor.processImage(bitmapToProcess, filterType).also {
+                    processStyleTransfer(bitmapToProcess).also {
                         // Освобождаем масштабированный bitmap после использования
                         if (scaledBitmap != null && scaledBitmap != bitmap) {
                             scaledBitmap.recycle()
@@ -234,6 +242,24 @@ class ProcessingRepositoryImpl @Inject constructor(
     override suspend fun previewFilters(
         bitmap: Bitmap,
         filters: List<Pair<FilterType, Float?>>
+    ): Bitmap? {
+        // Для обратной совместимости используем модель по умолчанию
+        // Имя модели должно быть передано через другой механизм (например, через ImageData в processImage)
+        return previewFilters(bitmap, filters, null)
+    }
+    
+    /**
+     * Внутренний метод для предпросмотра фильтров с поддержкой имени модели.
+     * 
+     * @param bitmap Исходное изображение
+     * @param filters Список фильтров с их интенсивностями
+     * @param modelName Имя модели для STYLE_TRANSFER (опционально)
+     * @return Обработанное изображение или null в случае ошибки
+     */
+    private suspend fun previewFilters(
+        bitmap: Bitmap,
+        filters: List<Pair<FilterType, Float?>>,
+        modelName: String?
     ): Bitmap? = withContext(Dispatchers.Default) {
         try {
             if (bitmap.isRecycled) {
@@ -278,7 +304,7 @@ class ProcessingRepositoryImpl @Inject constructor(
                         splitterNetImageProcessor.processImage(workingBitmap, filterType)
                     }
                     FilterType.STYLE_TRANSFER -> {
-                        // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
+                        // Используем модель стилизации
                         // Масштабируем для предпросмотра для ускорения обработки
                         val maxPreviewDimension = 512 // Меньший размер для быстрого предпросмотра стилизации
                         val scaledBitmap = if (workingBitmap.width > maxPreviewDimension || workingBitmap.height > maxPreviewDimension) {
@@ -295,7 +321,8 @@ class ProcessingRepositoryImpl @Inject constructor(
                             null // Не масштабируем, используем оригинал
                         }
                         val bitmapToProcess = scaledBitmap ?: workingBitmap
-                        animeGan2ImageProcessor.processImage(bitmapToProcess, filterType).also {
+                        // Используем переданное имя модели или модель по умолчанию
+                        processStyleTransfer(bitmapToProcess, modelName).also {
                             // Освобождаем масштабированный bitmap после использования
                             if (scaledBitmap != null && scaledBitmap != workingBitmap) {
                                 scaledBitmap.recycle()
@@ -397,8 +424,9 @@ class ProcessingRepositoryImpl @Inject constructor(
                         splitterNetImageProcessor.processImage(workingBitmap, filterType)
                     }
                     FilterType.STYLE_TRANSFER -> {
-                        // Используем AnimeGan2ImageProcessor для стилизации в аниме стиль
-                        animeGan2ImageProcessor.processImage(workingBitmap, filterType)
+                        // Используем модель стилизации (по умолчанию AnimeGAN2)
+                        // Для processImageWithFilters имя модели не передается, используем модель по умолчанию
+                        processStyleTransfer(workingBitmap, null)
                     }
                     else -> {
                         // Используем ErsganImageProcessor для других ML-фильтров
@@ -567,6 +595,36 @@ class ProcessingRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("ProcessingRepository", "Ошибка поиска фильтра для $name: ${e.message}", e)
             null
+        }
+    }
+    
+    /**
+     * Обработать изображение через модель стилизации.
+     * 
+     * Выбирает процессор на основе имени модели или использует AnimeGAN2 по умолчанию.
+     * 
+     * @param bitmap Исходное изображение
+     * @param modelName Имя модели (опционально). Поддерживаемые модели:
+     *                  - "AnimeGAN2 Paprika" -> AnimeGan2ImageProcessor
+     *                  - "AnimeGAN Face Paint" -> AnimeGanFacePaintProcessor
+     *                  - "CelebA Distill" -> CelebADistillProcessor
+     *                  - "Hayao" -> HayaoProcessor
+     *                  - null или другое -> AnimeGan2ImageProcessor (по умолчанию)
+     * @return Обработанное изображение или null в случае ошибки
+     */
+    private suspend fun processStyleTransfer(
+        bitmap: Bitmap,
+        modelName: String? = null
+    ): Bitmap? = withContext(Dispatchers.Default) {
+        when (modelName) {
+            "AnimeGAN Face Paint" -> animeGanFacePaintProcessor.processImage(bitmap, FilterType.STYLE_TRANSFER)
+            "CelebA Distill" -> celebaDistillProcessor.processImage(bitmap, FilterType.STYLE_TRANSFER)
+            "Hayao" -> hayaoProcessor.processImage(bitmap, FilterType.STYLE_TRANSFER)
+            "AnimeGAN2 Paprika", null -> animeGan2ImageProcessor.processImage(bitmap, FilterType.STYLE_TRANSFER)
+            else -> {
+                android.util.Log.w("ProcessingRepository", "Неизвестная модель стилизации: $modelName, используем AnimeGAN2")
+                animeGan2ImageProcessor.processImage(bitmap, FilterType.STYLE_TRANSFER)
+            }
         }
     }
     
