@@ -304,10 +304,8 @@ class MainActivity : ComponentActivity() {
                                 previewBitmap = editorUiState.previewBitmap,
                                 isLoading = editorUiState.isLoading,
                                 error = editorUiState.error,
-                                filters = editorViewModel.getCurrentCategoryFilters(),
                                 selectedFilters = editorUiState.selectedFilters,
                                 currentFilterIntensity = editorUiState.currentFilterIntensity,
-                                showNeuralFilters = editorUiState.showNeuralFilters,
                                 showEditMode = editorUiState.showEditMode,
                                 brightness = editorUiState.brightness,
                                 contrast = editorUiState.contrast,
@@ -324,15 +322,9 @@ class MainActivity : ComponentActivity() {
                                 onIntensityChange = { filter, intensity ->
                                     editorViewModel.updateFilterIntensity(filter, intensity)
                                 },
-                                onClearFilters = {
-                                    editorViewModel.clearFilters()
-                                },
                                 onSaveClick = {
                                     // Применяем все выбранные фильтры с сохранением в файл
                                     editorViewModel.applyFilters()
-                                },
-                                onToggleFilterCategory = {
-                                    editorViewModel.toggleFilterCategory()
                                 },
                                 onToggleEditMode = {
                                     editorViewModel.toggleEditMode()
@@ -351,9 +343,6 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onColorBalanceChange = { editType, value ->
                                     editorViewModel.updateColorBalance(editType, value)
-                                },
-                                onClearGeometricEdits = {
-                                    editorViewModel.clearGeometricEdits()
                                 },
                                 onSaveToGallery = {
                                     editorViewModel.saveEditedImageToGallery()

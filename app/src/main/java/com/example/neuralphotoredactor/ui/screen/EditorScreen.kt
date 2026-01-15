@@ -3,8 +3,6 @@ package com.example.neuralphotoredactor.ui.screen
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -18,17 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.filled.Tonality
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.FilterBAndW
-import androidx.compose.material.icons.filled.PhotoFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -41,7 +31,6 @@ import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.ui.components.CropOverlay
-import com.example.neuralphotoredactor.ui.components.EditControls
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 import com.example.neuralphotoredactor.ui.viewmodel.EditCategory
@@ -54,7 +43,6 @@ import androidx.compose.material.icons.filled.FilterVintage
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Rotate90DegreesCw
 import androidx.compose.material.icons.filled.Vignette
-import androidx.compose.material.icons.filled.RotateRight
 
 /**
  * Получить локализованное название фильтра.
@@ -87,10 +75,8 @@ fun EditorScreen(
     previewBitmap: android.graphics.Bitmap?,
     isLoading: Boolean,
     error: String?,
-    filters: List<FilterType>,
     selectedFilters: List<Pair<FilterType, Float?>>,
     currentFilterIntensity: Float,
-    showNeuralFilters: Boolean,
     showEditMode: Boolean,
     brightness: Float,
     contrast: Float,
@@ -103,16 +89,13 @@ fun EditorScreen(
     cropBitmap: android.graphics.Bitmap?,
     onFilterToggle: (FilterType) -> Unit,
     onIntensityChange: (FilterType, Float) -> Unit,
-    onClearFilters: () -> Unit,
     onSaveClick: () -> Unit,
-    onToggleFilterCategory: () -> Unit,
     onToggleEditMode: () -> Unit,
     onEditCategoryChange: (EditCategory) -> Unit,
     onEditClick: (EditType) -> Unit,
     onBrightnessChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
     onColorBalanceChange: (EditType, Float) -> Unit,
-    onClearGeometricEdits: () -> Unit,
     onSaveToGallery: () -> Unit,
     onCropApply: (Rect) -> Unit,
     onCropCancel: () -> Unit,
