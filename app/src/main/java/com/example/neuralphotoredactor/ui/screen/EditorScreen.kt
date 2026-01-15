@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +52,9 @@ import androidx.compose.material.icons.filled.CropRotate
 import androidx.compose.material.icons.filled.Details
 import androidx.compose.material.icons.filled.FilterVintage
 import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.Rotate90DegreesCw
 import androidx.compose.material.icons.filled.Vignette
+import androidx.compose.material.icons.filled.RotateRight
 
 /**
  * Получить локализованное название фильтра.
@@ -119,7 +122,7 @@ fun EditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
                         text = stringResource(R.string.screen_editor),
                         fontSize = 16.sp,
@@ -165,105 +168,415 @@ fun EditorScreen(
     ) { paddingValues ->
         // Состояние для текущего cropRect (доступно во всем Column)
         var currentCropRect by remember { mutableStateOf<Rect?>(null) }
-        
+
+        // Состояние для показа оверлея с кнопками Crop и Rotate
+        var showCropRotateOverlay by remember { mutableStateOf(false) }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Изображение
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+            // Изображение и иконки в одном контейнере
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                // Проверяем, есть ли выбранные нейрофильтры
-                val neuralFilterTypes = listOf(
-                    FilterType.STYLE_TRANSFER,
-                    FilterType.DENOISE,
-                    FilterType.UPSCALE,
-                    FilterType.COLOR_CORRECTION
-                )
-                val hasSelectedNeuralFilters = selectedFilters.any { (filterType, _) ->
-                    filterType in neuralFilterTypes
-                }
-                val isNeuralFilterProcessing = isLoading && hasSelectedNeuralFilters
-
-                when {
-                    // Для нейрофильтров показываем изображение с overlay, для остальных - LoadingIndicator
-                    isLoading && !isNeuralFilterProcessing -> LoadingIndicator()
-                    error != null -> ErrorMessage(
-                        error,
-                        defaultMessageId = R.string.error_process_image
+                // Изображение
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.7f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Проверяем, есть ли выбранные нейрофильтры
+                    val neuralFilterTypes = listOf(
+                        FilterType.STYLE_TRANSFER,
+                        FilterType.DENOISE,
+                        FilterType.UPSCALE,
+                        FilterType.COLOR_CORRECTION
                     )
-
-                    previewBitmap != null -> {
-                        // Отображаем быстрый предпросмотр
-                        Image(
-                            bitmap = previewBitmap.asImageBitmap(),
-                            contentDescription = stringResource(R.string.editor_processed_image),
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                    val hasSelectedNeuralFilters = selectedFilters.any { (filterType, _) ->
+                        filterType in neuralFilterTypes
                     }
+                    val isNeuralFilterProcessing = isLoading && hasSelectedNeuralFilters
 
-                    processedImageUri != null -> {
-                        AsyncImage(
-                            model = processedImageUri,
-                            contentDescription = stringResource(R.string.editor_processed_image),
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
+                    when {
+                        // Для нейрофильтров показываем изображение с overlay, для остальных - LoadingIndicator
+                        isLoading && !isNeuralFilterProcessing -> LoadingIndicator()
+                        error != null -> ErrorMessage(
+                            error,
+                            defaultMessageId = R.string.error_process_image
                         )
-                    }
 
-                    imageUri != null -> {
-                        // При обработке нейрофильтров показываем исходное изображение под overlay
-                        AsyncImage(
-                            model = imageUri,
-                            contentDescription = stringResource(R.string.editor_original_image),
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-
-                // Overlay для кадрирования
-                if (showCropOverlay && cropBitmap != null) {
-                    CropOverlay(
-                        bitmap = cropBitmap,
-                        onCropApply = { rect ->
-                            // Этот callback вызывается из внутренних кнопок CropOverlay (если showButtons = true)
-                            onCropApply(rect)
-                        },
-                        onCropCancel = onCropCancel,
-                        modifier = Modifier.fillMaxSize(),
-                        showButtons = false,
-                        onCropRectChange = { rect ->
-                            // rect уже масштабирован в координаты bitmap
-                            currentCropRect = rect
+                        previewBitmap != null -> {
+                            // Отображаем быстрый предпросмотр
+                            Image(
+                                bitmap = previewBitmap.asImageBitmap(),
+                                contentDescription = stringResource(R.string.editor_processed_image),
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
-                    )
+
+                        processedImageUri != null -> {
+                            AsyncImage(
+                                model = processedImageUri,
+                                contentDescription = stringResource(R.string.editor_processed_image),
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        imageUri != null -> {
+                            // При обработке нейрофильтров показываем исходное изображение под overlay
+                            AsyncImage(
+                                model = imageUri,
+                                contentDescription = stringResource(R.string.editor_original_image),
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+
+                    // Overlay для кадрирования
+                    if (showCropOverlay && cropBitmap != null) {
+                        // Закрываем оверлей Crop/Rotate при показе cropOverlay
+                        LaunchedEffect(showCropOverlay) {
+                            if (showCropOverlay) {
+                                showCropRotateOverlay = false
+                            }
+                        }
+                        CropOverlay(
+                            bitmap = cropBitmap,
+                            onCropApply = { rect ->
+                                // Этот callback вызывается из внутренних кнопок CropOverlay (если showButtons = true)
+                                onCropApply(rect)
+                            },
+                            onCropCancel = onCropCancel,
+                            modifier = Modifier.fillMaxSize(),
+                            showButtons = false,
+                            onCropRectChange = { rect ->
+                                // rect уже масштабирован в координаты bitmap
+                                currentCropRect = rect
+                            }
+                        )
+                    }
+
+                    // Overlay с progress bar для нейрофильтров
+                    if (isNeuralFilterProcessing) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
+                    }
                 }
 
-                // Overlay с progress bar для нейрофильтров
-                if (isNeuralFilterProcessing) {
-                    Box(
+                // Иконки в ряд: в зависимости от режима (скрываются при кадрировании)
+                // Размещаем сразу под изображением
+                if (!showCropOverlay) {
+                    val bottomPadding = if (showCropRotateOverlay) 132.dp else 8.dp
+                    Row(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = bottomPadding
+                            ),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(48.dp)
-                        )
+                        if (showCropRotateOverlay) {
+                            // Оверлей с иконками: Crop, Rotate 90, Rotate 180, Rotate 270
+                            // Иконка Crop
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        showCropRotateOverlay = false
+                                        onEditClick(EditType.CROP)
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Crop,
+                                        contentDescription = stringResource(R.string.edit_crop),
+                                        tint = Color.White
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.edit_crop),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp
+                                )
+                            }
+
+                            // Иконка Rotate 90
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        showCropRotateOverlay = false
+                                        onEditClick(EditType.ROTATE_90)
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Rotate90DegreesCw,
+                                        contentDescription = stringResource(R.string.edit_rotate_90),
+                                        tint = Color.White
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.edit_rotate_90),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp
+                                )
+                            }
+
+                            // Иконка Rotate 180
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        showCropRotateOverlay = false
+                                        onEditClick(EditType.ROTATE_180)
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Rotate90DegreesCw,
+                                        contentDescription = stringResource(R.string.edit_rotate_180),
+                                        tint = Color.White
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.edit_rotate_180),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp
+                                )
+                            }
+
+                            // Иконка Rotate 270
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        showCropRotateOverlay = false
+                                        onEditClick(EditType.ROTATE_270)
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Rotate90DegreesCw,
+                                        contentDescription = stringResource(R.string.edit_rotate_270),
+                                        tint = Color.White
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.edit_rotate_270),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        } else if (showEditMode) {
+                            // Режим настроек: яркость, контрастность, баланс цветов, кадрирование, отражение
+                            val lastAppliedEdit = appliedEdits.lastOrNull()?.first
+                            val isFlipActive =
+                                lastAppliedEdit == EditType.FLIP_HORIZONTAL || lastAppliedEdit == EditType.FLIP_VERTICAL
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = { onEditCategoryChange(EditCategory.BRIGHTNESS) }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Brightness1,
+                                        contentDescription = stringResource(R.string.edit_brightness),
+                                        tint = Color.White
+                                    )
+                                }
+                                if (currentEditCategory == EditCategory.BRIGHTNESS && !showCropOverlay) {
+                                    Text(
+                                        text = stringResource(R.string.edit_brightness),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = { onEditCategoryChange(EditCategory.CONTRAST) }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Contrast,
+                                        contentDescription = stringResource(R.string.edit_contrast),
+                                        tint = Color.White
+                                    )
+                                }
+                                if (currentEditCategory == EditCategory.CONTRAST && !showCropOverlay) {
+                                    Text(
+                                        text = stringResource(R.string.edit_contrast),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = { onEditCategoryChange(EditCategory.COLOR_BALANCE) }
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.triangle_circle),
+                                        contentDescription = stringResource(R.string.edit_color_balance),
+                                        tint = Color.White
+                                    )
+                                }
+                                if (currentEditCategory == EditCategory.COLOR_BALANCE && !showCropOverlay) {
+                                    Text(
+                                        text = stringResource(R.string.edit_color_balance),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = { showCropRotateOverlay = true }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.CropRotate,
+                                        contentDescription = stringResource(R.string.edit_crop),
+                                        tint = Color.White
+                                    )
+                                }
+                                if (showCropOverlay) {
+                                    Text(
+                                        text = stringResource(R.string.edit_crop),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                IconButton(
+                                    onClick = { onEditClick(EditType.FLIP_HORIZONTAL) }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Flip,
+                                        contentDescription = stringResource(R.string.edit_flip),
+                                        tint = Color.White
+                                    )
+                                }
+                                if (isFlipActive && !showCropOverlay) {
+                                    Text(
+                                        text = stringResource(R.string.edit_flip),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        } else {
+                            // Режим фильтров: Размытие, Резкость, Виньетка, Черно-белый, Сепия
+                            val filterTypes = listOf(
+                                FilterType.GAUSSIAN_BLUR,
+                                FilterType.SHARPEN,
+                                FilterType.VIGNETTE,
+                                FilterType.GRAYSCALE,
+                                FilterType.SEPIA
+                            )
+                            val lastSelectedFilter = selectedFilters.lastOrNull()?.first
+                            filterTypes.forEach { filterType ->
+                                val isLastSelected = filterType == lastSelectedFilter
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    IconButton(
+                                        onClick = { onFilterToggle(filterType) }
+                                    ) {
+                                        when (filterType) {
+                                            FilterType.VIGNETTE -> {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.vignette_2),
+                                                    contentDescription = getFilterName(filterType),
+                                                    tint = Color.White
+                                                )
+                                            }
+
+                                            FilterType.SEPIA -> {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.filter_vintage),
+                                                    contentDescription = getFilterName(filterType),
+                                                    tint = Color.White
+                                                )
+                                            }
+
+                                            else -> {
+                                                Icon(
+                                                    imageVector = when (filterType) {
+                                                        FilterType.GAUSSIAN_BLUR -> Icons.Filled.BlurOn
+                                                        FilterType.SHARPEN -> Icons.Filled.Details
+                                                        FilterType.GRAYSCALE -> Icons.Filled.FilterBAndW
+                                                        else -> Icons.Filled.BlurOn
+                                                    },
+                                                    contentDescription = getFilterName(filterType),
+                                                    tint = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (isLastSelected) {
+                                        Text(
+                                            text = getFilterName(filterType),
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-            
-            // Слайдер Material Design 3 (скрывается при кадрировании)
-            if (!showCropOverlay) {
+
+            // Слайдер Material Design 3 (скрывается при кадрировании и оверлее Crop/Rotate)
+            if (!showCropOverlay && !showCropRotateOverlay) {
                 if (showEditMode) {
                     // Режим настроек
                     when (currentEditCategory) {
@@ -282,6 +595,7 @@ fun EditorScreen(
                                 )
                             }
                         }
+
                         EditCategory.CONTRAST -> {
                             Column(
                                 modifier = Modifier
@@ -297,6 +611,7 @@ fun EditorScreen(
                                 )
                             }
                         }
+
                         EditCategory.COLOR_BALANCE -> {
                             Column(
                                 modifier = Modifier
@@ -307,7 +622,12 @@ fun EditorScreen(
                                 // Красный канал
                                 Slider(
                                     value = colorBalanceRed,
-                                    onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_RED, it) },
+                                    onValueChange = {
+                                        onColorBalanceChange(
+                                            EditType.COLOR_BALANCE_RED,
+                                            it
+                                        )
+                                    },
                                     valueRange = -1f..1f,
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
@@ -316,11 +636,16 @@ fun EditorScreen(
                                         activeTrackColor = Color(0xFFFFA79B)
                                     )
                                 )
-                                
+
                                 // Зеленый канал
                                 Slider(
                                     value = colorBalanceGreen,
-                                    onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_GREEN, it) },
+                                    onValueChange = {
+                                        onColorBalanceChange(
+                                            EditType.COLOR_BALANCE_GREEN,
+                                            it
+                                        )
+                                    },
                                     valueRange = -1f..1f,
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
@@ -329,11 +654,16 @@ fun EditorScreen(
                                         activeTrackColor = Color(0xFF9CD49F)
                                     )
                                 )
-                                
+
                                 // Синий канал
                                 Slider(
                                     value = colorBalanceBlue,
-                                    onValueChange = { onColorBalanceChange(EditType.COLOR_BALANCE_BLUE, it) },
+                                    onValueChange = {
+                                        onColorBalanceChange(
+                                            EditType.COLOR_BALANCE_BLUE,
+                                            it
+                                        )
+                                    },
                                     valueRange = -1f..1f,
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
@@ -344,6 +674,7 @@ fun EditorScreen(
                                 )
                             }
                         }
+
                         EditCategory.GEOMETRY -> {
                             // Для геометрических операций слайдер не показываем
                         }
@@ -385,267 +716,84 @@ fun EditorScreen(
                     }
                 }
             }
-            
-            // 5 иконок в ряд: в зависимости от режима (скрываются при кадрировании)
-            if (!showCropOverlay) {
+
+            // Кнопки: Настройки/Фильтры или Отмена/Применить (при кадрировании и оверлее Crop/Rotate)
+            if (!showCropRotateOverlay) {
                 Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                if (showEditMode) {
-                    // Режим настроек: яркость, контрастность, баланс цветов, кадрирование, отражение
-                    val lastAppliedEdit = appliedEdits.lastOrNull()?.first
-                    val isFlipActive = lastAppliedEdit == EditType.FLIP_HORIZONTAL || lastAppliedEdit == EditType.FLIP_VERTICAL
-                    
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        IconButton(
-                            onClick = { onEditCategoryChange(EditCategory.BRIGHTNESS) }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Brightness1,
-                                contentDescription = stringResource(R.string.edit_brightness),
-                                tint = Color.White
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (showCropOverlay) {
+                        // Кнопки для кадрирования: Отмена и Применить
+                        FilledTonalButton(
+                            onClick = onCropCancel,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.background
                             )
-                        }
-                        if (currentEditCategory == EditCategory.BRIGHTNESS && !showCropOverlay) {
+                        ) {
                             Text(
-                                text = stringResource(R.string.edit_brightness),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp
+                                text = stringResource(R.string.edit_cancel),
+                                color = Color.White
                             )
                         }
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        IconButton(
-                            onClick = { onEditCategoryChange(EditCategory.CONTRAST) }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Contrast,
-                                contentDescription = stringResource(R.string.edit_contrast),
-                                tint = Color.White
-                            )
-                        }
-                        if (currentEditCategory == EditCategory.CONTRAST && !showCropOverlay) {
-                            Text(
-                                text = stringResource(R.string.edit_contrast),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        IconButton(
-                            onClick = { onEditCategoryChange(EditCategory.COLOR_BALANCE) }
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.triangle_circle),
-                                contentDescription = stringResource(R.string.edit_color_balance),
-                                tint = Color.White
-                            )
-                        }
-                        if (currentEditCategory == EditCategory.COLOR_BALANCE && !showCropOverlay) {
-                            Text(
-                                text = stringResource(R.string.edit_color_balance),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        IconButton(
-                            onClick = { onEditClick(EditType.CROP) }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.CropRotate,
-                                contentDescription = stringResource(R.string.edit_crop),
-                                tint = Color.White
-                            )
-                        }
-                        if (showCropOverlay) {
-                            Text(
-                                text = stringResource(R.string.edit_crop),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        IconButton(
-                            onClick = { onEditClick(EditType.FLIP_HORIZONTAL) }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Flip,
-                                contentDescription = stringResource(R.string.edit_flip),
-                                tint = Color.White
-                            )
-                        }
-                        if (isFlipActive && !showCropOverlay) {
-                            Text(
-                                text = stringResource(R.string.edit_flip),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                } else {
-                    // Режим фильтров: Размытие, Резкость, Виньетка, Черно-белый, Сепия
-                    val filterTypes = listOf(
-                        FilterType.GAUSSIAN_BLUR,
-                        FilterType.SHARPEN,
-                        FilterType.VIGNETTE,
-                        FilterType.GRAYSCALE,
-                        FilterType.SEPIA
-                    )
-                    val lastSelectedFilter = selectedFilters.lastOrNull()?.first
-                    filterTypes.forEach { filterType ->
-                        val isLastSelected = filterType == lastSelectedFilter
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            IconButton(
-                                onClick = { onFilterToggle(filterType) }
-                            ) {
-                                when (filterType) {
-                                    FilterType.VIGNETTE -> {
-                                        Icon(
-                                            painter = painterResource(R.drawable.vignette_2),
-                                            contentDescription = getFilterName(filterType),
-                                            tint = Color.White
-                                        )
-                                    }
-                                    FilterType.SEPIA -> {
-                                        Icon(
-                                            painter = painterResource(R.drawable.filter_vintage),
-                                            contentDescription = getFilterName(filterType),
-                                            tint = Color.White
-                                        )
-                                    }
-                                    else -> {
-                                        Icon(
-                                            imageVector = when (filterType) {
-                                                FilterType.GAUSSIAN_BLUR -> Icons.Filled.BlurOn
-                                                FilterType.SHARPEN -> Icons.Filled.Details
-                                                FilterType.GRAYSCALE -> Icons.Filled.FilterBAndW
-                                                else -> Icons.Filled.BlurOn
-                                            },
-                                            contentDescription = getFilterName(filterType),
-                                            tint = Color.White
-                                        )
-                                    }
+                        FilledTonalButton(
+                            onClick = {
+                                // currentCropRect уже содержит масштабированный Rect в координатах bitmap
+                                if (currentCropRect != null) {
+                                    onCropApply(currentCropRect!!)
                                 }
-                            }
-                            if (isLastSelected) {
-                                Text(
-                                    text = getFilterName(filterType),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp
-                                )
-                            }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.edit_apply),
+                                color = Color.White
+                            )
                         }
-                    }
-                }
-                }
-            }
-            
-            // Кнопки: Настройки/Фильтры или Отмена/Применить (при кадрировании)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (showCropOverlay) {
-                    // Кнопки для кадрирования: Отмена и Применить
-                    FilledTonalButton(
-                        onClick = onCropCancel,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.background
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.edit_cancel),
-                            color = Color.White
-                        )
-                    }
-                    FilledTonalButton(
-                        onClick = {
-                            // currentCropRect уже содержит масштабированный Rect в координатах bitmap
-                            if (currentCropRect != null) {
-                                onCropApply(currentCropRect!!)
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.edit_apply),
-                            color = Color.White
-                        )
-                    }
-                } else {
-                    // Обычные кнопки: Настройки и Фильтры
-                    FilledTonalButton(
-                        onClick = {
-                            if (!showEditMode) {
-                                onToggleEditMode()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = if (showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.editor_settings_button),
-                            color = Color.White
-                        )
-                    }
-                    FilledTonalButton(
-                        onClick = {
-                            if (showEditMode) {
-                                onToggleEditMode()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = if (!showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.editor_filters_button),
-                            color = Color.White
-                        )
+                    } else {
+                        // Обычные кнопки: Настройки и Фильтры
+                        FilledTonalButton(
+                            onClick = {
+                                if (!showEditMode) {
+                                    onToggleEditMode()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.editor_settings_button),
+                                color = Color.White
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                if (showEditMode) {
+                                    onToggleEditMode()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (!showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.editor_filters_button),
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }
