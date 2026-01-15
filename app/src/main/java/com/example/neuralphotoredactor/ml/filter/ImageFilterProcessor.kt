@@ -9,7 +9,6 @@ import javax.inject.Inject
  * 
  * Поддерживает различные типы фильтров:
  * - Gaussian Blur (RenderEffect)
- * - Noise Reduction (алгоритмический или ML)
  * - Sharpen/Unsharp Mask (Convolution)
  * - Vignette (AGSL или RenderEffect)
  * - Grayscale (ColorMatrix)
