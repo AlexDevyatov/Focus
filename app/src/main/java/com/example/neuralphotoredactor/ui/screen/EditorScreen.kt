@@ -35,6 +35,7 @@ import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
 import com.example.neuralphotoredactor.ui.viewmodel.EditCategory
 import android.graphics.Rect
+import androidx.compose.foundation.gestures.snapping.SnapPosition
 import androidx.compose.material.icons.filled.Brightness1
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.CropRotate
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.FilterVintage
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Rotate90DegreesCw
 import androidx.compose.material.icons.filled.Vignette
+import androidx.compose.ui.text.style.TextAlign
 
 /**
  * Получить локализованное название фильтра.
@@ -401,7 +403,8 @@ fun EditorScreen(
                                         text = stringResource(R.string.edit_brightness),
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.sp
+                                        fontSize = 10.sp,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -423,7 +426,8 @@ fun EditorScreen(
                                         text = stringResource(R.string.edit_contrast),
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.sp
+                                        fontSize = 10.sp,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -445,7 +449,8 @@ fun EditorScreen(
                                         text = stringResource(R.string.edit_color_balance),
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.sp
+                                        fontSize = 10.sp,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -467,7 +472,8 @@ fun EditorScreen(
                                         text = stringResource(R.string.edit_crop),
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.sp
+                                        fontSize = 10.sp,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -489,7 +495,8 @@ fun EditorScreen(
                                         text = stringResource(R.string.edit_flip),
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.sp
+                                        fontSize = 10.sp,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -548,7 +555,8 @@ fun EditorScreen(
                                             text = getFilterName(filterType),
                                             color = Color.White,
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.sp
+                                            fontSize = 10.sp,
+                                            textAlign = TextAlign.Center
                                         )
                                     }
                                 }
