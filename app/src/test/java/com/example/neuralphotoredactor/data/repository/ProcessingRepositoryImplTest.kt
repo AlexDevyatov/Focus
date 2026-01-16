@@ -9,7 +9,6 @@ import com.example.neuralphotoredactor.data.local.dao.FilterDao
 import com.example.neuralphotoredactor.data.local.dao.ProcessingHistoryDao
 import com.example.neuralphotoredactor.data.local.database.AppDatabase
 import com.example.neuralphotoredactor.data.local.entity.ProcessingHistoryEntity
-import com.example.neuralphotoredactor.data.mapper.ProcessingHistoryMapper
 import com.example.neuralphotoredactor.data.storage.ImageStorage
 import com.example.neuralphotoredactor.domain.repository.NeuralModelRepository
 import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
@@ -30,7 +29,6 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
-import android.util.Log
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -111,8 +109,6 @@ class ProcessingRepositoryImplTest {
             imageEditProcessor = imageEditProcessor,
             imageStorage = imageStorage,
             processingHistoryDao = processingHistoryDao,
-            processingOperationRepository = processingOperationRepository,
-            neuralModelRepository = neuralModelRepository,
             filterDao = filterDao,
             appDatabase = appDatabase
         )

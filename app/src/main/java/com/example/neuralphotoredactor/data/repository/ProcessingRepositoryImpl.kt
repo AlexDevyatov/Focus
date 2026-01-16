@@ -16,8 +16,6 @@ import com.example.neuralphotoredactor.domain.model.ImageData
 import com.example.neuralphotoredactor.domain.model.OperationParameters
 import com.example.neuralphotoredactor.domain.model.ProcessingOperation
 import com.example.neuralphotoredactor.domain.model.ProcessingResult
-import com.example.neuralphotoredactor.domain.repository.NeuralModelRepository
-import com.example.neuralphotoredactor.domain.repository.ProcessingOperationRepository
 import com.example.neuralphotoredactor.domain.repository.ProcessingRepository
 import com.example.neuralphotoredactor.ml.edit.ImageEditProcessor
 import com.example.neuralphotoredactor.ml.filter.ImageFilterProcessor
@@ -38,8 +36,10 @@ import javax.inject.Inject
 /**
  * Реализация репозитория для обработки изображений.
  * 
- * Использует Room Database для хранения истории обработок.
- * Вся работа с БД происходит через DAO, обеспечивая изоляцию слоев.
+ * Центральный компонент data слоя, интегрирующий ML-процессоры (ESRGAN, SplitterNet, AnimeGAN и др.)
+ * с Room Database для хранения истории обработок. Обеспечивает применение фильтров, предпросмотр эффектов,
+ * редактирование изображений и сохранение результатов в галерею. Все операции выполняются в фоновых
+ * потоках с автоматическим управлением памятью для предотвращения OutOfMemoryError.
  */
 class ProcessingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -53,8 +53,6 @@ class ProcessingRepositoryImpl @Inject constructor(
     private val imageEditProcessor: ImageEditProcessor,
     private val imageStorage: ImageStorage,
     private val processingHistoryDao: ProcessingHistoryDao,
-    private val processingOperationRepository: ProcessingOperationRepository,
-    private val neuralModelRepository: NeuralModelRepository,
     private val filterDao: FilterDao,
     private val appDatabase: AppDatabase
 ) : ProcessingRepository {
