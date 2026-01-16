@@ -7,9 +7,9 @@ import androidx.room.PrimaryKey
 
 /**
  * Entity для хранения операций обработки изображений.
- * 
+ *
  * Фиксирует каждое отдельное действие, выполненное пользователем.
- * 
+ *
  * @param id Уникальный идентификатор операции
  * @param historyId Идентификатор записи в истории обработки (Foreign Key)
  * @param sessionId Идентификатор сессии (без Foreign Key)
@@ -27,20 +27,20 @@ import androidx.room.PrimaryKey
             entity = ProcessingHistoryEntity::class,
             parentColumns = ["id"],
             childColumns = ["historyId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE,
         ),
         ForeignKey(
             entity = FilterEntity::class,
             parentColumns = ["id"],
             childColumns = ["filterId"],
-            onDelete = ForeignKey.RESTRICT // Нельзя удалить фильтр, если он используется в операциях
-        )
+            onDelete = ForeignKey.RESTRICT, // Нельзя удалить фильтр, если он используется в операциях
+        ),
     ],
     indices = [
         Index(value = ["historyId"]),
         Index(value = ["sessionId"]),
-        Index(value = ["filterId"])
-    ]
+        Index(value = ["filterId"]),
+    ],
 )
 data class ProcessingOperationEntity(
     @PrimaryKey(autoGenerate = true)
@@ -52,6 +52,5 @@ data class ProcessingOperationEntity(
     val inputImageUri: String,
     val outputImageUri: String,
     val processingTimeMs: Long,
-    val sequenceNumber: Int
+    val sequenceNumber: Int,
 )
-

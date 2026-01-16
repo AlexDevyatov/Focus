@@ -4,10 +4,10 @@ import android.net.Uri
 
 /**
  * Результат обработки изображения.
- * 
+ *
  * Содержит исходное и обработанное изображение, а также информацию
  * о примененном фильтре или эффекте.
- * 
+ *
  * @param originalUri URI исходного изображения
  * @param processedUri URI обработанного изображения
  * @param filterType Тип примененного фильтра
@@ -21,6 +21,5 @@ data class ProcessingResult(
     val filterType: String,
     val timestamp: Long = System.currentTimeMillis(),
     val historyId: Long? = null,
-    val operationId: Long? = null // Deprecated, оставлено для обратной совместимости
+    val operationId: Long? = null, // Deprecated, оставлено для обратной совместимости
 )
-

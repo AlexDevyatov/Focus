@@ -26,46 +26,40 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-    
     @Binds
     @Singleton
-    abstract fun bindImageRepository(
-        imageRepositoryImpl: ImageRepositoryImpl
-    ): ImageRepository
-    
+    abstract fun bindImageRepository(imageRepositoryImpl: ImageRepositoryImpl): ImageRepository
+
     @Binds
     @Singleton
     abstract fun bindProcessingRepository(
-        processingRepositoryImpl: ProcessingRepositoryImpl
+        processingRepositoryImpl: ProcessingRepositoryImpl,
     ): ProcessingRepository
-    
+
     @Binds
     @Singleton
     abstract fun bindProcessingOperationRepository(
-        processingOperationRepositoryImpl: ProcessingOperationRepositoryImpl
+        processingOperationRepositoryImpl: ProcessingOperationRepositoryImpl,
     ): ProcessingOperationRepository
-    
+
     @Binds
     @Singleton
     abstract fun bindNeuralModelRepository(
-        neuralModelRepositoryImpl: NeuralModelRepositoryImpl
+        neuralModelRepositoryImpl: NeuralModelRepositoryImpl,
     ): NeuralModelRepository
-    
+
     @Binds
     @Singleton
     abstract fun bindTFLiteModelRepository(
-        tfliteModelRepositoryImpl: TFLiteModelRepositoryImpl
+        tfliteModelRepositoryImpl: TFLiteModelRepositoryImpl,
     ): TFLiteModelRepository
-    
+
     @Binds
     @Singleton
-    abstract fun bindFilterRepository(
-        filterRepositoryImpl: FilterRepositoryImpl
-    ): FilterRepository
-    
+    abstract fun bindFilterRepository(filterRepositoryImpl: FilterRepositoryImpl): FilterRepository
+
     @Binds
     abstract fun bindGalleryDataSource(
-        galleryDataSourceImpl: GalleryDataSourceImpl
+        galleryDataSourceImpl: GalleryDataSourceImpl,
     ): GalleryDataSource
 }
-

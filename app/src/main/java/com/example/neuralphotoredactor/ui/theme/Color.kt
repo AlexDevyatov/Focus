@@ -17,4 +17,3 @@ val TertiaryDark = Color(0xFF5DADE2) // Более светлый синий
 val SurfaceDark = Color(0xFF1E1E1E) // Темный фон
 val BackgroundDark = Color(0xFF101010) // Стандартный темный фон Material
 val ErrorDark = Color(0xFFEC7063) // Более светлый красный для темной темы
-

@@ -16,79 +16,86 @@ import javax.inject.Inject
  * ViewModel для экрана галереи.
  */
 @HiltViewModel
-class GalleryViewModel @Inject constructor(
-    private val getAllImagesUseCase: GetAllImagesUseCase
-) : ViewModel() {
-    
-    private val _uiState = MutableStateFlow(GalleryUiState())
-    val uiState: StateFlow<GalleryUiState> = _uiState.asStateFlow()
-    
-    private var loadJob: kotlinx.coroutines.Job? = null
-    
-    /**
-     * Загрузить изображения из галереи.
-     * Должен вызываться только после предоставления разрешения на доступ к галерее.
-     */
-    fun loadImages() {
-        // Отменяем предыдущую загрузку, если она есть
-        loadJob?.cancel()
-        
-        loadJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            try {
-                // Используем first() для одноразового Flow
-                val imageList = getAllImagesUseCase.invoke.first()
-                _uiState.value = _uiState.value.copy(
-                    images = imageList,
-                    isLoading = false
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message
-                )
-            }
+class GalleryViewModel
+    @Inject
+    constructor(
+        private val getAllImagesUseCase: GetAllImagesUseCase,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(GalleryUiState())
+        val uiState: StateFlow<GalleryUiState> = _uiState.asStateFlow()
+
+        private var loadJob: kotlinx.coroutines.Job? = null
+
+        /**
+         * Загрузить изображения из галереи.
+         * Должен вызываться только после предоставления разрешения на доступ к галерее.
+         */
+        fun loadImages() {
+            // Отменяем предыдущую загрузку, если она есть
+            loadJob?.cancel()
+
+            loadJob =
+                viewModelScope.launch {
+                    _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                    try {
+                        // Используем first() для одноразового Flow
+                        val imageList = getAllImagesUseCase.invoke.first()
+                        _uiState.value =
+                            _uiState.value.copy(
+                                images = imageList,
+                                isLoading = false,
+                            )
+                    } catch (e: Exception) {
+                        _uiState.value =
+                            _uiState.value.copy(
+                                isLoading = false,
+                                error = e.message,
+                            )
+                    }
+                }
+        }
+
+        /**
+         * Обновить список изображений (pull to refresh).
+         * Инвалидирует кэш и перезагружает изображения.
+         */
+        fun refreshImages() {
+            // Отменяем предыдущую загрузку, если она есть
+            loadJob?.cancel()
+
+            loadJob =
+                viewModelScope.launch {
+                    _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+                    try {
+                        // Инвалидируем кэш перед загрузкой
+                        getAllImagesUseCase.invalidateCache()
+
+                        // Используем first() для одноразового Flow
+                        val imageList = getAllImagesUseCase.invoke.first()
+                        _uiState.value =
+                            _uiState.value.copy(
+                                images = imageList,
+                                isRefreshing = false,
+                            )
+                    } catch (e: Exception) {
+                        _uiState.value =
+                            _uiState.value.copy(
+                                isRefreshing = false,
+                                error = e.message,
+                            )
+                    }
+                }
+        }
+
+        /**
+         * Остановить загрузку изображений.
+         */
+        fun stopLoading() {
+            loadJob?.cancel()
+            loadJob = null
+            _uiState.value = _uiState.value.copy(isLoading = false)
         }
     }
-    
-    /**
-     * Обновить список изображений (pull to refresh).
-     * Инвалидирует кэш и перезагружает изображения.
-     */
-    fun refreshImages() {
-        // Отменяем предыдущую загрузку, если она есть
-        loadJob?.cancel()
-        
-        loadJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
-            try {
-                // Инвалидируем кэш перед загрузкой
-                getAllImagesUseCase.invalidateCache()
-                
-                // Используем first() для одноразового Flow
-                val imageList = getAllImagesUseCase.invoke.first()
-                _uiState.value = _uiState.value.copy(
-                    images = imageList,
-                    isRefreshing = false
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isRefreshing = false,
-                    error = e.message
-                )
-            }
-        }
-    }
-    
-    /**
-     * Остановить загрузку изображений.
-     */
-    fun stopLoading() {
-        loadJob?.cancel()
-        loadJob = null
-        _uiState.value = _uiState.value.copy(isLoading = false)
-    }
-}
 
 /**
  * Состояние UI экрана галереи.
@@ -97,6 +104,5 @@ data class GalleryUiState(
     val images: List<ImageData> = emptyList(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false, // Для pull to refresh
-    val error: String? = null
+    val error: String? = null,
 )
-

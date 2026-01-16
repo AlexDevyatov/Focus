@@ -9,21 +9,24 @@ import java.nio.channels.FileChannel
 
 /**
  * Утилита для загрузки TFLite моделей из assets и файловой системы.
- * 
+ *
  * Используется для загрузки множества моделей. Каждая модель загружается
  * в отдельный MappedByteBuffer, из которого создается отдельный Interpreter.
- * 
+ *
  * Для управления множеством моделей и их Interpreter'ами используйте TFLiteModelRepository.
  */
 object ModelLoader {
     /**
      * Загрузить TFLite модель из assets.
-     * 
+     *
      * @param context Контекст приложения
      * @param modelPath Путь к модели в assets (например, "ersgan.tflite")
      * @return MappedByteBuffer с моделью
      */
-    fun loadModelFile(context: Context, modelPath: String): MappedByteBuffer {
+    fun loadModelFile(
+        context: Context,
+        modelPath: String,
+    ): MappedByteBuffer {
         val fileDescriptor = context.assets.openFd(modelPath)
         val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
         val fileChannel = inputStream.channel
@@ -31,10 +34,10 @@ object ModelLoader {
         val declaredLength = fileDescriptor.declaredLength
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
-    
+
     /**
      * Загрузить TFLite модель из файла по пути.
-     * 
+     *
      * @param filePath Путь к файлу модели
      * @return MappedByteBuffer с моделью
      */
@@ -44,10 +47,10 @@ object ModelLoader {
         val fileChannel = inputStream.channel
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, file.length())
     }
-    
+
     /**
      * Создать TFLite Interpreter из модели.
-     * 
+     *
      * @param modelBuffer Буфер с моделью
      * @return Interpreter для инференса
      */
@@ -61,4 +64,3 @@ object ModelLoader {
         return Interpreter(modelBuffer, options)
     }
 }
-

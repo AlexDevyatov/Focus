@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Preview компонент, демонстрирующий использование темы.
- * 
+ *
  * Показывает кнопки и карточки в светлой и темной темах.
  */
 @Preview(name = "Light Theme", showBackground = true)
@@ -33,164 +33,165 @@ private fun DarkThemePreview() {
 private fun ThemePreviewContent() {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = MaterialTheme.colorScheme.background,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Заголовок
             Text(
                 text = "Material Theme Preview",
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
-            
+
             // Кнопки
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Button(
                     onClick = { },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text("Primary")
                 }
-                
+
                 OutlinedButton(
                     onClick = { },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text("Secondary")
                 }
             }
-            
+
             TextButton(onClick = { }) {
                 Text("Tertiary Button")
             }
-            
+
             // Карточки с разными размерами
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { }
+                onClick = { },
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = "Card (Medium Shape)",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
                         text = "This card uses medium rounded corners (8dp)",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            
+
             // Карточка с small shape
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.surfaceVariant
+                color = MaterialTheme.colorScheme.surfaceVariant,
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = "Surface (Small Shape)",
-                        style = MaterialTheme.typography.titleSmall
+                        style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
                         text = "This uses small rounded corners (4dp)",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            
+
             // Карточка с large shape
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                onClick = { }
+                onClick = { },
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = "Card (Large Shape)",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
                     )
                     Text(
                         text = "This card uses large rounded corners (12dp)",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            
+
             // Error компонент
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.errorContainer,
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = "Error Message",
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onErrorContainer
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                     )
                 }
             }
-            
+
             // Цветовая палитра
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = "Color Palette",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
                 )
-                
+
                 ColorSwatch(
                     label = "Primary",
                     color = MaterialTheme.colorScheme.primary,
-                    onColor = MaterialTheme.colorScheme.onPrimary
+                    onColor = MaterialTheme.colorScheme.onPrimary,
                 )
                 ColorSwatch(
                     label = "Secondary",
                     color = MaterialTheme.colorScheme.secondary,
-                    onColor = MaterialTheme.colorScheme.onSecondary
+                    onColor = MaterialTheme.colorScheme.onSecondary,
                 )
                 ColorSwatch(
                     label = "Tertiary",
                     color = MaterialTheme.colorScheme.tertiary,
-                    onColor = MaterialTheme.colorScheme.onTertiary
+                    onColor = MaterialTheme.colorScheme.onTertiary,
                 )
                 ColorSwatch(
                     label = "Surface",
                     color = MaterialTheme.colorScheme.surface,
-                    onColor = MaterialTheme.colorScheme.onSurface
+                    onColor = MaterialTheme.colorScheme.onSurface,
                 )
                 ColorSwatch(
                     label = "Error",
                     color = MaterialTheme.colorScheme.error,
-                    onColor = MaterialTheme.colorScheme.onError
+                    onColor = MaterialTheme.colorScheme.onError,
                 )
             }
         }
@@ -201,27 +202,28 @@ private fun ThemePreviewContent() {
 private fun ColorSwatch(
     label: String,
     color: androidx.compose.ui.graphics.Color,
-    onColor: androidx.compose.ui.graphics.Color
+    onColor: androidx.compose.ui.graphics.Color,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp),
         color = color,
-        shape = MaterialTheme.shapes.small
+        shape = MaterialTheme.shapes.small,
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.CenterStart
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.CenterStart,
         ) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                color = onColor
+                color = onColor,
             )
         }
     }
 }
-

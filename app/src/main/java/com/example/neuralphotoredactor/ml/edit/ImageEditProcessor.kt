@@ -2,11 +2,10 @@ package com.example.neuralphotoredactor.ml.edit
 
 import android.graphics.Bitmap
 import com.example.neuralphotoredactor.domain.enums.EditType
-import javax.inject.Inject
 
 /**
  * Процессор для редактирования изображений.
- * 
+ *
  * Поддерживает:
  * - Кадрирование
  * - Поворот и отражение
@@ -16,7 +15,7 @@ import javax.inject.Inject
 interface ImageEditProcessor {
     /**
      * Применить редактирование к изображению.
-     * 
+     *
      * @param bitmap Исходное изображение
      * @param editType Тип редактирования
      * @param value Значение для редактирования (для яркости, контраста, цветового баланса)
@@ -27,6 +26,6 @@ interface ImageEditProcessor {
         bitmap: Bitmap,
         editType: EditType,
         value: Float = 0f,
-        cropRect: android.graphics.Rect? = null
+        cropRect: android.graphics.Rect? = null,
     ): Bitmap?
 }

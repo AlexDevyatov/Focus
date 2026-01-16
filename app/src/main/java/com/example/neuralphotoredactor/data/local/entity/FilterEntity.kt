@@ -7,9 +7,9 @@ import androidx.room.PrimaryKey
 
 /**
  * Entity для хранения информации о фильтрах.
- * 
+ *
  * Содержит названия фильтров и ссылку на нейронную модель (если фильтр использует модель).
- * 
+ *
  * @param id Уникальный идентификатор фильтра
  * @param name Название фильтра (соответствует FilterType enum)
  * @param modelId Ссылка на нейросетевую модель (Foreign Key, может быть null для алгоритмических фильтров)
@@ -21,18 +21,17 @@ import androidx.room.PrimaryKey
             entity = NeuralModelEntity::class,
             parentColumns = ["id"],
             childColumns = ["modelId"],
-            onDelete = ForeignKey.SET_NULL
-        )
+            onDelete = ForeignKey.SET_NULL,
+        ),
     ],
     indices = [
         Index(value = ["modelId"]),
-        Index(value = ["name"], unique = true)
-    ]
+        Index(value = ["name"], unique = true),
+    ],
 )
 data class FilterEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String, // Название фильтра (например, "GAUSSIAN_BLUR", "STYLE_TRANSFER")
-    val modelId: Long? = null // Ссылка на модель, если фильтр использует нейросеть
+    val modelId: Long? = null, // Ссылка на модель, если фильтр использует нейросеть
 )
-

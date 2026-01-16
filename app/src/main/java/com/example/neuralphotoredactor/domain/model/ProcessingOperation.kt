@@ -4,10 +4,10 @@ import android.net.Uri
 
 /**
  * Domain модель операции обработки изображения.
- * 
+ *
  * Фиксирует каждое отдельное действие, выполненное пользователем
  * в рамках сессии редактирования.
- * 
+ *
  * @param id Уникальный идентификатор операции
  * @param historyId ID записи в истории обработки
  * @param sessionId ID сессии редактирования
@@ -27,12 +27,12 @@ data class ProcessingOperation(
     val inputImageUri: Uri,
     val outputImageUri: Uri,
     val processingTimeMs: Long,
-    val sequenceNumber: Int
+    val sequenceNumber: Int,
 )
 
 /**
  * Параметры операции обработки.
- * 
+ *
  * @param filterType Тип фильтра (если применимо)
  * @param intensity Интенсивность эффекта (0.0 - 1.0)
  * @param additionalParams Дополнительные параметры в формате Map
@@ -40,6 +40,5 @@ data class ProcessingOperation(
 data class OperationParameters(
     val filterType: String? = null,
     val intensity: Float = 1.0f,
-    val additionalParams: Map<String, Any> = emptyMap()
+    val additionalParams: Map<String, Any> = emptyMap(),
 )
-

@@ -2,15 +2,15 @@ package com.example.neuralphotoredactor.ml.filter.agsl
 
 /**
  * AGSL (Android Graphics Shading Language) шейдеры для фильтров изображений.
- * 
+ *
  * Все шейдеры оптимизированы для GPU-ускорения и работают на API 31+.
  */
 object AGSLShaders {
-    
     /**
      * Шейдер для преобразования в grayscale (чёрно-белое).
      */
-    val GRAYSCALE_SHADER = """
+    val GRAYSCALE_SHADER =
+        """
         uniform shader input;
         
         half4 main(float2 coord) {
@@ -19,12 +19,13 @@ object AGSLShaders {
             half gray = dot(color.rgb, half3(0.299, 0.587, 0.114));
             return half4(gray, gray, gray, color.a);
         }
-    """.trimIndent()
-    
+        """.trimIndent()
+
     /**
      * Альтернативный способ - через Paint и Shader (для совместимости).
      */
-    val GRAYSCALE_SHADER_ALT = """
+    val GRAYSCALE_SHADER_ALT =
+        """
         uniform shader input;
         
         half4 main(float2 coord) {
@@ -32,12 +33,13 @@ object AGSLShaders {
             half gray = dot(c.rgb, half3(0.299, 0.587, 0.114));
             return half4(gray, gray, gray, c.a);
         }
-    """.trimIndent()
-    
+        """.trimIndent()
+
     /**
      * Шейдер для сепия эффекта.
      */
-    val SEPIA_SHADER = """
+    val SEPIA_SHADER =
+        """
         uniform shader input;
         uniform float intensity;
         
@@ -56,12 +58,13 @@ object AGSLShaders {
             
             return half4(r, g, b, color.a);
         }
-    """.trimIndent()
-    
+        """.trimIndent()
+
     /**
      * Шейдер для виньетки (радиальное затемнение от центра к краям).
      */
-    val VIGNETTE_SHADER = """
+    val VIGNETTE_SHADER =
+        """
         uniform shader input;
         uniform float2 size;
         uniform float intensity;
@@ -87,13 +90,14 @@ object AGSLShaders {
             
             return color * vignetteFactor;
         }
-    """.trimIndent()
-    
+        """.trimIndent()
+
     /**
      * Шейдер для резкости (unsharp mask).
      * Использует 3x3 ядро для повышения резкости.
      */
-    val SHARPEN_SHADER = """
+    val SHARPEN_SHADER =
+        """
         uniform shader input;
         uniform float2 size;
         uniform float strength;
@@ -117,13 +121,14 @@ object AGSLShaders {
             
             return clamp(result, 0.0, 1.0);
         }
-    """.trimIndent()
-    
+        """.trimIndent()
+
     /**
      * Шейдер для размытия по Гауссу (упрощенная версия).
      * Для лучшего качества используется встроенный createBlurEffect.
      */
-    val GAUSSIAN_BLUR_SHADER = """
+    val GAUSSIAN_BLUR_SHADER =
+        """
         uniform shader input;
         uniform float2 size;
         uniform float radius;
@@ -150,12 +155,13 @@ object AGSLShaders {
             
             return totalWeight > 0.0 ? color / totalWeight : input.eval(coord);
         }
-    """.trimIndent()
-    
+        """.trimIndent()
+
     /**
      * Шейдер для удаления шумов (bilateral filter - упрощенная версия).
      */
-    val NOISE_REDUCTION_SHADER = """
+    val NOISE_REDUCTION_SHADER =
+        """
         uniform shader input;
         uniform float2 size;
         uniform float intensity;
@@ -184,6 +190,5 @@ object AGSLShaders {
             
             return totalWeight > 0.0 ? sum / totalWeight : center;
         }
-    """.trimIndent()
+        """.trimIndent()
 }
-

@@ -8,15 +8,14 @@ import org.json.JSONObject
 
 /**
  * Mapper для преобразования между ProcessingOperationEntity и ProcessingOperation.
- * 
+ *
  * Выполняет преобразование между слоями data и domain,
  * включая парсинг JSON параметров.
  */
 object ProcessingOperationMapper {
-    
     /**
      * Преобразовать Entity в Domain модель.
-     * 
+     *
      * @param entity Entity из базы данных
      * @return Domain модель ProcessingOperation
      */
@@ -30,13 +29,13 @@ object ProcessingOperationMapper {
             inputImageUri = Uri.parse(entity.inputImageUri),
             outputImageUri = Uri.parse(entity.outputImageUri),
             processingTimeMs = entity.processingTimeMs,
-            sequenceNumber = entity.sequenceNumber
+            sequenceNumber = entity.sequenceNumber,
         )
     }
-    
+
     /**
      * Преобразовать Domain модель в Entity.
-     * 
+     *
      * @param operation Domain модель ProcessingOperation
      * @return Entity для базы данных
      */
@@ -50,20 +49,20 @@ object ProcessingOperationMapper {
             inputImageUri = operation.inputImageUri.toString(),
             outputImageUri = operation.outputImageUri.toString(),
             processingTimeMs = operation.processingTimeMs,
-            sequenceNumber = operation.sequenceNumber
+            sequenceNumber = operation.sequenceNumber,
         )
     }
-    
+
     /**
      * Преобразовать список Entity в список Domain моделей.
-     * 
+     *
      * @param entities Список Entity
      * @return Список Domain моделей
      */
     fun toDomainList(entities: List<ProcessingOperationEntity>): List<ProcessingOperation> {
         return entities.map { toDomain(it) }
     }
-    
+
     /**
      * Парсить JSON параметры в OperationParameters.
      */
@@ -75,43 +74,48 @@ object ProcessingOperationMapper {
             additionalObject?.let {
                 it.keys().forEach { key ->
                     val value = it.get(key)
-                    additionalParams[key] = when (value) {
-                        is String -> value
-                        is Number -> value
-                        is Boolean -> value
-                        else -> value.toString()
-                    }
+                    additionalParams[key] =
+                        when (value) {
+                            is String -> value
+                            is Number -> value
+                            is Boolean -> value
+                            else -> value.toString()
+                        }
                 }
             }
-            
+
             OperationParameters(
-                filterType = if (json.has("filterType") && !json.isNull("filterType")) {
-                    json.getString("filterType")
-                } else {
-                    null
-                },
+                filterType =
+                    if (json.has("filterType") && !json.isNull("filterType")) {
+                        json.getString("filterType")
+                    } else {
+                        null
+                    },
                 intensity = json.optDouble("intensity", 1.0).toFloat(),
-                additionalParams = additionalParams
+                additionalParams = additionalParams,
             )
         } catch (e: Exception) {
             OperationParameters()
         }
     }
-    
+
     /**
      * Сериализовать OperationParameters в JSON строку.
      */
     private fun serializeParameters(parameters: OperationParameters): String {
         return try {
-            val json = JSONObject().apply {
-                parameters.filterType?.let { put("filterType", it) }
-                put("intensity", parameters.intensity)
-                put("additionalParams", JSONObject(parameters.additionalParams.mapValues { it.value.toString() }))
-            }
+            val json =
+                JSONObject().apply {
+                    parameters.filterType?.let { put("filterType", it) }
+                    put("intensity", parameters.intensity)
+                    put(
+                        "additionalParams",
+                        JSONObject(parameters.additionalParams.mapValues { it.value.toString() }),
+                    )
+                }
             json.toString()
         } catch (e: Exception) {
             "{}"
         }
     }
 }
-

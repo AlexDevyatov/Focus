@@ -7,9 +7,9 @@ import androidx.compose.ui.unit.dp
 /**
  * Формы для Material Design 3.
  */
-val AppShapes = Shapes(
-    small = RoundedCornerShape(4.dp),
-    medium = RoundedCornerShape(8.dp),
-    large = RoundedCornerShape(36.dp)
-)
-
+val AppShapes =
+    Shapes(
+        small = RoundedCornerShape(4.dp),
+        medium = RoundedCornerShape(8.dp),
+        large = RoundedCornerShape(36.dp),
+    )

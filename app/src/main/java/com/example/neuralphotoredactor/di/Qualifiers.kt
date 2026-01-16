@@ -22,4 +22,3 @@ annotation class SplitterNetInterpreter
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class AnimeGan2Interpreter
-

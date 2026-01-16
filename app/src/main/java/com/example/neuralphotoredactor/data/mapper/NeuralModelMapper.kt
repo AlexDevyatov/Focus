@@ -7,15 +7,14 @@ import com.example.neuralphotoredactor.domain.model.NeuralModel
 
 /**
  * Mapper для преобразования между NeuralModelEntity и NeuralModel.
- * 
+ *
  * Выполняет преобразование между слоями data и domain,
  * включая преобразование строковых типов в enum.
  */
 object NeuralModelMapper {
-    
     /**
      * Преобразовать Entity в Domain модель.
-     * 
+     *
      * @param entity Entity из базы данных
      * @return Domain модель NeuralModel
      */
@@ -28,13 +27,13 @@ object NeuralModelMapper {
             filePath = entity.filePath,
             fileSize = entity.fileSize,
             isActive = entity.isActive,
-            compatibilityLevel = parseCompatibilityLevel(entity.compatibilityLevel)
+            compatibilityLevel = parseCompatibilityLevel(entity.compatibilityLevel),
         )
     }
-    
+
     /**
      * Преобразовать Domain модель в Entity.
-     * 
+     *
      * @param model Domain модель NeuralModel
      * @return Entity для базы данных
      */
@@ -47,20 +46,20 @@ object NeuralModelMapper {
             filePath = model.filePath,
             fileSize = model.fileSize,
             isActive = model.isActive,
-            compatibilityLevel = model.compatibilityLevel.name
+            compatibilityLevel = model.compatibilityLevel.name,
         )
     }
-    
+
     /**
      * Преобразовать список Entity в список Domain моделей.
-     * 
+     *
      * @param entities Список Entity
      * @return Список Domain моделей
      */
     fun toDomainList(entities: List<NeuralModelEntity>): List<NeuralModel> {
         return entities.map { toDomain(it) }
     }
-    
+
     /**
      * Парсить строковый тип модели в ModelType enum.
      */
@@ -78,7 +77,7 @@ object NeuralModelMapper {
             }
         }
     }
-    
+
     /**
      * Парсить строковый уровень совместимости в CompatibilityLevel enum.
      */
@@ -90,4 +89,3 @@ object NeuralModelMapper {
         }
     }
 }
-

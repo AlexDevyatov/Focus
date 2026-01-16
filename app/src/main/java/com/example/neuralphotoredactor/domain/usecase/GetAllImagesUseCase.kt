@@ -8,23 +8,24 @@ import javax.inject.Inject
 /**
  * Use case для получения всех изображений из галереи.
  */
-class GetAllImagesUseCase @Inject constructor(
-    private val imageRepository: ImageRepository
-) {
-    /**
-     * Получить все изображения.
-     * 
-     * @return Flow со списком изображений
-     */
-    val invoke: Flow<List<ImageData>>
-        get() = imageRepository.getAllImages()
-    
-    /**
-     * Инвалидировать кэш изображений.
-     * Используется для принудительного обновления списка изображений.
-     */
-    suspend fun invalidateCache() {
-        imageRepository.invalidateCache()
-    }
-}
+class GetAllImagesUseCase
+    @Inject
+    constructor(
+        private val imageRepository: ImageRepository,
+    ) {
+        /**
+         * Получить все изображения.
+         *
+         * @return Flow со списком изображений
+         */
+        val invoke: Flow<List<ImageData>>
+            get() = imageRepository.getAllImages()
 
+        /**
+         * Инвалидировать кэш изображений.
+         * Используется для принудительного обновления списка изображений.
+         */
+        suspend fun invalidateCache() {
+            imageRepository.invalidateCache()
+        }
+    }

@@ -16,13 +16,14 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 interface AppEntryPoint {
     fun initializeNeuralModelsUseCase(): InitializeNeuralModelsUseCase
+
     fun initializeFiltersUseCase(): InitializeFiltersUseCase
-    
+
     companion object {
         fun get(context: Context): AppEntryPoint {
             return EntryPointAccessors.fromApplication(
                 context.applicationContext,
-                AppEntryPoint::class.java
+                AppEntryPoint::class.java,
             )
         }
     }
@@ -36,4 +37,3 @@ interface AppEntryPoint {
 interface ShareHelperEntryPoint {
     fun shareHelper(): ShareHelper
 }
-

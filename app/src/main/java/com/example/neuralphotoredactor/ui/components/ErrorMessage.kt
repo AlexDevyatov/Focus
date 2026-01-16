@@ -9,7 +9,7 @@ import com.example.neuralphotoredactor.R
 
 /**
  * Компонент для отображения сообщения об ошибке.
- * 
+ *
  * @param message Сообщение об ошибке (может быть null)
  * @param defaultMessageId ID строкового ресурса для дефолтного сообщения
  * @param modifier Modifier для компонента
@@ -18,12 +18,11 @@ import com.example.neuralphotoredactor.R
 fun ErrorMessage(
     message: String?,
     defaultMessageId: Int = R.string.error_load_images,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Text(
         text = message ?: stringResource(defaultMessageId),
         modifier = modifier,
-        textAlign = TextAlign.Center
+        textAlign = TextAlign.Center,
     )
 }
-

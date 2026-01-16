@@ -12,12 +12,11 @@ import kotlinx.coroutines.launch
  */
 @HiltAndroidApp
 class App : Application() {
-    
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    
+
     override fun onCreate() {
         super.onCreate()
-        
+
         // Инициализируем модели и фильтры при первом запуске
         // Используем EntryPoint для получения зависимостей в Application
         applicationScope.launch {
@@ -32,4 +31,3 @@ class App : Application() {
         }
     }
 }
-

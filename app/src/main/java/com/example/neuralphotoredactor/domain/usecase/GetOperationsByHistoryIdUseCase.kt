@@ -8,17 +8,18 @@ import javax.inject.Inject
 /**
  * Use case для получения операций обработки по ID записи истории.
  */
-class GetOperationsByHistoryIdUseCase @Inject constructor(
-    private val processingOperationRepository: ProcessingOperationRepository
-) {
-    /**
-     * Получить все операции для записи истории обработки.
-     * 
-     * @param historyId ID записи в истории обработки
-     * @return Flow со списком операций обработки
-     */
-    fun invoke(historyId: Long): Flow<List<ProcessingOperation>> {
-        return processingOperationRepository.getOperationsByHistoryId(historyId)
+class GetOperationsByHistoryIdUseCase
+    @Inject
+    constructor(
+        private val processingOperationRepository: ProcessingOperationRepository,
+    ) {
+        /**
+         * Получить все операции для записи истории обработки.
+         *
+         * @param historyId ID записи в истории обработки
+         * @return Flow со списком операций обработки
+         */
+        fun invoke(historyId: Long): Flow<List<ProcessingOperation>> {
+            return processingOperationRepository.getOperationsByHistoryId(historyId)
+        }
     }
-}
-

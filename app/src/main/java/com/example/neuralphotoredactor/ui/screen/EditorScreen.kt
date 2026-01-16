@@ -1,9 +1,21 @@
 package com.example.neuralphotoredactor.ui.screen
 
 import android.graphics.Bitmap
+import android.graphics.Rect
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Brightness1
+import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.CropRotate
+import androidx.compose.material.icons.filled.Details
+import androidx.compose.material.icons.filled.FilterBAndW
+import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.Rotate90DegreesCw
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,38 +25,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.FilterBAndW
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.background
 import coil.compose.AsyncImage
 import com.example.neuralphotoredactor.R
-import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.ui.components.CropOverlay
 import com.example.neuralphotoredactor.ui.components.ErrorMessage
 import com.example.neuralphotoredactor.ui.components.LoadingIndicator
+import com.example.neuralphotoredactor.ui.theme.BackgroundDark
 import com.example.neuralphotoredactor.ui.viewmodel.EditCategory
-import android.graphics.Rect
-import androidx.compose.foundation.gestures.snapping.SnapPosition
-import androidx.compose.material.icons.filled.Brightness1
-import androidx.compose.material.icons.filled.Contrast
-import androidx.compose.material.icons.filled.CropRotate
-import androidx.compose.material.icons.filled.Details
-import androidx.compose.material.icons.filled.FilterVintage
-import androidx.compose.material.icons.filled.Flip
-import androidx.compose.material.icons.filled.Rotate90DegreesCw
-import androidx.compose.material.icons.filled.Vignette
-import androidx.compose.ui.text.style.TextAlign
 
 /**
  * Получить локализованное название фильтра.
@@ -102,7 +99,7 @@ fun EditorScreen(
     onCropApply: (Rect) -> Unit,
     onCropCancel: () -> Unit,
     onBackClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Scaffold(
         topBar = {
@@ -111,19 +108,20 @@ fun EditorScreen(
                     Text(
                         text = stringResource(R.string.screen_editor),
                         fontSize = 16.sp,
-                        color = Color.White
+                        color = Color.White,
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BackgroundDark
-                ),
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = BackgroundDark,
+                    ),
                 navigationIcon = {
                     if (onBackClick != null) {
                         IconButton(onClick = onBackClick) {
                             Icon(
                                 painter = painterResource(id = R.drawable.back_arrow),
                                 contentDescription = stringResource(R.string.navigate_back),
-                                tint = Color.White
+                                tint = Color.White,
                             )
                         }
                     }
@@ -134,7 +132,7 @@ fun EditorScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.save_image),
                                 contentDescription = stringResource(R.string.edit_save_to_gallery),
-                                tint = Color.White
+                                tint = Color.White,
                             )
                         }
                     } else if (selectedFilters.isNotEmpty() || processedImageUri != null) {
@@ -142,14 +140,14 @@ fun EditorScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.save_image),
                                 contentDescription = stringResource(R.string.editor_save_button),
-                                tint = Color.White
+                                tint = Color.White,
                             )
                         }
                     }
-                }
+                },
             )
         },
-        modifier = modifier
+        modifier = modifier,
     ) { paddingValues ->
         // Состояние для текущего cropRect (доступно во всем Column)
         var currentCropRect by remember { mutableStateOf<Rect?>(null) }
@@ -158,57 +156,68 @@ fun EditorScreen(
         var showCropRotateOverlay by remember { mutableStateOf(false) }
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             // Изображение и иконки в одном контейнере
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 // Изображение
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(0.7f),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(0.7f),
+                    contentAlignment = Alignment.Center,
                 ) {
                     // Проверяем, есть ли выбранные нейрофильтры
-                    val neuralFilterTypes = listOf(
-                        FilterType.STYLE_TRANSFER,
-                        FilterType.DENOISE,
-                        FilterType.UPSCALE,
-                        FilterType.COLOR_CORRECTION
-                    )
-                    val hasSelectedNeuralFilters = selectedFilters.any { (filterType, _) ->
-                        filterType in neuralFilterTypes
-                    }
+                    val neuralFilterTypes =
+                        listOf(
+                            FilterType.STYLE_TRANSFER,
+                            FilterType.DENOISE,
+                            FilterType.UPSCALE,
+                            FilterType.COLOR_CORRECTION,
+                        )
+                    val hasSelectedNeuralFilters =
+                        selectedFilters.any { (filterType, _) ->
+                            filterType in neuralFilterTypes
+                        }
                     val isNeuralFilterProcessing = isLoading && hasSelectedNeuralFilters
 
                     when {
                         // Для нейрофильтров показываем изображение с overlay, для остальных - LoadingIndicator
                         isLoading && !isNeuralFilterProcessing -> LoadingIndicator()
-                        error != null -> ErrorMessage(
-                            error,
-                            defaultMessageId = R.string.error_process_image
-                        )
+                        error != null ->
+                            ErrorMessage(
+                                error,
+                                defaultMessageId = R.string.error_process_image,
+                            )
 
                         previewBitmap != null -> {
                             // Отображаем быстрый предпросмотр
                             Image(
                                 bitmap = previewBitmap.asImageBitmap(),
-                                contentDescription = stringResource(R.string.editor_processed_image),
+                                contentDescription =
+                                    stringResource(
+                                        R.string.editor_processed_image,
+                                    ),
                                 contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
 
                         processedImageUri != null -> {
                             AsyncImage(
                                 model = processedImageUri,
-                                contentDescription = stringResource(R.string.editor_processed_image),
+                                contentDescription =
+                                    stringResource(
+                                        R.string.editor_processed_image,
+                                    ),
                                 contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
 
@@ -218,7 +227,7 @@ fun EditorScreen(
                                 model = imageUri,
                                 contentDescription = stringResource(R.string.editor_original_image),
                                 contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }
@@ -243,21 +252,22 @@ fun EditorScreen(
                             onCropRectChange = { rect ->
                                 // rect уже масштабирован в координаты bitmap
                                 currentCropRect = rect
-                            }
+                            },
                         )
                     }
 
                     // Overlay с progress bar для нейрофильтров
                     if (isNeuralFilterProcessing) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.5f)),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center,
                         ) {
                             CircularProgressIndicator(
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier.size(48.dp),
                             )
                         }
                     }
@@ -268,115 +278,125 @@ fun EditorScreen(
                 if (!showCropOverlay) {
                     val bottomPadding = if (showCropRotateOverlay) 132.dp else 8.dp
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = 8.dp,
-                                bottom = bottomPadding
-                            ),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = 8.dp,
+                                    bottom = bottomPadding,
+                                ),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
                         if (showCropRotateOverlay) {
                             // Оверлей с иконками: Crop, Rotate 90, Rotate 180, Rotate 270
                             // Иконка Crop
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
                                     onClick = {
                                         showCropRotateOverlay = false
                                         onEditClick(EditType.CROP)
-                                    }
+                                    },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Crop,
                                         contentDescription = stringResource(R.string.edit_crop),
-                                        tint = Color.White
+                                        tint = Color.White,
                                     )
                                 }
                                 Text(
                                     text = stringResource(R.string.edit_crop),
                                     color = Color.White,
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
                                 )
                             }
 
                             // Иконка Rotate 90
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
                                     onClick = {
                                         showCropRotateOverlay = false
                                         onEditClick(EditType.ROTATE_90)
-                                    }
+                                    },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Rotate90DegreesCw,
-                                        contentDescription = stringResource(R.string.edit_rotate_90),
-                                        tint = Color.White
+                                        contentDescription =
+                                            stringResource(
+                                                R.string.edit_rotate_90,
+                                            ),
+                                        tint = Color.White,
                                     )
                                 }
                                 Text(
                                     text = stringResource(R.string.edit_rotate_90),
                                     color = Color.White,
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
                                 )
                             }
 
                             // Иконка Rotate 180
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
                                     onClick = {
                                         showCropRotateOverlay = false
                                         onEditClick(EditType.ROTATE_180)
-                                    }
+                                    },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Rotate90DegreesCw,
-                                        contentDescription = stringResource(R.string.edit_rotate_180),
-                                        tint = Color.White
+                                        contentDescription =
+                                            stringResource(
+                                                R.string.edit_rotate_180,
+                                            ),
+                                        tint = Color.White,
                                     )
                                 }
                                 Text(
                                     text = stringResource(R.string.edit_rotate_180),
                                     color = Color.White,
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
                                 )
                             }
 
                             // Иконка Rotate 270
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
                                     onClick = {
                                         showCropRotateOverlay = false
                                         onEditClick(EditType.ROTATE_270)
-                                    }
+                                    },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Rotate90DegreesCw,
-                                        contentDescription = stringResource(R.string.edit_rotate_270),
-                                        tint = Color.White
+                                        contentDescription =
+                                            stringResource(
+                                                R.string.edit_rotate_270,
+                                            ),
+                                        tint = Color.White,
                                     )
                                 }
                                 Text(
                                     text = stringResource(R.string.edit_rotate_270),
                                     color = Color.White,
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
                                 )
                             }
                         } else if (showEditMode) {
@@ -387,15 +407,18 @@ fun EditorScreen(
 
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
-                                    onClick = { onEditCategoryChange(EditCategory.BRIGHTNESS) }
+                                    onClick = { onEditCategoryChange(EditCategory.BRIGHTNESS) },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Brightness1,
-                                        contentDescription = stringResource(R.string.edit_brightness),
-                                        tint = Color.White
+                                        contentDescription =
+                                            stringResource(
+                                                R.string.edit_brightness,
+                                            ),
+                                        tint = Color.White,
                                     )
                                 }
                                 if (currentEditCategory == EditCategory.BRIGHTNESS && !showCropOverlay) {
@@ -404,21 +427,21 @@ fun EditorScreen(
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontSize = 10.sp,
-                                        textAlign = TextAlign.Center
+                                        textAlign = TextAlign.Center,
                                     )
                                 }
                             }
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
-                                    onClick = { onEditCategoryChange(EditCategory.CONTRAST) }
+                                    onClick = { onEditCategoryChange(EditCategory.CONTRAST) },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Contrast,
                                         contentDescription = stringResource(R.string.edit_contrast),
-                                        tint = Color.White
+                                        tint = Color.White,
                                     )
                                 }
                                 if (currentEditCategory == EditCategory.CONTRAST && !showCropOverlay) {
@@ -427,21 +450,24 @@ fun EditorScreen(
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontSize = 10.sp,
-                                        textAlign = TextAlign.Center
+                                        textAlign = TextAlign.Center,
                                     )
                                 }
                             }
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
-                                    onClick = { onEditCategoryChange(EditCategory.COLOR_BALANCE) }
+                                    onClick = { onEditCategoryChange(EditCategory.COLOR_BALANCE) },
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.triangle_circle),
-                                        contentDescription = stringResource(R.string.edit_color_balance),
-                                        tint = Color.White
+                                        contentDescription =
+                                            stringResource(
+                                                R.string.edit_color_balance,
+                                            ),
+                                        tint = Color.White,
                                     )
                                 }
                                 if (currentEditCategory == EditCategory.COLOR_BALANCE && !showCropOverlay) {
@@ -450,21 +476,21 @@ fun EditorScreen(
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontSize = 10.sp,
-                                        textAlign = TextAlign.Center
+                                        textAlign = TextAlign.Center,
                                     )
                                 }
                             }
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
-                                    onClick = { showCropRotateOverlay = true }
+                                    onClick = { showCropRotateOverlay = true },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.CropRotate,
                                         contentDescription = stringResource(R.string.edit_crop),
-                                        tint = Color.White
+                                        tint = Color.White,
                                     )
                                 }
                                 if (showCropOverlay) {
@@ -473,21 +499,21 @@ fun EditorScreen(
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontSize = 10.sp,
-                                        textAlign = TextAlign.Center
+                                        textAlign = TextAlign.Center,
                                     )
                                 }
                             }
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             ) {
                                 IconButton(
-                                    onClick = { onEditClick(EditType.FLIP_HORIZONTAL) }
+                                    onClick = { onEditClick(EditType.FLIP_HORIZONTAL) },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Flip,
                                         contentDescription = stringResource(R.string.edit_flip),
-                                        tint = Color.White
+                                        tint = Color.White,
                                     )
                                 }
                                 if (isFlipActive && !showCropOverlay) {
@@ -496,56 +522,73 @@ fun EditorScreen(
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontSize = 10.sp,
-                                        textAlign = TextAlign.Center
+                                        textAlign = TextAlign.Center,
                                     )
                                 }
                             }
                         } else {
                             // Режим фильтров: Размытие, Резкость, Виньетка, Черно-белый, Сепия
-                            val filterTypes = listOf(
-                                FilterType.GAUSSIAN_BLUR,
-                                FilterType.SHARPEN,
-                                FilterType.VIGNETTE,
-                                FilterType.GRAYSCALE,
-                                FilterType.SEPIA
-                            )
+                            val filterTypes =
+                                listOf(
+                                    FilterType.GAUSSIAN_BLUR,
+                                    FilterType.SHARPEN,
+                                    FilterType.VIGNETTE,
+                                    FilterType.GRAYSCALE,
+                                    FilterType.SEPIA,
+                                )
                             val lastSelectedFilter = selectedFilters.lastOrNull()?.first
                             filterTypes.forEach { filterType ->
                                 val isLastSelected = filterType == lastSelectedFilter
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
                                 ) {
                                     IconButton(
-                                        onClick = { onFilterToggle(filterType) }
+                                        onClick = { onFilterToggle(filterType) },
                                     ) {
                                         when (filterType) {
                                             FilterType.VIGNETTE -> {
                                                 Icon(
-                                                    painter = painterResource(R.drawable.vignette_2),
-                                                    contentDescription = getFilterName(filterType),
-                                                    tint = Color.White
+                                                    painter =
+                                                        painterResource(
+                                                            R.drawable.vignette_2,
+                                                        ),
+                                                    contentDescription =
+                                                        getFilterName(
+                                                            filterType,
+                                                        ),
+                                                    tint = Color.White,
                                                 )
                                             }
 
                                             FilterType.SEPIA -> {
                                                 Icon(
-                                                    painter = painterResource(R.drawable.filter_vintage),
-                                                    contentDescription = getFilterName(filterType),
-                                                    tint = Color.White
+                                                    painter =
+                                                        painterResource(
+                                                            R.drawable.filter_vintage,
+                                                        ),
+                                                    contentDescription =
+                                                        getFilterName(
+                                                            filterType,
+                                                        ),
+                                                    tint = Color.White,
                                                 )
                                             }
 
                                             else -> {
                                                 Icon(
-                                                    imageVector = when (filterType) {
-                                                        FilterType.GAUSSIAN_BLUR -> Icons.Filled.BlurOn
-                                                        FilterType.SHARPEN -> Icons.Filled.Details
-                                                        FilterType.GRAYSCALE -> Icons.Filled.FilterBAndW
-                                                        else -> Icons.Filled.BlurOn
-                                                    },
-                                                    contentDescription = getFilterName(filterType),
-                                                    tint = Color.White
+                                                    imageVector =
+                                                        when (filterType) {
+                                                            FilterType.GAUSSIAN_BLUR -> Icons.Filled.BlurOn
+                                                            FilterType.SHARPEN -> Icons.Filled.Details
+                                                            FilterType.GRAYSCALE -> Icons.Filled.FilterBAndW
+                                                            else -> Icons.Filled.BlurOn
+                                                        },
+                                                    contentDescription =
+                                                        getFilterName(
+                                                            filterType,
+                                                        ),
+                                                    tint = Color.White,
                                                 )
                                             }
                                         }
@@ -556,7 +599,7 @@ fun EditorScreen(
                                             color = Color.White,
                                             style = MaterialTheme.typography.labelSmall,
                                             fontSize = 10.sp,
-                                            textAlign = TextAlign.Center
+                                            textAlign = TextAlign.Center,
                                         )
                                     }
                                 }
@@ -573,42 +616,45 @@ fun EditorScreen(
                     when (currentEditCategory) {
                         EditCategory.BRIGHTNESS -> {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
                             ) {
                                 Slider(
                                     value = brightness,
                                     onValueChange = onBrightnessChange,
                                     valueRange = -1f..1f,
                                     steps = 199,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                         }
 
                         EditCategory.CONTRAST -> {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
                             ) {
                                 Slider(
                                     value = contrast,
                                     onValueChange = onContrastChange,
                                     valueRange = -1f..1f,
                                     steps = 199,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                         }
 
                         EditCategory.COLOR_BALANCE -> {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 // Красный канал
                                 Slider(
@@ -616,16 +662,17 @@ fun EditorScreen(
                                     onValueChange = {
                                         onColorBalanceChange(
                                             EditType.COLOR_BALANCE_RED,
-                                            it
+                                            it,
                                         )
                                     },
                                     valueRange = -1f..1f,
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color(0xFFFFA79B),
-                                        activeTrackColor = Color(0xFFFFA79B)
-                                    )
+                                    colors =
+                                        SliderDefaults.colors(
+                                            thumbColor = Color(0xFFFFA79B),
+                                            activeTrackColor = Color(0xFFFFA79B),
+                                        ),
                                 )
 
                                 // Зеленый канал
@@ -634,16 +681,17 @@ fun EditorScreen(
                                     onValueChange = {
                                         onColorBalanceChange(
                                             EditType.COLOR_BALANCE_GREEN,
-                                            it
+                                            it,
                                         )
                                     },
                                     valueRange = -1f..1f,
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color(0xFF9CD49F),
-                                        activeTrackColor = Color(0xFF9CD49F)
-                                    )
+                                    colors =
+                                        SliderDefaults.colors(
+                                            thumbColor = Color(0xFF9CD49F),
+                                            activeTrackColor = Color(0xFF9CD49F),
+                                        ),
                                 )
 
                                 // Синий канал
@@ -652,16 +700,17 @@ fun EditorScreen(
                                     onValueChange = {
                                         onColorBalanceChange(
                                             EditType.COLOR_BALANCE_BLUE,
-                                            it
+                                            it,
                                         )
                                     },
                                     valueRange = -1f..1f,
                                     steps = 199,
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color(0xFF86D1EA),
-                                        activeTrackColor = Color(0xFF86D1EA)
-                                    )
+                                    colors =
+                                        SliderDefaults.colors(
+                                            thumbColor = Color(0xFF86D1EA),
+                                            activeTrackColor = Color(0xFF86D1EA),
+                                        ),
                                 )
                             }
                         }
@@ -676,22 +725,25 @@ fun EditorScreen(
                     if (lastSelectedFilter != null) {
                         val (filterType, savedIntensity) = lastSelectedFilter
                         // Показываем слайдер только для обычных фильтров (не нейросетевых)
-                        val neuralFilters = listOf(
-                            FilterType.STYLE_TRANSFER,
-                            FilterType.DENOISE,
-                            FilterType.UPSCALE,
-                            FilterType.COLOR_CORRECTION
-                        )
+                        val neuralFilters =
+                            listOf(
+                                FilterType.STYLE_TRANSFER,
+                                FilterType.DENOISE,
+                                FilterType.UPSCALE,
+                                FilterType.COLOR_CORRECTION,
+                            )
                         // Фильтры без слайдера
-                        val filtersWithoutSlider = listOf(
-                            FilterType.GRAYSCALE,
-                            FilterType.SEPIA
-                        )
+                        val filtersWithoutSlider =
+                            listOf(
+                                FilterType.GRAYSCALE,
+                                FilterType.SEPIA,
+                            )
                         if (filterType !in neuralFilters && filterType !in filtersWithoutSlider) {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
                             ) {
                                 Slider(
                                     value = savedIntensity ?: currentFilterIntensity,
@@ -700,7 +752,7 @@ fun EditorScreen(
                                     },
                                     valueRange = 0f..1f,
                                     steps = 99,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                         }
@@ -711,10 +763,11 @@ fun EditorScreen(
             // Кнопки: Настройки/Фильтры или Отмена/Применить (при кадрировании и оверлее Crop/Rotate)
             if (!showCropRotateOverlay) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (showCropOverlay) {
                         // Кнопки для кадрирования: Отмена и Применить
@@ -722,13 +775,14 @@ fun EditorScreen(
                             onClick = onCropCancel,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.background
-                            )
+                            colors =
+                                ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.background,
+                                ),
                         ) {
                             Text(
                                 text = stringResource(R.string.edit_cancel),
-                                color = Color.White
+                                color = Color.White,
                             )
                         }
                         FilledTonalButton(
@@ -740,13 +794,14 @@ fun EditorScreen(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            )
+                            colors =
+                                ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                ),
                         ) {
                             Text(
                                 text = stringResource(R.string.edit_apply),
-                                color = Color.White
+                                color = Color.White,
                             )
                         }
                     } else {
@@ -759,13 +814,14 @@ fun EditorScreen(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = if (showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
-                            )
+                            colors =
+                                ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background,
+                                ),
                         ) {
                             Text(
                                 text = stringResource(R.string.editor_settings_button),
-                                color = Color.White
+                                color = Color.White,
                             )
                         }
                         FilledTonalButton(
@@ -776,13 +832,14 @@ fun EditorScreen(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = if (!showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
-                            )
+                            colors =
+                                ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (!showEditMode) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background,
+                                ),
                         ) {
                             Text(
                                 text = stringResource(R.string.editor_filters_button),
-                                color = Color.White
+                                color = Color.White,
                             )
                         }
                     }
@@ -791,4 +848,3 @@ fun EditorScreen(
         }
     }
 }
-

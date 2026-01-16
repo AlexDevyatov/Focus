@@ -8,15 +8,16 @@ import javax.inject.Inject
 /**
  * Use case для получения истории обработок.
  */
-class GetProcessingHistoryUseCase @Inject constructor(
-    private val processingRepository: ProcessingRepository
-) {
-    /**
-     * Получить историю обработок.
-     * 
-     * @return Flow со списком результатов обработки
-     */
-    val invoke: Flow<List<ProcessingResult>>
-        get() = processingRepository.getProcessingHistory()
-}
-
+class GetProcessingHistoryUseCase
+    @Inject
+    constructor(
+        private val processingRepository: ProcessingRepository,
+    ) {
+        /**
+         * Получить историю обработок.
+         *
+         * @return Flow со списком результатов обработки
+         */
+        val invoke: Flow<List<ProcessingResult>>
+            get() = processingRepository.getProcessingHistory()
+    }

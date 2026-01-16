@@ -6,15 +6,14 @@ import com.example.neuralphotoredactor.domain.model.ProcessingResult
 
 /**
  * Mapper для преобразования между Entity и Domain моделями.
- * 
+ *
  * Выполняет преобразование между слоями data и domain,
  * обеспечивая изоляцию слоев.
  */
 object ProcessingHistoryMapper {
-    
     /**
      * Преобразовать Entity в Domain модель.
-     * 
+     *
      * @param entity Entity из базы данных
      * @return Domain модель ProcessingResult
      */
@@ -25,13 +24,13 @@ object ProcessingHistoryMapper {
             filterType = "", // filterType больше не хранится в БД, информация о фильтрах в processing_operations
             timestamp = entity.timestamp,
             historyId = entity.id, // Используем id записи истории для получения операций
-            operationId = null // Deprecated, используйте historyId
+            operationId = null, // Deprecated, используйте historyId
         )
     }
-    
+
     /**
      * Преобразовать Domain модель в Entity.
-     * 
+     *
      * @param result Domain модель ProcessingResult
      * @return Entity для базы данных
      */
@@ -39,13 +38,13 @@ object ProcessingHistoryMapper {
         return ProcessingHistoryEntity(
             originalUri = result.originalUri.toString(),
             processedUri = result.processedUri.toString(),
-            timestamp = result.timestamp
+            timestamp = result.timestamp,
         )
     }
-    
+
     /**
      * Преобразовать список Entity в список Domain моделей.
-     * 
+     *
      * @param entities Список Entity
      * @return Список Domain моделей
      */
@@ -53,4 +52,3 @@ object ProcessingHistoryMapper {
         return entities.map { toDomain(it) }
     }
 }
-

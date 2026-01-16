@@ -14,37 +14,42 @@ import androidx.core.view.WindowCompat
 /**
  * Светлая цветовая схема Material Design 3.
  */
-private val ColorScheme = lightColorScheme(
-    primary = SurfaceLight,
-    secondary = SecondaryLight,
-    secondaryContainer = SecondaryDark,
-    tertiary = TertiaryLight,
-    surface = SurfaceLight,
-    background = BackgroundDark,
-    error = ErrorLight,
-    onPrimary = Color(0xFFFFFFFF), // Белый текст на ярких цветах
-    onSecondary = Color(0xFFFFFFFF),
-    onTertiary = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF212121), // Темно-серый текст на светлых поверхностях для лучшей читаемости
-    onBackground = Color(0xFF212121),
-    onError = Color(0xFFFFFFFF),
-)
+private val ColorScheme =
+    lightColorScheme(
+        primary = SurfaceLight,
+        secondary = SecondaryLight,
+        secondaryContainer = SecondaryDark,
+        tertiary = TertiaryLight,
+        surface = SurfaceLight,
+        background = BackgroundDark,
+        error = ErrorLight,
+        onPrimary = Color(0xFFFFFFFF), // Белый текст на ярких цветах
+        onSecondary = Color(0xFFFFFFFF),
+        onTertiary = Color(0xFFFFFFFF),
+        onSurface =
+            Color(
+                0xFF212121,
+            ),
+        // Темно-серый текст на светлых поверхностях для лучшей читаемости
+        onBackground = Color(0xFF212121),
+        onError = Color(0xFFFFFFFF),
+    )
 
 /**
  * Основная тема приложения.
- * 
+ *
  * Использует светлую тему с указанными цветами.
- * 
+ *
  * @param darkTheme Игнорируется - всегда используется светлая тема
  * @param content Composable контент, который будет обернут в тему
  */
 @Composable
 fun AppTheme(
     darkTheme: Boolean = false, // Всегда используем светлую тему
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val colorScheme = ColorScheme
-    
+
     // Настройка системного статус-бара
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -59,13 +64,13 @@ fun AppTheme(
         colorScheme = colorScheme,
         typography = Typography,
         shapes = AppShapes,
-        content = content
+        content = content,
     )
 }
 
 /**
  * Старая функция темы для обратной совместимости.
- * 
+ *
  * @deprecated Используйте AppTheme вместо этого
  */
 @Composable
@@ -73,8 +78,7 @@ fun AppTheme(
 fun NeuralPhotoRedactorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     AppTheme(darkTheme = darkTheme, content = content)
 }
-

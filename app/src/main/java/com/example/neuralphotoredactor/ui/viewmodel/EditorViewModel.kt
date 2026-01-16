@@ -1,9 +1,9 @@
 package com.example.neuralphotoredactor.ui.viewmodel
 
 import android.graphics.Bitmap
+import android.graphics.Rect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import android.graphics.Rect
 import com.example.neuralphotoredactor.domain.enums.EditType
 import com.example.neuralphotoredactor.domain.enums.FilterType
 import com.example.neuralphotoredactor.domain.model.ImageData
@@ -16,10 +16,10 @@ import com.example.neuralphotoredactor.domain.usecase.SaveEditedImageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,1036 +27,1149 @@ import javax.inject.Inject
  * ViewModel для экрана редактора.
  */
 @HiltViewModel
-class EditorViewModel @Inject constructor(
-    private val previewFiltersUseCase: PreviewFiltersUseCase,
-    private val applyEditUseCase: ApplyEditUseCase,
-    private val saveEditedImageUseCase: SaveEditedImageUseCase,
-    private val loadBitmapUseCase: LoadBitmapUseCase,
-    private val processImageWithFiltersUseCase: ProcessImageWithFiltersUseCase
-) : ViewModel() {
-    
-    private val _uiState = MutableStateFlow(EditorUiState())
-    val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
-    
-    private var currentFilterJob: Job? = null // Для отмены предыдущих запросов
-    private var currentPreviewJob: Job? = null // Для отмены предыдущих предпросмотров
-    private var cachedOriginalBitmap: Bitmap? = null // Кэш исходного изображения (может быть изменен после кадрирования)
-    private var trueOriginalBitmap: Bitmap? = null // Истинно оригинальное изображение (не изменяется)
-    
-    // Callback для обновления галереи после сохранения
-    var onImageSaved: (() -> Unit)? = null
-    
-    // Callback для навигации после успешного применения фильтров
-    var onNavigateToProcessed: (() -> Unit)? = null
-    
-    // Обычные фильтры (алгоритмические)
-    val regularFilters = listOf(
-        FilterType.GAUSSIAN_BLUR,
-        FilterType.NOISE_REDUCTION,
-        FilterType.SHARPEN,
-        FilterType.VIGNETTE,
-        FilterType.GRAYSCALE,
-        FilterType.SEPIA
-    )
-    
-    // Нейросетевые фильтры (требуют TFLite модели)
-    val neuralFilters = listOf(
-        FilterType.STYLE_TRANSFER,
-        FilterType.DENOISE,
-        FilterType.UPSCALE,
-        FilterType.COLOR_CORRECTION
-    )
-    
-    val availableFilters = FilterType.entries
-    
-    fun setImage(imageData: ImageData) {
-        // Сбрасываем все настройки к дефолтным значениям при открытии нового изображения
-        _uiState.value = EditorUiState(
-            imageData = imageData,
-            processedResult = null,
-            previewBitmap = null,
-            fullSizeBitmap = null,
-            cropBitmap = null,
-            isLoading = false,
-            error = null,
-            selectedFilters = emptyList(),
-            currentFilterIntensity = 0.5f,
-            showNeuralFilters = false,
-            showEditMode = true,
-            brightness = 0f,
-            contrast = 0f,
-            colorBalanceRed = 0f,
-            colorBalanceGreen = 0f,
-            colorBalanceBlue = 0f,
-            appliedEdits = emptyList(),
-            currentEditCategory = EditCategory.BRIGHTNESS,
-            showCropOverlay = false
-        )
-        // Очищаем кэш при смене изображения
-        cachedOriginalBitmap = null
-        trueOriginalBitmap = null
-        currentPreviewJob?.cancel()
-        currentFilterJob?.cancel()
-        
-        // Предзагружаем Bitmap в фоне для быстрого доступа
-        viewModelScope.launch {
-            getOrLoadOriginalBitmap()
-        }
-    }
-    
-    /**
-     * Установить изображение с автоматическим применением фильтра.
-     * Используется при переходе из AiFiltersScreen.
-     */
-    fun setImageWithFilter(imageData: ImageData, filterTypeName: String?) {
-        // Парсим формат "style_transfer:ModelName" для выбора конкретной модели стилизации
-        val (filterNameBase, modelName) = if (filterTypeName?.contains(":") == true) {
-            val parts = filterTypeName.split(":", limit = 2)
-            parts[0] to parts.getOrNull(1)
-        } else {
-            filterTypeName to null
-        }
-        
-        // Если указано имя модели, добавляем его в URI как query параметр
-        val imageDataWithModel = if (modelName != null) {
-            val uriWithModel = imageData.uri.buildUpon()
-                .appendQueryParameter("modelName", modelName)
-                .build()
-            imageData.copy(uri = uriWithModel)
-        } else {
-            imageData
-        }
-        
-        // Сбрасываем все настройки к дефолтным значениям
-        setImage(imageDataWithModel)
-        
-        // Применяем фильтр, если он указан
-        filterNameBase?.let { filterName ->
-            // Маппинг строковых названий из AiFiltersScreen в FilterType
-            val filterType = when (filterName.lowercase()) {
-                "upscale" -> FilterType.UPSCALE
-                "denoise" -> FilterType.DENOISE
-                "style_transfer" -> FilterType.STYLE_TRANSFER
-                else -> {
-                    // Пытаемся преобразовать напрямую в enum
-                    try {
-                        FilterType.valueOf(filterName.uppercase())
-                    } catch (e: IllegalArgumentException) {
-                        android.util.Log.e("EditorViewModel", "Неизвестный тип фильтра: $filterName", e)
-                        return@let
-                    }
-                }
-            }
-            
-            // Добавляем фильтр в выбранные (для нейросетевых фильтров intensity = null)
-            val intensity = if (filterType in neuralFilters) {
-                null
-            } else {
-                0.5f
-            }
-            
-            // Сохраняем имя модели для STYLE_TRANSFER
-            _uiState.value = _uiState.value.copy(
-                selectedFilters = listOf(Pair(filterType, intensity)),
-                showNeuralFilters = filterType in neuralFilters,
-                selectedStyleTransferModel = if (filterType == FilterType.STYLE_TRANSFER) modelName else null
+class EditorViewModel
+    @Inject
+    constructor(
+        private val previewFiltersUseCase: PreviewFiltersUseCase,
+        private val applyEditUseCase: ApplyEditUseCase,
+        private val saveEditedImageUseCase: SaveEditedImageUseCase,
+        private val loadBitmapUseCase: LoadBitmapUseCase,
+        private val processImageWithFiltersUseCase: ProcessImageWithFiltersUseCase,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(EditorUiState())
+        val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
+
+        private var currentFilterJob: Job? = null // Для отмены предыдущих запросов
+        private var currentPreviewJob: Job? = null // Для отмены предыдущих предпросмотров
+        private var cachedOriginalBitmap: Bitmap? = null // Кэш исходного изображения (может быть изменен после кадрирования)
+        private var trueOriginalBitmap: Bitmap? = null // Истинно оригинальное изображение (не изменяется)
+
+        // Callback для обновления галереи после сохранения
+        var onImageSaved: (() -> Unit)? = null
+
+        // Callback для навигации после успешного применения фильтров
+        var onNavigateToProcessed: (() -> Unit)? = null
+
+        // Обычные фильтры (алгоритмические)
+        val regularFilters =
+            listOf(
+                FilterType.GAUSSIAN_BLUR,
+                FilterType.NOISE_REDUCTION,
+                FilterType.SHARPEN,
+                FilterType.VIGNETTE,
+                FilterType.GRAYSCALE,
+                FilterType.SEPIA,
             )
-            // Пересчитываем предпросмотр с примененным фильтром
+
+        // Нейросетевые фильтры (требуют TFLite модели)
+        val neuralFilters =
+            listOf(
+                FilterType.STYLE_TRANSFER,
+                FilterType.DENOISE,
+                FilterType.UPSCALE,
+                FilterType.COLOR_CORRECTION,
+            )
+
+        val availableFilters = FilterType.entries
+
+        fun setImage(imageData: ImageData) {
+            // Сбрасываем все настройки к дефолтным значениям при открытии нового изображения
+            _uiState.value =
+                EditorUiState(
+                    imageData = imageData,
+                    processedResult = null,
+                    previewBitmap = null,
+                    fullSizeBitmap = null,
+                    cropBitmap = null,
+                    isLoading = false,
+                    error = null,
+                    selectedFilters = emptyList(),
+                    currentFilterIntensity = 0.5f,
+                    showNeuralFilters = false,
+                    showEditMode = true,
+                    brightness = 0f,
+                    contrast = 0f,
+                    colorBalanceRed = 0f,
+                    colorBalanceGreen = 0f,
+                    colorBalanceBlue = 0f,
+                    appliedEdits = emptyList(),
+                    currentEditCategory = EditCategory.BRIGHTNESS,
+                    showCropOverlay = false,
+                )
+            // Очищаем кэш при смене изображения
+            cachedOriginalBitmap = null
+            trueOriginalBitmap = null
+            currentPreviewJob?.cancel()
+            currentFilterJob?.cancel()
+
+            // Предзагружаем Bitmap в фоне для быстрого доступа
+            viewModelScope.launch {
+                getOrLoadOriginalBitmap()
+            }
+        }
+
+        /**
+         * Установить изображение с автоматическим применением фильтра.
+         * Используется при переходе из AiFiltersScreen.
+         */
+        fun setImageWithFilter(
+            imageData: ImageData,
+            filterTypeName: String?,
+        ) {
+            // Парсим формат "style_transfer:ModelName" для выбора конкретной модели стилизации
+            val (filterNameBase, modelName) =
+                if (filterTypeName?.contains(":") == true) {
+                    val parts = filterTypeName.split(":", limit = 2)
+                    parts[0] to parts.getOrNull(1)
+                } else {
+                    filterTypeName to null
+                }
+
+            // Если указано имя модели, добавляем его в URI как query параметр
+            val imageDataWithModel =
+                if (modelName != null) {
+                    val uriWithModel =
+                        imageData.uri.buildUpon()
+                            .appendQueryParameter("modelName", modelName)
+                            .build()
+                    imageData.copy(uri = uriWithModel)
+                } else {
+                    imageData
+                }
+
+            // Сбрасываем все настройки к дефолтным значениям
+            setImage(imageDataWithModel)
+
+            // Применяем фильтр, если он указан
+            filterNameBase?.let { filterName ->
+                // Маппинг строковых названий из AiFiltersScreen в FilterType
+                val filterType =
+                    when (filterName.lowercase()) {
+                        "upscale" -> FilterType.UPSCALE
+                        "denoise" -> FilterType.DENOISE
+                        "style_transfer" -> FilterType.STYLE_TRANSFER
+                        else -> {
+                            // Пытаемся преобразовать напрямую в enum
+                            try {
+                                FilterType.valueOf(filterName.uppercase())
+                            } catch (e: IllegalArgumentException) {
+                                android.util.Log.e(
+                                    "EditorViewModel",
+                                    "Неизвестный тип фильтра: $filterName",
+                                    e,
+                                )
+                                return@let
+                            }
+                        }
+                    }
+
+                // Добавляем фильтр в выбранные (для нейросетевых фильтров intensity = null)
+                val intensity =
+                    if (filterType in neuralFilters) {
+                        null
+                    } else {
+                        0.5f
+                    }
+
+                // Сохраняем имя модели для STYLE_TRANSFER
+                _uiState.value =
+                    _uiState.value.copy(
+                        selectedFilters = listOf(Pair(filterType, intensity)),
+                        showNeuralFilters = filterType in neuralFilters,
+                        selectedStyleTransferModel = if (filterType == FilterType.STYLE_TRANSFER) modelName else null,
+                    )
+                // Пересчитываем предпросмотр с примененным фильтром
+                recalculatePreview()
+            }
+        }
+
+        fun toggleFilter(filterType: FilterType) {
+            val currentFilters = _uiState.value.selectedFilters.toMutableList()
+            val existingIndex = currentFilters.indexOfFirst { it.first == filterType }
+
+            if (existingIndex >= 0) {
+                // Удаляем фильтр, если он уже выбран
+                currentFilters.removeAt(existingIndex)
+            } else {
+                // Для нейросетевых фильтров не добавляем intensity (null)
+                // Для обычных фильтров добавляем с интенсивностью по умолчанию
+                val intensity =
+                    if (filterType in neuralFilters) {
+                        null // Нейросетевые фильтры применяются без настроек
+                    } else {
+                        0.5f // Обычные фильтры с интенсивностью по умолчанию
+                    }
+                currentFilters.add(Pair(filterType, intensity))
+            }
+
+            _uiState.value = _uiState.value.copy(selectedFilters = currentFilters)
+            // Пересчитываем предпросмотр с учетом всех настроек и фильтров
             recalculatePreview()
         }
-    }
-    
-    fun toggleFilter(filterType: FilterType) {
-        val currentFilters = _uiState.value.selectedFilters.toMutableList()
-        val existingIndex = currentFilters.indexOfFirst { it.first == filterType }
-        
-        if (existingIndex >= 0) {
-            // Удаляем фильтр, если он уже выбран
-            currentFilters.removeAt(existingIndex)
-        } else {
-            // Для нейросетевых фильтров не добавляем intensity (null)
-            // Для обычных фильтров добавляем с интенсивностью по умолчанию
-            val intensity = if (filterType in neuralFilters) {
-                null // Нейросетевые фильтры применяются без настроек
-            } else {
-                0.5f // Обычные фильтры с интенсивностью по умолчанию
-            }
-            currentFilters.add(Pair(filterType, intensity))
-        }
-        
-        _uiState.value = _uiState.value.copy(selectedFilters = currentFilters)
-        // Пересчитываем предпросмотр с учетом всех настроек и фильтров
-        recalculatePreview()
-    }
-    
-    fun updateFilterIntensity(filterType: FilterType, intensity: Float) {
-        // Нейросетевые фильтры не поддерживают изменение intensity
-        if (filterType in neuralFilters) {
-            return
-        }
-        
-        val currentFilters = _uiState.value.selectedFilters.toMutableList()
-        val existingIndex = currentFilters.indexOfFirst { it.first == filterType }
-        
-        if (existingIndex >= 0) {
-            // Обновляем интенсивность существующего фильтра
-            currentFilters[existingIndex] = Pair(filterType, intensity)
-        } else {
-            // Добавляем новый фильтр с указанной интенсивностью
-            currentFilters.add(Pair(filterType, intensity))
-        }
-        
-        _uiState.value = _uiState.value.copy(
-            selectedFilters = currentFilters,
-            currentFilterIntensity = intensity
-        )
-        // Пересчитываем предпросмотр с учетом всех настроек и фильтров
-        recalculatePreview()
-    }
-    
-    /**
-     * Быстрый предпросмотр множественных фильтров без сохранения в файл.
-     * Используется для отображения результата в реальном времени.
-     */
-    private fun previewFilters(filters: List<Pair<FilterType, Float?>>) {
-        // Отменяем предыдущий предпросмотр
-        currentPreviewJob?.cancel()
-        
-        if (filters.isEmpty()) {
-            _uiState.value = _uiState.value.copy(
-                previewBitmap = null,
-                fullSizeBitmap = null,
-                isLoading = false
-            )
-            return
-        }
-        
-        // Проверяем, есть ли нейросетевые фильтры (они требуют больше времени)
-        val hasNeuralFilters = filters.any { (filterType, _) ->
-            filterType in neuralFilters
-        }
-        
-        // Устанавливаем isLoading для нейросетевых фильтров, так как они долго обрабатываются
-        if (hasNeuralFilters) {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-        }
-        
-        currentPreviewJob = viewModelScope.launch {
-            // Небольшая задержка для debounce
-            delay(100)
-            
-            val originalBitmap = getOrLoadOriginalBitmap()
-            if (originalBitmap == null) {
-                android.util.Log.e("EditorViewModel", "Не удалось получить исходный Bitmap для предпросмотра")
-                if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        error = "Не удалось загрузить изображение",
-                        isLoading = false
-                    )
-                }
-                return@launch
-            }
-            
-            // Проверяем, что Bitmap не переработан
-            if (originalBitmap.isRecycled) {
-                android.util.Log.e("EditorViewModel", "Исходный Bitmap был переработан, перезагружаем...")
-                cachedOriginalBitmap = null
-                val reloadedBitmap = getOrLoadOriginalBitmap() ?: return@launch
-                if (reloadedBitmap.isRecycled) {
-                    android.util.Log.e("EditorViewModel", "Перезагруженный Bitmap также переработан")
-                    return@launch
-                }
-            }
-            
-            try {
-                android.util.Log.d("EditorViewModel", "Применяем ${filters.size} фильтров для предпросмотра")
-                val processedBitmap = previewFiltersUseCase.invoke(
-                    originalBitmap,
-                    filters.map { it.first to it.second }
-                )
-                
-                if (isActive) {
-                    if (processedBitmap != null) {
-                        android.util.Log.d("EditorViewModel", "Обработанное изображение создано: ${processedBitmap.width}x${processedBitmap.height}")
-                        
-                        // Проверяем размер Bitmap в байтах
-                        val bitmapSizeBytes = processedBitmap.width * processedBitmap.height * 4 // ARGB_8888 = 4 байта на пиксель
-                        val maxCanvasSizeBytes = 100 * 1024 * 1024 // ~100 МБ - максимальный размер для Canvas
-                        
-                        // Масштабируем для preview, чтобы избежать ошибки Canvas
-                        // Используем максимум 2048x2048 для безопасности и производительности
-                        val maxPreviewDimension = 2048
-                        val previewBitmap = if (bitmapSizeBytes > maxCanvasSizeBytes || 
-                                               processedBitmap.width > maxPreviewDimension || 
-                                               processedBitmap.height > maxPreviewDimension) {
-                            val scale = minOf(
-                                maxPreviewDimension.toFloat() / processedBitmap.width,
-                                maxPreviewDimension.toFloat() / processedBitmap.height
-                            )
-                            val scaledWidth = (processedBitmap.width * scale).toInt()
-                            val scaledHeight = (processedBitmap.height * scale).toInt()
-                            android.util.Log.d("EditorViewModel", 
-                                "Масштабируем preview: ${processedBitmap.width}x${processedBitmap.height} (${bitmapSizeBytes / 1024 / 1024} МБ) -> ${scaledWidth}x${scaledHeight}")
-                            Bitmap.createScaledBitmap(processedBitmap, scaledWidth, scaledHeight, true)
-                        } else {
-                            processedBitmap
-                        }
-                        
-                        // Сохраняем оригинальный большой Bitmap для сохранения в файл
-                        // previewBitmap будет использоваться только для отображения
-                        _uiState.value = _uiState.value.copy(
-                            previewBitmap = previewBitmap,
-                            fullSizeBitmap = if (previewBitmap != processedBitmap) processedBitmap else null,
-                            isLoading = false
-                        )
-                    } else {
-                        android.util.Log.e("EditorViewModel", "Предпросмотр вернул null")
-                        _uiState.value = _uiState.value.copy(
-                            error = "Не удалось применить фильтры",
-                            isLoading = false
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("EditorViewModel", "Ошибка при применении фильтров: ${e.message}", e)
-                if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        error = e.message ?: "Ошибка применения фильтров",
-                        isLoading = false
-                    )
-                }
-            }
-        }
-    }
-    
-    /**
-     * Применить выбранные фильтры с сохранением в файл (для финального результата).
-     * 
-     * Использует уже обработанный previewBitmap для быстрого сохранения без повторной обработки.
-     * Сохраняет изображение в галерею и в папку processed.
-     */
-    fun applyFilters() {
-        val currentImage = _uiState.value.imageData ?: return
-        val selectedFilters = _uiState.value.selectedFilters
-        val previewBitmap = _uiState.value.previewBitmap
-        
-        if (selectedFilters.isEmpty()) {
-            android.util.Log.w("EditorViewModel", "Нет выбранных фильтров для применения")
-            return
-        }
-        
-        // Отменяем предыдущий запрос, если он еще выполняется
-        currentFilterJob?.cancel()
-        currentPreviewJob?.cancel()
-        
-        currentFilterJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                error = null
-            )
-            
-            try {
-                // Используем fullSizeBitmap если есть (полноразмерное изображение), иначе previewBitmap
-                val bitmapToSave = _uiState.value.fullSizeBitmap ?: previewBitmap
-                
-                val result = if (bitmapToSave != null && !bitmapToSave.isRecycled) {
-                    // Используем уже обработанный Bitmap для быстрого сохранения
-                    android.util.Log.d("EditorViewModel", 
-                        "Используем ${if (_uiState.value.fullSizeBitmap != null) "fullSizeBitmap" else "previewBitmap"} для сохранения (${bitmapToSave.width}x${bitmapToSave.height})")
-                    
-                    val filterNames = selectedFilters.joinToString("_") { it.first.name }
-                    val timestamp = System.currentTimeMillis()
-                    val fileName = "processed_${timestamp}_${filterNames}.jpg"
-                    
-                    // Сохраняем в галерею и в папку processed
-                    // Собираем все настройки для сохранения
-                    val editSettings = mapOf(
-                        "filters" to selectedFilters.map { it.first.name },
-                        "intensities" to selectedFilters.mapNotNull { it.second }
-                    )
-                    
-                    val uri = saveEditedImageUseCase.invoke(
-                        bitmapToSave, 
-                        fileName,
-                        originalUri = currentImage.uri,
-                        filterType = filterNames,
-                        editSettings = editSettings
-                    )
-                    
-                    if (uri != null) {
-                        ProcessingResult(
-                            originalUri = currentImage.uri,
-                            processedUri = uri,
-                            filterType = filterNames
-                        )
-                    } else {
-                        null
-                    }
-                } else {
-                    // Если previewBitmap нет, обрабатываем заново (fallback)
-                    android.util.Log.d("EditorViewModel", "PreviewBitmap отсутствует, обрабатываем заново")
-                    processImageWithFiltersUseCase.invoke(
-                        currentImage,
-                        selectedFilters.map { it.first to it.second }
-                    )
-                }
-                
-                // Проверяем, что корутина не была отменена и результат успешен
-                if (isActive && result != null) {
-                    _uiState.value = _uiState.value.copy(
-                        processedResult = result,
-                        previewBitmap = null,
-                        fullSizeBitmap = null, // Очищаем полноразмерное изображение после сохранения
-                        isLoading = false
-                    )
-                    
-                    // Обновляем галерею после успешного сохранения
-                    onImageSaved?.invoke()
-                    
-                    // Переходим на экран обработанных изображений
-                    onNavigateToProcessed?.invoke()
-                } else if (isActive && result == null) {
-                    // Если результат null, показываем ошибку
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Не удалось сохранить изображение"
-                    )
-                }
-            } catch (e: Exception) {
-                // Проверяем, что корутина не была отменена
-                if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = e.message
-                    )
-                }
-            }
-        }
-    }
-    
-    /**
-     * Получить или загрузить исходный Bitmap.
-     * Использует кэш для избежания повторной загрузки.
-     */
-    private suspend fun getOrLoadOriginalBitmap(): Bitmap? {
-        // Проверяем кэш
-        if (cachedOriginalBitmap != null && !cachedOriginalBitmap!!.isRecycled) {
-            return cachedOriginalBitmap
-        }
-        
-        val imageData = _uiState.value.imageData ?: return null
-        
-        // Используем UseCase для загрузки Bitmap
-        return try {
-            val bitmap = loadBitmapUseCase.invoke(imageData.uri)
-            if (bitmap != null) {
-                // Сохраняем истинно оригинальное изображение (если еще не сохранено)
-                if (trueOriginalBitmap == null || trueOriginalBitmap!!.isRecycled) {
-                    trueOriginalBitmap = bitmap
-                }
-                // Кэшируем для последующих использований
-                cachedOriginalBitmap = bitmap
-                android.util.Log.d("EditorViewModel", "Bitmap закэширован: ${bitmap.width}x${bitmap.height}")
-            } else {
-                android.util.Log.e("EditorViewModel", "Не удалось загрузить Bitmap из URI: ${imageData.uri}")
-            }
-            bitmap
-        } catch (e: Exception) {
-            android.util.Log.e("EditorViewModel", "Ошибка загрузки Bitmap: ${e.message}", e)
-            null
-        }
-    }
-    
-    /**
-     * Получить bitmap для кадрирования с учетом геометрических изменений, но без цветовых настроек и фильтров.
-     */
-    private suspend fun getBitmapForCropWithGeometry(): Bitmap? {
-        val baseBitmap = trueOriginalBitmap ?: getOrLoadOriginalBitmap()
-        if (baseBitmap == null || baseBitmap.isRecycled) {
-            return null
-        }
-        
-        // Применяем только геометрические изменения (повороты, отражения)
-        var workingBitmap: Bitmap? = baseBitmap
-        val bitmapsToRecycle = mutableListOf<Bitmap>()
-        
-        for ((geometricEditType, _) in _uiState.value.appliedEdits) {
-            if (workingBitmap == null || workingBitmap.isRecycled) break
-            if (geometricEditType == EditType.CROP) continue
-            val result = applyEditUseCase.invoke(workingBitmap, geometricEditType, 0f, null)
-            if (result != null && result != workingBitmap) {
-                if (workingBitmap != baseBitmap) {
-                    bitmapsToRecycle.add(workingBitmap)
-                }
-                workingBitmap = result
-            }
-        }
-        
-        // Освобождаем промежуточные bitmaps
-        bitmapsToRecycle.forEach { bitmap ->
-            if (!bitmap.isRecycled && bitmap != workingBitmap) {
-                bitmap.recycle()
-            }
-        }
-        
-        return workingBitmap
-    }
-    
-    fun clearFilters() {
-        currentPreviewJob?.cancel()
-        currentFilterJob?.cancel()
-        _uiState.value = _uiState.value.copy(
-            processedResult = null,
-            previewBitmap = null,
-            fullSizeBitmap = null,
-            selectedFilters = emptyList(),
-            currentFilterIntensity = 0.5f
-        )
-    }
-    
-    /**
-     * Сбросить все настройки и фильтры (вызывается при нажатии кнопки назад).
-     */
-    fun resetAll() {
-        currentPreviewJob?.cancel()
-        currentFilterJob?.cancel()
-        _uiState.value = _uiState.value.copy(
-            processedResult = null,
-            previewBitmap = null,
-            fullSizeBitmap = null,
-            selectedFilters = emptyList(),
-            currentFilterIntensity = 0.5f,
-            brightness = 0f,
-            contrast = 0f,
-            colorBalanceRed = 0f,
-            colorBalanceGreen = 0f,
-            colorBalanceBlue = 0f,
-            appliedEdits = emptyList(),
-            currentEditCategory = EditCategory.BRIGHTNESS,
-            showCropOverlay = false,
-            cropBitmap = null
-        )
-        // Очищаем кэш
-        cachedOriginalBitmap = null
-        trueOriginalBitmap = null
-    }
-    
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
-    }
-    
-    /**
-     * Переключить категорию фильтров (обычные/нейросетевые).
-     */
-    fun toggleFilterCategory() {
-        _uiState.value = _uiState.value.copy(
-            showNeuralFilters = !_uiState.value.showNeuralFilters
-        )
-    }
-    
-    /**
-     * Переключить режим (фильтры/редактирование).
-     * Настройки и фильтры сохраняются в состоянии, перерисовка не происходит.
-     */
-    fun toggleEditMode() {
-        _uiState.value = _uiState.value.copy(
-            showEditMode = !_uiState.value.showEditMode
-        )
-    }
-    
-    /**
-     * Обновить яркость.
-     */
-    fun updateBrightness(value: Float) {
-        _uiState.value = _uiState.value.copy(brightness = value)
-        recalculatePreview()
-    }
-    
-    /**
-     * Обновить контраст.
-     */
-    fun updateContrast(value: Float) {
-        _uiState.value = _uiState.value.copy(contrast = value)
-        recalculatePreview()
-    }
-    
-    /**
-     * Обновить цветовой баланс.
-     */
-    fun updateColorBalance(editType: EditType, value: Float) {
-        val newState = when (editType) {
-            EditType.COLOR_BALANCE_RED -> _uiState.value.copy(colorBalanceRed = value)
-            EditType.COLOR_BALANCE_GREEN -> _uiState.value.copy(colorBalanceGreen = value)
-            EditType.COLOR_BALANCE_BLUE -> _uiState.value.copy(colorBalanceBlue = value)
-            else -> _uiState.value
-        }
-        _uiState.value = newState
-        recalculatePreview()
-    }
-    
-    /**
-     * Получить список фильтров для текущей категории.
-     */
-    fun getCurrentCategoryFilters(): List<FilterType> {
-        return if (_uiState.value.showNeuralFilters) {
-            neuralFilters
-        } else {
-            regularFilters
-        }
-    }
-    
-    /**
-     * Применить редактирование к изображению.
-     * Для геометрических операций (повороты, отражения) накапливает изменения.
-     * Для цветовых корректировок применяет сразу.
-     */
-    fun applyEdit(editType: EditType, value: Float = 0f, cropRect: Rect? = null) {
-        // Для кадрирования показываем overlay и загружаем bitmap
-        if (editType == EditType.CROP) {
-            viewModelScope.launch {
-                val bitmap = getBitmapForCrop()
-                _uiState.value = _uiState.value.copy(
-                    showCropOverlay = true,
-                    cropBitmap = bitmap
-                )
-            }
-            return
-        }
-        
-        currentPreviewJob?.cancel()
-        
-        // Для геометрических операций накапливаем изменения
-        val isGeometric = editType in listOf(
-            EditType.ROTATE_90, EditType.ROTATE_180, EditType.ROTATE_270,
-            EditType.FLIP_HORIZONTAL, EditType.FLIP_VERTICAL
-        )
-        
-        val newAppliedEdits = if (isGeometric) {
-            _uiState.value.appliedEdits + (editType to 0f)
-        } else {
-            _uiState.value.appliedEdits
-        }
-        
-        _uiState.value = _uiState.value.copy(appliedEdits = newAppliedEdits)
-        
-        // Пересчитываем предпросмотр со всеми накопленными изменениями
-        recalculatePreview()
-    }
-    
-    /**
-     * Получить bitmap для кадрирования с учетом геометрических изменений, но без цветовых настроек и фильтров.
-     */
-    suspend fun getBitmapForCrop(): Bitmap? {
-        return getBitmapForCropWithGeometry()
-    }
-    
-    /**
-     * Применить кадрирование с указанным прямоугольником.
-     * Координаты cropRect должны быть в координатах bitmap, переданного в CropOverlay.
-     */
-    fun applyCrop(cropRect: Rect) {
-        currentPreviewJob?.cancel()
-        
-        // Применяем кадрирование и пересчитываем предпросмотр
-        currentPreviewJob = viewModelScope.launch {
-            delay(100)
-            
-            // Получаем bitmap для кадрирования (с геометрическими изменениями, но без цветовых настроек и фильтров)
-            val bitmapForCrop = getBitmapForCropWithGeometry()
-            if (bitmapForCrop == null || bitmapForCrop.isRecycled) {
-                _uiState.value = _uiState.value.copy(
-                    error = "Не удалось загрузить изображение"
-                )
-                return@launch
-            }
-            
-            try {
-                // Проверяем, нужно ли масштабировать координаты
-                val cropBitmap = _uiState.value.cropBitmap
-                val needsScaling = cropBitmap != null && 
-                                   (cropBitmap.width != bitmapForCrop.width || 
-                                    cropBitmap.height != bitmapForCrop.height)
-                
-                val finalCropRect = if (needsScaling && cropBitmap != null) {
-                    // Масштабируем координаты из cropBitmap в bitmapForCrop
-                    val scaleX = bitmapForCrop.width.toFloat() / cropBitmap.width.toFloat()
-                    val scaleY = bitmapForCrop.height.toFloat() / cropBitmap.height.toFloat()
-                    Rect(
-                        (cropRect.left * scaleX).toInt().coerceIn(0, bitmapForCrop.width),
-                        (cropRect.top * scaleY).toInt().coerceIn(0, bitmapForCrop.height),
-                        (cropRect.right * scaleX).toInt().coerceIn(0, bitmapForCrop.width),
-                        (cropRect.bottom * scaleY).toInt().coerceIn(0, bitmapForCrop.height)
-                    )
-                } else {
-                    // Координаты уже в правильном масштабе
-                    cropRect
-                }
-                
-                val croppedBitmap = applyEditUseCase.invoke(
-                    bitmapForCrop,
-                    EditType.CROP,
-                    0f,
-                    finalCropRect
-                )
-                
-                if (isActive && croppedBitmap != null) {
-                    // Обновляем кэш на обрезанное изображение
-                    cachedOriginalBitmap = croppedBitmap
-                    
-                    // Обновляем состояние (не добавляем CROP в appliedEdits, так как он уже применен к исходному изображению)
-                    _uiState.value = _uiState.value.copy(
-                        showCropOverlay = false,
-                        cropBitmap = null,
-                        error = null
-                    )
-                    
-                    // Пересчитываем предпросмотр с учетом всех настроек и фильтров
-                    recalculatePreview()
-                } else if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        error = "Не удалось применить кадрирование"
-                    )
-                }
-            } catch (e: Exception) {
-                if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        error = e.message ?: "Ошибка применения кадрирования"
-                    )
-                }
-            }
-        }
-    }
-    
-    /**
-     * Отменить кадрирование.
-     */
-    fun cancelCrop() {
-        _uiState.value = _uiState.value.copy(
-            showCropOverlay = false,
-            cropBitmap = null
-        )
-    }
-    
-    /**
-     * Пересчитать предпросмотр с учетом всех накопленных изменений.
-     */
-    private fun recalculatePreview() {
-        android.util.Log.e("EditorViewModel", "recalculatePreview() вызван")
-        android.util.Log.d("EditorViewModel", "  - brightness: ${_uiState.value.brightness}")
-        android.util.Log.d("EditorViewModel", "  - contrast: ${_uiState.value.contrast}")
-        android.util.Log.d("EditorViewModel", "  - colorBalance: R=${_uiState.value.colorBalanceRed}, G=${_uiState.value.colorBalanceGreen}, B=${_uiState.value.colorBalanceBlue}")
-        android.util.Log.d("EditorViewModel", "  - selectedFilters: ${_uiState.value.selectedFilters.size} фильтров")
-        android.util.Log.d("EditorViewModel", "  - appliedEdits: ${_uiState.value.appliedEdits.size} изменений")
-        currentPreviewJob?.cancel()
-        
-        currentPreviewJob = viewModelScope.launch {
-            delay(400) // Увеличена задержка для уменьшения частоты вызовов при движении слайдера
-            
-            val originalBitmap = getOrLoadOriginalBitmap()
-            if (originalBitmap == null || originalBitmap.isRecycled) {
-                _uiState.value = _uiState.value.copy(
-                    error = "Не удалось загрузить изображение"
-                )
-                return@launch
-            }
-            
-            try {
-                // Применяем все накопленные изменения последовательно
-                var workingBitmap: Bitmap? = originalBitmap
-                val bitmapsToRecycle = mutableListOf<Bitmap>()
-                
-                // Сначала применяем все геометрические изменения (кроме CROP, так как он уже применен к исходному изображению)
-                for ((geometricEditType, _) in _uiState.value.appliedEdits) {
-                    if (workingBitmap == null || workingBitmap.isRecycled) break
-                    // Пропускаем CROP, так как он уже применен к исходному изображению в кэше
-                    if (geometricEditType == EditType.CROP) continue
-                    val result = applyEditUseCase.invoke(workingBitmap, geometricEditType, 0f, null)
-                    if (result != null && result != workingBitmap) {
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        workingBitmap = result
-                    }
-                }
-                
-                if (workingBitmap == null || workingBitmap.isRecycled) {
-                    _uiState.value = _uiState.value.copy(
-                        error = "Ошибка применения геометрических изменений"
-                    )
-                    return@launch
-                }
-                
-                // Затем применяем цветовые корректировки
-                if (_uiState.value.brightness != 0f) {
-                    val result = applyEditUseCase.invoke(workingBitmap, EditType.BRIGHTNESS, _uiState.value.brightness, null)
-                    if (result != null && result != workingBitmap) {
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        workingBitmap = result
-                    } else if (result == null) {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Ошибка применения яркости"
-                        )
-                        return@launch
-                    }
-                }
-                
-                if (_uiState.value.contrast != 0f) {
-                    val result = applyEditUseCase.invoke(workingBitmap, EditType.CONTRAST, _uiState.value.contrast, null)
-                    if (result != null && result != workingBitmap) {
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        workingBitmap = result
-                    } else if (result == null) {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Ошибка применения контраста"
-                        )
-                        return@launch
-                    }
-                }
-                
-                // Применяем цветовой баланс
-                if (_uiState.value.colorBalanceRed != 0f) {
-                    val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_RED, _uiState.value.colorBalanceRed, null)
-                    if (result != null && result != workingBitmap) {
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        workingBitmap = result
-                    } else if (result == null) {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Ошибка применения цветового баланса"
-                        )
-                        return@launch
-                    }
-                }
-                
-                if (_uiState.value.colorBalanceGreen != 0f) {
-                    val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_GREEN, _uiState.value.colorBalanceGreen, null)
-                    if (result != null && result != workingBitmap) {
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        workingBitmap = result
-                    } else if (result == null) {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Ошибка применения цветового баланса"
-                        )
-                        return@launch
-                    }
-                }
-                
-                if (_uiState.value.colorBalanceBlue != 0f) {
-                    val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_BLUE, _uiState.value.colorBalanceBlue, null)
-                    if (result != null && result != workingBitmap) {
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        workingBitmap = result
-                    } else if (result == null) {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Ошибка применения цветового баланса"
-                        )
-                        return@launch
-                    }
-                }
-                
-                // Применяем фильтры, если они есть
-                if (workingBitmap != null && !workingBitmap.isRecycled && _uiState.value.selectedFilters.isNotEmpty()) {
-                    // Для предпросмотра используем стандартный метод
-                    // Имя модели будет извлечено из URI в processImage при сохранении
-                    // Для предпросмотра используем модель по умолчанию (AnimeGAN2)
-                    val filteredResult = previewFiltersUseCase.invoke(
-                        workingBitmap,
-                        _uiState.value.selectedFilters.map { it.first to it.second }
-                    )
-                    if (filteredResult != null && filteredResult != workingBitmap) {
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        workingBitmap = filteredResult
-                    }
-                }
-                
-                if (isActive && workingBitmap != null && !workingBitmap.isRecycled) {
-                    // Сохраняем старые битмапы из UI перед обновлением
-                    val oldPreviewBitmap = _uiState.value.previewBitmap
-                    val oldFullSizeBitmap = _uiState.value.fullSizeBitmap
-                    
-                    // Масштабируем для preview, чтобы избежать ошибки Canvas
-                    // Используем максимум 2048x2048 для безопасности и производительности
-                    val maxPreviewDimension = 2048
-                    val bitmapSizeBytes = workingBitmap.width * workingBitmap.height * 4 // ARGB_8888 = 4 байта на пиксель
-                    val maxCanvasSizeBytes = 100 * 1024 * 1024 // ~100 МБ - максимальный размер для Canvas
-                    
-                    val previewBitmap = if (bitmapSizeBytes > maxCanvasSizeBytes || 
-                                           workingBitmap.width > maxPreviewDimension || 
-                                           workingBitmap.height > maxPreviewDimension) {
-                        val scale = minOf(
-                            maxPreviewDimension.toFloat() / workingBitmap.width,
-                            maxPreviewDimension.toFloat() / workingBitmap.height
-                        )
-                        val scaledWidth = (workingBitmap.width * scale).toInt()
-                        val scaledHeight = (workingBitmap.height * scale).toInt()
-                        android.util.Log.d("EditorViewModel", 
-                            "Масштабируем preview: ${workingBitmap.width}x${workingBitmap.height} (${bitmapSizeBytes / 1024 / 1024} МБ) -> ${scaledWidth}x${scaledHeight}")
-                        val scaled = Bitmap.createScaledBitmap(workingBitmap, scaledWidth, scaledHeight, true)
-                        if (workingBitmap != originalBitmap) {
-                            bitmapsToRecycle.add(workingBitmap)
-                        }
-                        scaled
-                    } else {
-                        workingBitmap
-                    }
-                    
-                    // Обновляем состояние UI
-                    _uiState.value = _uiState.value.copy(
-                        previewBitmap = previewBitmap,
-                        fullSizeBitmap = if (previewBitmap != workingBitmap) workingBitmap else null
-                    )
-                    
-                    // Освобождаем старые битмапы из UI после обновления состояния
-                    // Используем небольшую задержку, чтобы UI успел обновиться
-                    viewModelScope.launch {
-                        delay(200) // Даем время UI обновиться
-                        oldPreviewBitmap?.let {
-                            if (!it.isRecycled && it != previewBitmap && it != workingBitmap) {
-                                it.recycle()
-                            }
-                        }
-                        oldFullSizeBitmap?.let {
-                            if (!it.isRecycled && it != previewBitmap && it != workingBitmap && it != oldPreviewBitmap) {
-                                it.recycle()
-                            }
-                        }
-                    }
-                }
-                
-                // Освобождаем промежуточные bitmaps (но не те, что используются в UI)
-                bitmapsToRecycle.forEach { bitmap ->
-                    val oldPreview = _uiState.value.previewBitmap
-                    val oldFullSize = _uiState.value.fullSizeBitmap
-                    if (!bitmap.isRecycled && bitmap != oldPreview && bitmap != oldFullSize) {
-                        bitmap.recycle()
-                    }
-                }
-            } catch (e: Exception) {
-                if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        error = e.message ?: "Ошибка применения редактирования"
-                    )
-                }
-            }
-        }
-    }
-    
-    /**
-     * Установить текущую категорию редактирования.
-     */
-    fun setEditCategory(category: EditCategory) {
-        _uiState.value = _uiState.value.copy(currentEditCategory = category)
-    }
-    
-    /**
-     * Очистить все примененные геометрические изменения.
-     */
-    fun clearGeometricEdits() {
-        _uiState.value = _uiState.value.copy(appliedEdits = emptyList())
-        // Пересчитываем предпросмотр
-        recalculatePreview()
-    }
-    
-    /**
-     * Сохранить отредактированное изображение в галерею.
-     */
-    fun saveEditedImageToGallery() {
-        // Используем fullSizeBitmap если есть (полноразмерное изображение), иначе previewBitmap
-        val bitmapToSave = _uiState.value.fullSizeBitmap ?: _uiState.value.previewBitmap ?: return
-        
-        currentFilterJob?.cancel()
-        currentPreviewJob?.cancel()
-        
-        currentFilterJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                error = null
-            )
-            
-            try {
-                val timestamp = System.currentTimeMillis()
-                val fileName = "edited_${timestamp}.jpg"
-                // Сохраняем и в галерею, и в папку processed
-                android.util.Log.d("EditorViewModel", 
-                    "Сохраняем ${if (_uiState.value.fullSizeBitmap != null) "fullSizeBitmap" else "previewBitmap"}: ${bitmapToSave.width}x${bitmapToSave.height}")
-                // Собираем все настройки редактирования для сохранения
-                val editSettings = mutableMapOf<String, Any>()
-                if (_uiState.value.brightness != 0f) {
-                    editSettings["brightness"] = _uiState.value.brightness
-                }
-                if (_uiState.value.contrast != 0f) {
-                    editSettings["contrast"] = _uiState.value.contrast
-                }
-                if (_uiState.value.colorBalanceRed != 0f || 
-                    _uiState.value.colorBalanceGreen != 0f || 
-                    _uiState.value.colorBalanceBlue != 0f) {
-                    editSettings["colorBalanceRed"] = _uiState.value.colorBalanceRed
-                    editSettings["colorBalanceGreen"] = _uiState.value.colorBalanceGreen
-                    editSettings["colorBalanceBlue"] = _uiState.value.colorBalanceBlue
-                }
-                // Сохраняем appliedEdits как список пар (String, Float) для сериализации
-                if (_uiState.value.appliedEdits.isNotEmpty()) {
-                    editSettings["appliedEdits"] = _uiState.value.appliedEdits.map { Pair(it.first.name, it.second) }
-                }
-                if (_uiState.value.selectedFilters.isNotEmpty()) {
-                    editSettings["filters"] = _uiState.value.selectedFilters.map { it.first.name }
-                    editSettings["filterIntensities"] = _uiState.value.selectedFilters.mapNotNull { it.second }
-                }
-                
-                val uri = saveEditedImageUseCase.invoke(
-                    bitmapToSave, 
-                    fileName,
-                    originalUri = _uiState.value.imageData?.uri,
-                    filterType = "edited",
-                    editSettings = editSettings
-                )
-                
-                if (isActive && uri != null) {
-                    _uiState.value = _uiState.value.copy(
-                        processedResult = ProcessingResult(
-                            originalUri = _uiState.value.imageData?.uri ?: uri,
-                            processedUri = uri,
-                            filterType = "edited"
-                        ),
-                        isLoading = false
-                    )
-                    
-                    // Обновляем галерею и обработанные изображения
-                    onImageSaved?.invoke()
-                    onNavigateToProcessed?.invoke()
-                } else if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Не удалось сохранить изображение"
-                    )
-                }
-            } catch (e: Exception) {
-                if (isActive) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = e.message
-                    )
-                }
-            }
-        }
-    }
 
-    override fun onCleared() {
-        _uiState.value = EditorUiState()
-        super.onCleared()
+        fun updateFilterIntensity(
+            filterType: FilterType,
+            intensity: Float,
+        ) {
+            // Нейросетевые фильтры не поддерживают изменение intensity
+            if (filterType in neuralFilters) {
+                return
+            }
+
+            val currentFilters = _uiState.value.selectedFilters.toMutableList()
+            val existingIndex = currentFilters.indexOfFirst { it.first == filterType }
+
+            if (existingIndex >= 0) {
+                // Обновляем интенсивность существующего фильтра
+                currentFilters[existingIndex] = Pair(filterType, intensity)
+            } else {
+                // Добавляем новый фильтр с указанной интенсивностью
+                currentFilters.add(Pair(filterType, intensity))
+            }
+
+            _uiState.value =
+                _uiState.value.copy(
+                    selectedFilters = currentFilters,
+                    currentFilterIntensity = intensity,
+                )
+            // Пересчитываем предпросмотр с учетом всех настроек и фильтров
+            recalculatePreview()
+        }
+
+        /**
+         * Быстрый предпросмотр множественных фильтров без сохранения в файл.
+         * Используется для отображения результата в реальном времени.
+         */
+        private fun previewFilters(filters: List<Pair<FilterType, Float?>>) {
+            // Отменяем предыдущий предпросмотр
+            currentPreviewJob?.cancel()
+
+            if (filters.isEmpty()) {
+                _uiState.value =
+                    _uiState.value.copy(
+                        previewBitmap = null,
+                        fullSizeBitmap = null,
+                        isLoading = false,
+                    )
+                return
+            }
+
+            // Проверяем, есть ли нейросетевые фильтры (они требуют больше времени)
+            val hasNeuralFilters =
+                filters.any { (filterType, _) ->
+                    filterType in neuralFilters
+                }
+
+            // Устанавливаем isLoading для нейросетевых фильтров, так как они долго обрабатываются
+            if (hasNeuralFilters) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            }
+
+            currentPreviewJob =
+                viewModelScope.launch {
+                    // Небольшая задержка для debounce
+                    delay(100)
+
+                    val originalBitmap = getOrLoadOriginalBitmap()
+                    if (originalBitmap == null) {
+                        android.util.Log.e("EditorViewModel", "Не удалось получить исходный Bitmap для предпросмотра")
+                        if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    error = "Не удалось загрузить изображение",
+                                    isLoading = false,
+                                )
+                        }
+                        return@launch
+                    }
+
+                    // Проверяем, что Bitmap не переработан
+                    if (originalBitmap.isRecycled) {
+                        android.util.Log.e("EditorViewModel", "Исходный Bitmap был переработан, перезагружаем...")
+                        cachedOriginalBitmap = null
+                        val reloadedBitmap = getOrLoadOriginalBitmap() ?: return@launch
+                        if (reloadedBitmap.isRecycled) {
+                            android.util.Log.e("EditorViewModel", "Перезагруженный Bitmap также переработан")
+                            return@launch
+                        }
+                    }
+
+                    try {
+                        android.util.Log.d("EditorViewModel", "Применяем ${filters.size} фильтров для предпросмотра")
+                        val processedBitmap =
+                            previewFiltersUseCase.invoke(
+                                originalBitmap,
+                                filters.map { it.first to it.second },
+                            )
+
+                        if (isActive) {
+                            if (processedBitmap != null) {
+                                android.util.Log.d("EditorViewModel", "Обработанное изображение создано: ${processedBitmap.width}x${processedBitmap.height}")
+
+                                // Проверяем размер Bitmap в байтах
+                                val bitmapSizeBytes = processedBitmap.width * processedBitmap.height * 4 // ARGB_8888 = 4 байта на пиксель
+                                val maxCanvasSizeBytes = 100 * 1024 * 1024 // ~100 МБ - максимальный размер для Canvas
+
+                                // Масштабируем для preview, чтобы избежать ошибки Canvas
+                                // Используем максимум 2048x2048 для безопасности и производительности
+                                val maxPreviewDimension = 2048
+                                val previewBitmap =
+                                    if (bitmapSizeBytes > maxCanvasSizeBytes ||
+                                        processedBitmap.width > maxPreviewDimension ||
+                                        processedBitmap.height > maxPreviewDimension
+                                    ) {
+                                        val scale =
+                                            minOf(
+                                                maxPreviewDimension.toFloat() / processedBitmap.width,
+                                                maxPreviewDimension.toFloat() / processedBitmap.height,
+                                            )
+                                        val scaledWidth = (processedBitmap.width * scale).toInt()
+                                        val scaledHeight = (processedBitmap.height * scale).toInt()
+                                        android.util.Log.d(
+                                            "EditorViewModel",
+                                            "Масштабируем preview: ${processedBitmap.width}x${processedBitmap.height} (${bitmapSizeBytes / 1024 / 1024} МБ) -> ${scaledWidth}x$scaledHeight",
+                                        )
+                                        Bitmap.createScaledBitmap(processedBitmap, scaledWidth, scaledHeight, true)
+                                    } else {
+                                        processedBitmap
+                                    }
+
+                                // Сохраняем оригинальный большой Bitmap для сохранения в файл
+                                // previewBitmap будет использоваться только для отображения
+                                _uiState.value =
+                                    _uiState.value.copy(
+                                        previewBitmap = previewBitmap,
+                                        fullSizeBitmap = if (previewBitmap != processedBitmap) processedBitmap else null,
+                                        isLoading = false,
+                                    )
+                            } else {
+                                android.util.Log.e("EditorViewModel", "Предпросмотр вернул null")
+                                _uiState.value =
+                                    _uiState.value.copy(
+                                        error = "Не удалось применить фильтры",
+                                        isLoading = false,
+                                    )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("EditorViewModel", "Ошибка при применении фильтров: ${e.message}", e)
+                        if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    error = e.message ?: "Ошибка применения фильтров",
+                                    isLoading = false,
+                                )
+                        }
+                    }
+                }
+        }
+
+        /**
+         * Применить выбранные фильтры с сохранением в файл (для финального результата).
+         *
+         * Использует уже обработанный previewBitmap для быстрого сохранения без повторной обработки.
+         * Сохраняет изображение в галерею и в папку processed.
+         */
+        fun applyFilters() {
+            val currentImage = _uiState.value.imageData ?: return
+            val selectedFilters = _uiState.value.selectedFilters
+            val previewBitmap = _uiState.value.previewBitmap
+
+            if (selectedFilters.isEmpty()) {
+                android.util.Log.w("EditorViewModel", "Нет выбранных фильтров для применения")
+                return
+            }
+
+            // Отменяем предыдущий запрос, если он еще выполняется
+            currentFilterJob?.cancel()
+            currentPreviewJob?.cancel()
+
+            currentFilterJob =
+                viewModelScope.launch {
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isLoading = true,
+                            error = null,
+                        )
+
+                    try {
+                        // Используем fullSizeBitmap если есть (полноразмерное изображение), иначе previewBitmap
+                        val bitmapToSave = _uiState.value.fullSizeBitmap ?: previewBitmap
+
+                        val result =
+                            if (bitmapToSave != null && !bitmapToSave.isRecycled) {
+                                // Используем уже обработанный Bitmap для быстрого сохранения
+                                android.util.Log.d(
+                                    "EditorViewModel",
+                                    "Используем ${if (_uiState.value.fullSizeBitmap != null) "fullSizeBitmap" else "previewBitmap"} для сохранения (${bitmapToSave.width}x${bitmapToSave.height})",
+                                )
+
+                                val filterNames = selectedFilters.joinToString("_") { it.first.name }
+                                val timestamp = System.currentTimeMillis()
+                                val fileName = "processed_${timestamp}_$filterNames.jpg"
+
+                                // Сохраняем в галерею и в папку processed
+                                // Собираем все настройки для сохранения
+                                val editSettings =
+                                    mapOf(
+                                        "filters" to selectedFilters.map { it.first.name },
+                                        "intensities" to selectedFilters.mapNotNull { it.second },
+                                    )
+
+                                val uri =
+                                    saveEditedImageUseCase.invoke(
+                                        bitmapToSave,
+                                        fileName,
+                                        originalUri = currentImage.uri,
+                                        filterType = filterNames,
+                                        editSettings = editSettings,
+                                    )
+
+                                if (uri != null) {
+                                    ProcessingResult(
+                                        originalUri = currentImage.uri,
+                                        processedUri = uri,
+                                        filterType = filterNames,
+                                    )
+                                } else {
+                                    null
+                                }
+                            } else {
+                                // Если previewBitmap нет, обрабатываем заново (fallback)
+                                android.util.Log.d("EditorViewModel", "PreviewBitmap отсутствует, обрабатываем заново")
+                                processImageWithFiltersUseCase.invoke(
+                                    currentImage,
+                                    selectedFilters.map { it.first to it.second },
+                                )
+                            }
+
+                        // Проверяем, что корутина не была отменена и результат успешен
+                        if (isActive && result != null) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    processedResult = result,
+                                    previewBitmap = null,
+                                    fullSizeBitmap = null, // Очищаем полноразмерное изображение после сохранения
+                                    isLoading = false,
+                                )
+
+                            // Обновляем галерею после успешного сохранения
+                            onImageSaved?.invoke()
+
+                            // Переходим на экран обработанных изображений
+                            onNavigateToProcessed?.invoke()
+                        } else if (isActive && result == null) {
+                            // Если результат null, показываем ошибку
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    isLoading = false,
+                                    error = "Не удалось сохранить изображение",
+                                )
+                        }
+                    } catch (e: Exception) {
+                        // Проверяем, что корутина не была отменена
+                        if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    isLoading = false,
+                                    error = e.message,
+                                )
+                        }
+                    }
+                }
+        }
+
+        /**
+         * Получить или загрузить исходный Bitmap.
+         * Использует кэш для избежания повторной загрузки.
+         */
+        private suspend fun getOrLoadOriginalBitmap(): Bitmap? {
+            // Проверяем кэш
+            if (cachedOriginalBitmap != null && !cachedOriginalBitmap!!.isRecycled) {
+                return cachedOriginalBitmap
+            }
+
+            val imageData = _uiState.value.imageData ?: return null
+
+            // Используем UseCase для загрузки Bitmap
+            return try {
+                val bitmap = loadBitmapUseCase.invoke(imageData.uri)
+                if (bitmap != null) {
+                    // Сохраняем истинно оригинальное изображение (если еще не сохранено)
+                    if (trueOriginalBitmap == null || trueOriginalBitmap!!.isRecycled) {
+                        trueOriginalBitmap = bitmap
+                    }
+                    // Кэшируем для последующих использований
+                    cachedOriginalBitmap = bitmap
+                    android.util.Log.d(
+                        "EditorViewModel",
+                        "Bitmap закэширован: ${bitmap.width}x${bitmap.height}",
+                    )
+                } else {
+                    android.util.Log.e(
+                        "EditorViewModel",
+                        "Не удалось загрузить Bitmap из URI: ${imageData.uri}",
+                    )
+                }
+                bitmap
+            } catch (e: Exception) {
+                android.util.Log.e("EditorViewModel", "Ошибка загрузки Bitmap: ${e.message}", e)
+                null
+            }
+        }
+
+        /**
+         * Получить bitmap для кадрирования с учетом геометрических изменений, но без цветовых настроек и фильтров.
+         */
+        private suspend fun getBitmapForCropWithGeometry(): Bitmap? {
+            val baseBitmap = trueOriginalBitmap ?: getOrLoadOriginalBitmap()
+            if (baseBitmap == null || baseBitmap.isRecycled) {
+                return null
+            }
+
+            // Применяем только геометрические изменения (повороты, отражения)
+            var workingBitmap: Bitmap? = baseBitmap
+            val bitmapsToRecycle = mutableListOf<Bitmap>()
+
+            for ((geometricEditType, _) in _uiState.value.appliedEdits) {
+                if (workingBitmap == null || workingBitmap.isRecycled) break
+                if (geometricEditType == EditType.CROP) continue
+                val result = applyEditUseCase.invoke(workingBitmap, geometricEditType, 0f, null)
+                if (result != null && result != workingBitmap) {
+                    if (workingBitmap != baseBitmap) {
+                        bitmapsToRecycle.add(workingBitmap)
+                    }
+                    workingBitmap = result
+                }
+            }
+
+            // Освобождаем промежуточные bitmaps
+            bitmapsToRecycle.forEach { bitmap ->
+                if (!bitmap.isRecycled && bitmap != workingBitmap) {
+                    bitmap.recycle()
+                }
+            }
+
+            return workingBitmap
+        }
+
+        fun clearFilters() {
+            currentPreviewJob?.cancel()
+            currentFilterJob?.cancel()
+            _uiState.value =
+                _uiState.value.copy(
+                    processedResult = null,
+                    previewBitmap = null,
+                    fullSizeBitmap = null,
+                    selectedFilters = emptyList(),
+                    currentFilterIntensity = 0.5f,
+                )
+        }
+
+        /**
+         * Сбросить все настройки и фильтры (вызывается при нажатии кнопки назад).
+         */
+        fun resetAll() {
+            currentPreviewJob?.cancel()
+            currentFilterJob?.cancel()
+            _uiState.value =
+                _uiState.value.copy(
+                    processedResult = null,
+                    previewBitmap = null,
+                    fullSizeBitmap = null,
+                    selectedFilters = emptyList(),
+                    currentFilterIntensity = 0.5f,
+                    brightness = 0f,
+                    contrast = 0f,
+                    colorBalanceRed = 0f,
+                    colorBalanceGreen = 0f,
+                    colorBalanceBlue = 0f,
+                    appliedEdits = emptyList(),
+                    currentEditCategory = EditCategory.BRIGHTNESS,
+                    showCropOverlay = false,
+                    cropBitmap = null,
+                )
+            // Очищаем кэш
+            cachedOriginalBitmap = null
+            trueOriginalBitmap = null
+        }
+
+        fun clearError() {
+            _uiState.value = _uiState.value.copy(error = null)
+        }
+
+        /**
+         * Переключить категорию фильтров (обычные/нейросетевые).
+         */
+        fun toggleFilterCategory() {
+            _uiState.value =
+                _uiState.value.copy(
+                    showNeuralFilters = !_uiState.value.showNeuralFilters,
+                )
+        }
+
+        /**
+         * Переключить режим (фильтры/редактирование).
+         * Настройки и фильтры сохраняются в состоянии, перерисовка не происходит.
+         */
+        fun toggleEditMode() {
+            _uiState.value =
+                _uiState.value.copy(
+                    showEditMode = !_uiState.value.showEditMode,
+                )
+        }
+
+        /**
+         * Обновить яркость.
+         */
+        fun updateBrightness(value: Float) {
+            _uiState.value = _uiState.value.copy(brightness = value)
+            recalculatePreview()
+        }
+
+        /**
+         * Обновить контраст.
+         */
+        fun updateContrast(value: Float) {
+            _uiState.value = _uiState.value.copy(contrast = value)
+            recalculatePreview()
+        }
+
+        /**
+         * Обновить цветовой баланс.
+         */
+        fun updateColorBalance(
+            editType: EditType,
+            value: Float,
+        ) {
+            val newState =
+                when (editType) {
+                    EditType.COLOR_BALANCE_RED -> _uiState.value.copy(colorBalanceRed = value)
+                    EditType.COLOR_BALANCE_GREEN -> _uiState.value.copy(colorBalanceGreen = value)
+                    EditType.COLOR_BALANCE_BLUE -> _uiState.value.copy(colorBalanceBlue = value)
+                    else -> _uiState.value
+                }
+            _uiState.value = newState
+            recalculatePreview()
+        }
+
+        /**
+         * Получить список фильтров для текущей категории.
+         */
+        fun getCurrentCategoryFilters(): List<FilterType> {
+            return if (_uiState.value.showNeuralFilters) {
+                neuralFilters
+            } else {
+                regularFilters
+            }
+        }
+
+        /**
+         * Применить редактирование к изображению.
+         * Для геометрических операций (повороты, отражения) накапливает изменения.
+         * Для цветовых корректировок применяет сразу.
+         */
+        fun applyEdit(
+            editType: EditType,
+            value: Float = 0f,
+            cropRect: Rect? = null,
+        ) {
+            // Для кадрирования показываем overlay и загружаем bitmap
+            if (editType == EditType.CROP) {
+                viewModelScope.launch {
+                    val bitmap = getBitmapForCrop()
+                    _uiState.value =
+                        _uiState.value.copy(
+                            showCropOverlay = true,
+                            cropBitmap = bitmap,
+                        )
+                }
+                return
+            }
+
+            currentPreviewJob?.cancel()
+
+            // Для геометрических операций накапливаем изменения
+            val isGeometric =
+                editType in
+                    listOf(
+                        EditType.ROTATE_90, EditType.ROTATE_180, EditType.ROTATE_270,
+                        EditType.FLIP_HORIZONTAL, EditType.FLIP_VERTICAL,
+                    )
+
+            val newAppliedEdits =
+                if (isGeometric) {
+                    _uiState.value.appliedEdits + (editType to 0f)
+                } else {
+                    _uiState.value.appliedEdits
+                }
+
+            _uiState.value = _uiState.value.copy(appliedEdits = newAppliedEdits)
+
+            // Пересчитываем предпросмотр со всеми накопленными изменениями
+            recalculatePreview()
+        }
+
+        /**
+         * Получить bitmap для кадрирования с учетом геометрических изменений, но без цветовых настроек и фильтров.
+         */
+        suspend fun getBitmapForCrop(): Bitmap? {
+            return getBitmapForCropWithGeometry()
+        }
+
+        /**
+         * Применить кадрирование с указанным прямоугольником.
+         * Координаты cropRect должны быть в координатах bitmap, переданного в CropOverlay.
+         */
+        fun applyCrop(cropRect: Rect) {
+            currentPreviewJob?.cancel()
+
+            // Применяем кадрирование и пересчитываем предпросмотр
+            currentPreviewJob =
+                viewModelScope.launch {
+                    delay(100)
+
+                    // Получаем bitmap для кадрирования (с геометрическими изменениями, но без цветовых настроек и фильтров)
+                    val bitmapForCrop = getBitmapForCropWithGeometry()
+                    if (bitmapForCrop == null || bitmapForCrop.isRecycled) {
+                        _uiState.value =
+                            _uiState.value.copy(
+                                error = "Не удалось загрузить изображение",
+                            )
+                        return@launch
+                    }
+
+                    try {
+                        // Проверяем, нужно ли масштабировать координаты
+                        val cropBitmap = _uiState.value.cropBitmap
+                        val needsScaling =
+                            cropBitmap != null &&
+                                (
+                                    cropBitmap.width != bitmapForCrop.width ||
+                                        cropBitmap.height != bitmapForCrop.height
+                                )
+
+                        val finalCropRect =
+                            if (needsScaling && cropBitmap != null) {
+                                // Масштабируем координаты из cropBitmap в bitmapForCrop
+                                val scaleX = bitmapForCrop.width.toFloat() / cropBitmap.width.toFloat()
+                                val scaleY = bitmapForCrop.height.toFloat() / cropBitmap.height.toFloat()
+                                Rect(
+                                    (cropRect.left * scaleX).toInt().coerceIn(0, bitmapForCrop.width),
+                                    (cropRect.top * scaleY).toInt().coerceIn(0, bitmapForCrop.height),
+                                    (cropRect.right * scaleX).toInt().coerceIn(0, bitmapForCrop.width),
+                                    (cropRect.bottom * scaleY).toInt().coerceIn(0, bitmapForCrop.height),
+                                )
+                            } else {
+                                // Координаты уже в правильном масштабе
+                                cropRect
+                            }
+
+                        val croppedBitmap =
+                            applyEditUseCase.invoke(
+                                bitmapForCrop,
+                                EditType.CROP,
+                                0f,
+                                finalCropRect,
+                            )
+
+                        if (isActive && croppedBitmap != null) {
+                            // Обновляем кэш на обрезанное изображение
+                            cachedOriginalBitmap = croppedBitmap
+
+                            // Обновляем состояние (не добавляем CROP в appliedEdits, так как он уже применен к исходному изображению)
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    showCropOverlay = false,
+                                    cropBitmap = null,
+                                    error = null,
+                                )
+
+                            // Пересчитываем предпросмотр с учетом всех настроек и фильтров
+                            recalculatePreview()
+                        } else if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    error = "Не удалось применить кадрирование",
+                                )
+                        }
+                    } catch (e: Exception) {
+                        if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    error = e.message ?: "Ошибка применения кадрирования",
+                                )
+                        }
+                    }
+                }
+        }
+
+        /**
+         * Отменить кадрирование.
+         */
+        fun cancelCrop() {
+            _uiState.value =
+                _uiState.value.copy(
+                    showCropOverlay = false,
+                    cropBitmap = null,
+                )
+        }
+
+        /**
+         * Пересчитать предпросмотр с учетом всех накопленных изменений.
+         */
+        private fun recalculatePreview() {
+            android.util.Log.e("EditorViewModel", "recalculatePreview() вызван")
+            android.util.Log.d("EditorViewModel", "  - brightness: ${_uiState.value.brightness}")
+            android.util.Log.d("EditorViewModel", "  - contrast: ${_uiState.value.contrast}")
+            android.util.Log.d(
+                "EditorViewModel",
+                "  - colorBalance: R=${_uiState.value.colorBalanceRed}, G=${_uiState.value.colorBalanceGreen}, B=${_uiState.value.colorBalanceBlue}",
+            )
+            android.util.Log.d(
+                "EditorViewModel",
+                "  - selectedFilters: ${_uiState.value.selectedFilters.size} фильтров",
+            )
+            android.util.Log.d(
+                "EditorViewModel",
+                "  - appliedEdits: ${_uiState.value.appliedEdits.size} изменений",
+            )
+            currentPreviewJob?.cancel()
+
+            currentPreviewJob =
+                viewModelScope.launch {
+                    delay(400) // Увеличена задержка для уменьшения частоты вызовов при движении слайдера
+
+                    val originalBitmap = getOrLoadOriginalBitmap()
+                    if (originalBitmap == null || originalBitmap.isRecycled) {
+                        _uiState.value =
+                            _uiState.value.copy(
+                                error = "Не удалось загрузить изображение",
+                            )
+                        return@launch
+                    }
+
+                    try {
+                        // Применяем все накопленные изменения последовательно
+                        var workingBitmap: Bitmap? = originalBitmap
+                        val bitmapsToRecycle = mutableListOf<Bitmap>()
+
+                        // Сначала применяем все геометрические изменения (кроме CROP, так как он уже применен к исходному изображению)
+                        for ((geometricEditType, _) in _uiState.value.appliedEdits) {
+                            if (workingBitmap == null || workingBitmap.isRecycled) break
+                            // Пропускаем CROP, так как он уже применен к исходному изображению в кэше
+                            if (geometricEditType == EditType.CROP) continue
+                            val result = applyEditUseCase.invoke(workingBitmap, geometricEditType, 0f, null)
+                            if (result != null && result != workingBitmap) {
+                                if (workingBitmap != originalBitmap) {
+                                    bitmapsToRecycle.add(workingBitmap)
+                                }
+                                workingBitmap = result
+                            }
+                        }
+
+                        if (workingBitmap == null || workingBitmap.isRecycled) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    error = "Ошибка применения геометрических изменений",
+                                )
+                            return@launch
+                        }
+
+                        // Затем применяем цветовые корректировки
+                        if (_uiState.value.brightness != 0f) {
+                            val result = applyEditUseCase.invoke(workingBitmap, EditType.BRIGHTNESS, _uiState.value.brightness, null)
+                            if (result != null && result != workingBitmap) {
+                                if (workingBitmap != originalBitmap) {
+                                    bitmapsToRecycle.add(workingBitmap)
+                                }
+                                workingBitmap = result
+                            } else if (result == null) {
+                                _uiState.value =
+                                    _uiState.value.copy(
+                                        error = "Ошибка применения яркости",
+                                    )
+                                return@launch
+                            }
+                        }
+
+                        if (_uiState.value.contrast != 0f) {
+                            val result = applyEditUseCase.invoke(workingBitmap, EditType.CONTRAST, _uiState.value.contrast, null)
+                            if (result != null && result != workingBitmap) {
+                                if (workingBitmap != originalBitmap) {
+                                    bitmapsToRecycle.add(workingBitmap)
+                                }
+                                workingBitmap = result
+                            } else if (result == null) {
+                                _uiState.value =
+                                    _uiState.value.copy(
+                                        error = "Ошибка применения контраста",
+                                    )
+                                return@launch
+                            }
+                        }
+
+                        // Применяем цветовой баланс
+                        if (_uiState.value.colorBalanceRed != 0f) {
+                            val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_RED, _uiState.value.colorBalanceRed, null)
+                            if (result != null && result != workingBitmap) {
+                                if (workingBitmap != originalBitmap) {
+                                    bitmapsToRecycle.add(workingBitmap)
+                                }
+                                workingBitmap = result
+                            } else if (result == null) {
+                                _uiState.value =
+                                    _uiState.value.copy(
+                                        error = "Ошибка применения цветового баланса",
+                                    )
+                                return@launch
+                            }
+                        }
+
+                        if (_uiState.value.colorBalanceGreen != 0f) {
+                            val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_GREEN, _uiState.value.colorBalanceGreen, null)
+                            if (result != null && result != workingBitmap) {
+                                if (workingBitmap != originalBitmap) {
+                                    bitmapsToRecycle.add(workingBitmap)
+                                }
+                                workingBitmap = result
+                            } else if (result == null) {
+                                _uiState.value =
+                                    _uiState.value.copy(
+                                        error = "Ошибка применения цветового баланса",
+                                    )
+                                return@launch
+                            }
+                        }
+
+                        if (_uiState.value.colorBalanceBlue != 0f) {
+                            val result = applyEditUseCase.invoke(workingBitmap, EditType.COLOR_BALANCE_BLUE, _uiState.value.colorBalanceBlue, null)
+                            if (result != null && result != workingBitmap) {
+                                if (workingBitmap != originalBitmap) {
+                                    bitmapsToRecycle.add(workingBitmap)
+                                }
+                                workingBitmap = result
+                            } else if (result == null) {
+                                _uiState.value =
+                                    _uiState.value.copy(
+                                        error = "Ошибка применения цветового баланса",
+                                    )
+                                return@launch
+                            }
+                        }
+
+                        // Применяем фильтры, если они есть
+                        if (workingBitmap != null && !workingBitmap.isRecycled && _uiState.value.selectedFilters.isNotEmpty()) {
+                            // Для предпросмотра используем стандартный метод
+                            // Имя модели будет извлечено из URI в processImage при сохранении
+                            // Для предпросмотра используем модель по умолчанию (AnimeGAN2)
+                            val filteredResult =
+                                previewFiltersUseCase.invoke(
+                                    workingBitmap,
+                                    _uiState.value.selectedFilters.map { it.first to it.second },
+                                )
+                            if (filteredResult != null && filteredResult != workingBitmap) {
+                                if (workingBitmap != originalBitmap) {
+                                    bitmapsToRecycle.add(workingBitmap)
+                                }
+                                workingBitmap = filteredResult
+                            }
+                        }
+
+                        if (isActive && workingBitmap != null && !workingBitmap.isRecycled) {
+                            // Сохраняем старые битмапы из UI перед обновлением
+                            val oldPreviewBitmap = _uiState.value.previewBitmap
+                            val oldFullSizeBitmap = _uiState.value.fullSizeBitmap
+
+                            // Масштабируем для preview, чтобы избежать ошибки Canvas
+                            // Используем максимум 2048x2048 для безопасности и производительности
+                            val maxPreviewDimension = 2048
+                            val bitmapSizeBytes = workingBitmap.width * workingBitmap.height * 4 // ARGB_8888 = 4 байта на пиксель
+                            val maxCanvasSizeBytes = 100 * 1024 * 1024 // ~100 МБ - максимальный размер для Canvas
+
+                            val previewBitmap =
+                                if (bitmapSizeBytes > maxCanvasSizeBytes ||
+                                    workingBitmap.width > maxPreviewDimension ||
+                                    workingBitmap.height > maxPreviewDimension
+                                ) {
+                                    val scale =
+                                        minOf(
+                                            maxPreviewDimension.toFloat() / workingBitmap.width,
+                                            maxPreviewDimension.toFloat() / workingBitmap.height,
+                                        )
+                                    val scaledWidth = (workingBitmap.width * scale).toInt()
+                                    val scaledHeight = (workingBitmap.height * scale).toInt()
+                                    android.util.Log.d(
+                                        "EditorViewModel",
+                                        "Масштабируем preview: ${workingBitmap.width}x${workingBitmap.height} (${bitmapSizeBytes / 1024 / 1024} МБ) -> ${scaledWidth}x$scaledHeight",
+                                    )
+                                    val scaled = Bitmap.createScaledBitmap(workingBitmap, scaledWidth, scaledHeight, true)
+                                    if (workingBitmap != originalBitmap) {
+                                        bitmapsToRecycle.add(workingBitmap)
+                                    }
+                                    scaled
+                                } else {
+                                    workingBitmap
+                                }
+
+                            // Обновляем состояние UI
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    previewBitmap = previewBitmap,
+                                    fullSizeBitmap = if (previewBitmap != workingBitmap) workingBitmap else null,
+                                )
+
+                            // Освобождаем старые битмапы из UI после обновления состояния
+                            // Используем небольшую задержку, чтобы UI успел обновиться
+                            viewModelScope.launch {
+                                delay(200) // Даем время UI обновиться
+                                oldPreviewBitmap?.let {
+                                    if (!it.isRecycled && it != previewBitmap && it != workingBitmap) {
+                                        it.recycle()
+                                    }
+                                }
+                                oldFullSizeBitmap?.let {
+                                    if (!it.isRecycled && it != previewBitmap && it != workingBitmap && it != oldPreviewBitmap) {
+                                        it.recycle()
+                                    }
+                                }
+                            }
+                        }
+
+                        // Освобождаем промежуточные bitmaps (но не те, что используются в UI)
+                        bitmapsToRecycle.forEach { bitmap ->
+                            val oldPreview = _uiState.value.previewBitmap
+                            val oldFullSize = _uiState.value.fullSizeBitmap
+                            if (!bitmap.isRecycled && bitmap != oldPreview && bitmap != oldFullSize) {
+                                bitmap.recycle()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    error = e.message ?: "Ошибка применения редактирования",
+                                )
+                        }
+                    }
+                }
+        }
+
+        /**
+         * Установить текущую категорию редактирования.
+         */
+        fun setEditCategory(category: EditCategory) {
+            _uiState.value = _uiState.value.copy(currentEditCategory = category)
+        }
+
+        /**
+         * Очистить все примененные геометрические изменения.
+         */
+        fun clearGeometricEdits() {
+            _uiState.value = _uiState.value.copy(appliedEdits = emptyList())
+            // Пересчитываем предпросмотр
+            recalculatePreview()
+        }
+
+        /**
+         * Сохранить отредактированное изображение в галерею.
+         */
+        fun saveEditedImageToGallery() {
+            // Используем fullSizeBitmap если есть (полноразмерное изображение), иначе previewBitmap
+            val bitmapToSave = _uiState.value.fullSizeBitmap ?: _uiState.value.previewBitmap ?: return
+
+            currentFilterJob?.cancel()
+            currentPreviewJob?.cancel()
+
+            currentFilterJob =
+                viewModelScope.launch {
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isLoading = true,
+                            error = null,
+                        )
+
+                    try {
+                        val timestamp = System.currentTimeMillis()
+                        val fileName = "edited_$timestamp.jpg"
+                        // Сохраняем и в галерею, и в папку processed
+                        android.util.Log.d(
+                            "EditorViewModel",
+                            "Сохраняем ${if (_uiState.value.fullSizeBitmap != null) "fullSizeBitmap" else "previewBitmap"}: ${bitmapToSave.width}x${bitmapToSave.height}",
+                        )
+                        // Собираем все настройки редактирования для сохранения
+                        val editSettings = mutableMapOf<String, Any>()
+                        if (_uiState.value.brightness != 0f) {
+                            editSettings["brightness"] = _uiState.value.brightness
+                        }
+                        if (_uiState.value.contrast != 0f) {
+                            editSettings["contrast"] = _uiState.value.contrast
+                        }
+                        if (_uiState.value.colorBalanceRed != 0f ||
+                            _uiState.value.colorBalanceGreen != 0f ||
+                            _uiState.value.colorBalanceBlue != 0f
+                        ) {
+                            editSettings["colorBalanceRed"] = _uiState.value.colorBalanceRed
+                            editSettings["colorBalanceGreen"] = _uiState.value.colorBalanceGreen
+                            editSettings["colorBalanceBlue"] = _uiState.value.colorBalanceBlue
+                        }
+                        // Сохраняем appliedEdits как список пар (String, Float) для сериализации
+                        if (_uiState.value.appliedEdits.isNotEmpty()) {
+                            editSettings["appliedEdits"] = _uiState.value.appliedEdits.map { Pair(it.first.name, it.second) }
+                        }
+                        if (_uiState.value.selectedFilters.isNotEmpty()) {
+                            editSettings["filters"] = _uiState.value.selectedFilters.map { it.first.name }
+                            editSettings["filterIntensities"] = _uiState.value.selectedFilters.mapNotNull { it.second }
+                        }
+
+                        val uri =
+                            saveEditedImageUseCase.invoke(
+                                bitmapToSave,
+                                fileName,
+                                originalUri = _uiState.value.imageData?.uri,
+                                filterType = "edited",
+                                editSettings = editSettings,
+                            )
+
+                        if (isActive && uri != null) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    processedResult =
+                                        ProcessingResult(
+                                            originalUri = _uiState.value.imageData?.uri ?: uri,
+                                            processedUri = uri,
+                                            filterType = "edited",
+                                        ),
+                                    isLoading = false,
+                                )
+
+                            // Обновляем галерею и обработанные изображения
+                            onImageSaved?.invoke()
+                            onNavigateToProcessed?.invoke()
+                        } else if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    isLoading = false,
+                                    error = "Не удалось сохранить изображение",
+                                )
+                        }
+                    } catch (e: Exception) {
+                        if (isActive) {
+                            _uiState.value =
+                                _uiState.value.copy(
+                                    isLoading = false,
+                                    error = e.message,
+                                )
+                        }
+                    }
+                }
+        }
+
+        override fun onCleared() {
+            _uiState.value = EditorUiState()
+            super.onCleared()
+        }
     }
-}
 
 /**
  * Состояние UI экрана редактора.
@@ -1081,7 +1194,7 @@ data class EditorUiState(
     val colorBalanceBlue: Float = 0f,
     val appliedEdits: List<Pair<EditType, Float>> = emptyList(), // Накопленные редактирования (повороты, отражения)
     val currentEditCategory: EditCategory = EditCategory.BRIGHTNESS, // Текущая категория редактирования
-    val showCropOverlay: Boolean = false // Показывать overlay для кадрирования
+    val showCropOverlay: Boolean = false, // Показывать overlay для кадрирования
 )
 
 /**
@@ -1091,5 +1204,5 @@ enum class EditCategory {
     BRIGHTNESS,
     CONTRAST,
     COLOR_BALANCE,
-    GEOMETRY
+    GEOMETRY,
 }

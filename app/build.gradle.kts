@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -25,7 +26,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -39,7 +40,7 @@ android {
     buildFeatures {
         compose = true
     }
-    
+
     // Включаем опции для тестов
     testOptions {
         unitTests {
@@ -49,7 +50,6 @@ android {
     }
 }
 
-
 dependencies {
     // Core Android
     implementation(libs.androidx.core.ktx)
@@ -57,7 +57,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
-    
+
     // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -66,37 +66,37 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.navigation.compose)
-    
+
     // Dependency Injection
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
-    
+
     // Camera
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
-    
+
     // Image Loading
     implementation(libs.coil.compose)
-    
+
     // AI/ML
     implementation(libs.tensorflow.lite)
     implementation(libs.tensorflow.lite.gpu)
     implementation(libs.tensorflow.lite.support)
-    
+
     // Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
-    
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
-    
+
     // Pull to refresh
     implementation("com.google.accompanist:accompanist-swiperefresh:0.34.0")
-    
+
     // Testing
     testImplementation(libs.junit)
     // MockK для мокирования
@@ -111,7 +111,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.11.1")
     // AndroidX Test Core для ApplicationProvider
     testImplementation("androidx.test:core:1.5.0")
-    
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

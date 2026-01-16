@@ -8,18 +8,23 @@ import javax.inject.Inject
 
 /**
  * Реализация препроцессора изображений.
- * 
+ *
  * Выполняет ресайз и нормализацию изображений для TFLite моделей.
  */
-class ImagePreprocessorImpl @Inject constructor() : ImagePreprocessor {
-    
-    override fun preprocess(bitmap: Bitmap, targetWidth: Int, targetHeight: Int): TensorImage {
-        val imageProcessor = ImageProcessor.Builder()
-            .add(ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
-            .build()
-        
-        val tensorImage = TensorImage.fromBitmap(bitmap)
-        return imageProcessor.process(tensorImage)
-    }
-}
+class ImagePreprocessorImpl
+    @Inject
+    constructor() : ImagePreprocessor {
+        override fun preprocess(
+            bitmap: Bitmap,
+            targetWidth: Int,
+            targetHeight: Int,
+        ): TensorImage {
+            val imageProcessor =
+                ImageProcessor.Builder()
+                    .add(ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
+                    .build()
 
+            val tensorImage = TensorImage.fromBitmap(bitmap)
+            return imageProcessor.process(tensorImage)
+        }
+    }

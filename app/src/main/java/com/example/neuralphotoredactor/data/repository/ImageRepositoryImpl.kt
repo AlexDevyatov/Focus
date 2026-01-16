@@ -10,18 +10,19 @@ import javax.inject.Inject
 /**
  * Реализация репозитория для работы с изображениями.
  */
-class ImageRepositoryImpl @Inject constructor(
-    private val galleryDataSource: GalleryDataSource
-) : ImageRepository {
-    
-    override fun getAllImages(): Flow<List<ImageData>> {
-        return flow {
-            val images = galleryDataSource.getAllImages()
-            emit(images)
+class ImageRepositoryImpl
+    @Inject
+    constructor(
+        private val galleryDataSource: GalleryDataSource,
+    ) : ImageRepository {
+        override fun getAllImages(): Flow<List<ImageData>> {
+            return flow {
+                val images = galleryDataSource.getAllImages()
+                emit(images)
+            }
+        }
+
+        override suspend fun invalidateCache() {
+            galleryDataSource.invalidateCache()
         }
     }
-    
-    override suspend fun invalidateCache() {
-        galleryDataSource.invalidateCache()
-    }
-}
