@@ -238,8 +238,7 @@ abstract class MLModule {
         @Provides
         @Singleton
         fun provideAnimeGanFacePaintProcessor(
-            tfliteModelRepository:
-                com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository,
+            tfliteModelRepository: com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository,
         ): AnimeGanFacePaintProcessor {
             return AnimeGanFacePaintProcessor(tfliteModelRepository)
         }
@@ -259,8 +258,7 @@ abstract class MLModule {
         @Provides
         @Singleton
         fun provideCelebADistillProcessor(
-            tfliteModelRepository:
-                com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository,
+            tfliteModelRepository: com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository,
         ): CelebADistillProcessor {
             return CelebADistillProcessor(tfliteModelRepository)
         }
@@ -280,8 +278,7 @@ abstract class MLModule {
         @Provides
         @Singleton
         fun provideHayaoProcessor(
-            tfliteModelRepository:
-                com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository,
+            tfliteModelRepository: com.example.neuralphotoredactor.domain.repository.TFLiteModelRepository,
         ): HayaoProcessor {
             return HayaoProcessor(tfliteModelRepository)
         }

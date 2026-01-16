@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -78,26 +79,26 @@ fun AiFiltersScreen(
                 ),
                 FilterItem(
                     title = stringResource(R.string.ai_filter_style_transfer),
-                    icon = Icons.Filled.Spa,
-                    imageResId = R.drawable.img_style_transfer,
+                    icon = Icons.Outlined.Spa,
+                    imageResId = R.drawable.paprika_background,
                     onClick = { onFilterClick("style_transfer") },
                 ),
                 FilterItem(
                     title = stringResource(R.string.ai_filter_animegan_face_paint),
-                    icon = Icons.Filled.Palette,
-                    imageResId = R.drawable.img_style_transfer,
+                    icon = Icons.Outlined.Spa,
+                    imageResId = R.drawable.face_paint_background,
                     onClick = { onFilterClick("style_transfer:AnimeGAN Face Paint") },
                 ),
                 FilterItem(
                     title = stringResource(R.string.ai_filter_celeba_distill),
-                    icon = Icons.Filled.Brush,
-                    imageResId = R.drawable.img_style_transfer,
+                    icon = Icons.Outlined.Spa,
+                    imageResId = R.drawable.celeba_distill_background,
                     onClick = { onFilterClick("style_transfer:CelebA Distill") },
                 ),
                 FilterItem(
                     title = stringResource(R.string.ai_filter_hayao),
-                    icon = Icons.Filled.ColorLens,
-                    imageResId = R.drawable.img_style_transfer,
+                    icon = Icons.Outlined.Spa,
+                    imageResId = R.drawable.hayao_background,
                     onClick = { onFilterClick("style_transfer:Hayao") },
                 ),
             )

@@ -47,8 +47,8 @@
     <!-- AI Filters Screen -->
     <string name="ai_filter_upscale">Суперразрешение</string>
     <string name="ai_filter_denoise">Умное шумоподавление</string>
-    <string name="ai_filter_style_transfer">Художественный стиль</string>
-    <string name="ai_filter_animegan_face_paint">AnimeGAN Face Paint</string>
+    <string name="ai_filter_style_transfer">Paprika</string>
+    <string name="ai_filter_animegan_face_paint">Face Paint</string>
     <string name="ai_filter_celeba_distill">CelebA Distill</string>
     <string name="ai_filter_hayao">Hayao</string>
     
