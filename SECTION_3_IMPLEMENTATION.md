@@ -1,5 +1,309 @@
 # РАЗДЕЛ 3. РЕАЛИЗАЦИЯ ПРЕЦЕДЕНТОВ
 
+## 3.1. Реализация прецедента «Загрузка изображений из галереи и камеры»
+
+Данный прецедент обеспечивает выбор исходного изображения для последующей обработки.
+
+### 3.1.1. Реализация алгоритмов
+
+**Входные данные:** выбор источника (галерея/камера).
+
+**Выходные данные:** изображение, загруженное в приложение.
+
+**Алгоритм загрузки из галереи:**
+
+1. **Запрос разрешений:** При открытии экрана галереи (`GalleryScreen`) автоматически проверяется наличие разрешения на доступ к медиафайлам:
+   - Для Android 13+ (API 33+): `READ_MEDIA_IMAGES`
+   - Для Android 12 и ниже: `READ_EXTERNAL_STORAGE`
+   - Если разрешение отсутствует, запускается `ActivityResultContracts.RequestPermission()` через `rememberLauncherForActivityResult`.
+
+2. **Загрузка изображений:** После предоставления разрешения вызывается `GalleryViewModel.loadImages()`, который:
+   - Использует `GetAllImagesUseCase` для получения списка изображений
+   - `GetAllImagesUseCase` обращается к `ImageRepository`
+   - `ImageRepository` использует `GalleryDataSource` для работы с `MediaStore`
+
+3. **Получение списка изображений:** `GalleryDataSourceImpl.getAllImages()`:
+   - Выполняет запрос к `MediaStore.Images.Media.EXTERNAL_CONTENT_URI`
+   - Использует оптимизированную projection (только `_ID` и `DATE_ADDED`)
+   - Сортирует по `DATE_ADDED DESC` (новые изображения первыми)
+   - Формирует список `ImageData` с URI изображений через `ContentUris.withAppendedId()`
+   - Кэширует результаты (первые 200 изображений на 5 минут)
+
+4. **Отображение в интерфейсе:** 
+   - `GalleryScreen` отображает сетку изображений через `LazyVerticalGrid`
+   - Использует `AsyncImage` (Coil) для загрузки превью с оптимизацией размера
+   - Поддерживает pull-to-refresh для обновления списка
+
+**Алгоритм загрузки с камеры:**
+
+1. **Запрос разрешения камеры:** При нажатии на кнопку "Камера" в `MainActivity`:
+   - Проверяется наличие разрешения `Manifest.permission.CAMERA`
+   - Если разрешение отсутствует, запускается `ActivityResultContracts.RequestPermission()` через `cameraPermissionLauncher`
+
+2. **Создание временного файла:** После предоставления разрешения:
+   - Создается временный файл через `createImageFile()` в `getExternalFilesDir(Environment.DIRECTORY_PICTURES)`
+   - Имя файла: `JPEG_yyyyMMdd_HHmmss_.jpg`
+   - Генерируется URI через `FileProvider.getUriForFile()`
+
+3. **Запуск камеры:** Используется `ActivityResultContracts.TakePicture()` через `takePictureLauncher`:
+   - Запускается системное приложение камеры Android
+   - Фотография сохраняется во временный файл по указанному URI
+
+4. **Обработка результата:** В callback `takePictureLauncher`:
+   - При успешной съемке создается `ImageData` с URI снятой фотографии
+   - Изображение передается в `EditorViewModel.setImage()`
+   - Выполняется навигация на экран редактора (`navController.navigate("editor")`)
+   - Обновляется галерея для отображения новой фотографии
+
+**Схема алгоритма загрузки изображения:**
+
+```
+╭─────────────────────────────────╮
+│        НАЧАЛО                    │
+│   Вход: источник (галерея/камера)│
+╰─────────────┬─────────────────────╯
+              │
+              ▼
+       ╱──────────────╲
+      ╱ Источник?     ╲
+     ╲────────────────╱
+     ╲      ╱
+      ╲    ╱
+       ▼  ▼
+   Галерея │ │ Камера
+       │   │   │
+       │   │   └──► [Алгоритм камеры]
+       │   │         │
+       │   │         ▼
+       │   │    ┌──────────────────┐
+       │   │    │ Запрос разрешения│
+       │   │    │ CAMERA           │
+       │   │    └────────┬─────────┘
+       │   │             │
+       │   │             ▼
+       │   │    ┌──────────────────┐
+       │   │    │ Создание         │
+       │   │    │ временного файла │
+       │   │    └────────┬─────────┘
+       │   │             │
+       │   │             ▼
+       │   │    ┌──────────────────┐
+       │   │    │ Запуск камеры    │
+       │   │    │ через Intent     │
+       │   │    └────────┬─────────┘
+       │   │             │
+       │   │             ▼
+       │   │    ┌──────────────────┐
+       │   │    │ Получение URI    │
+       │   │    │ снятой фотографии│
+       │   │    └────────┬─────────┘
+       │   │             │
+       │   │             └───┐
+       │   │                 │
+       │   └─────────────────┘
+       │         │
+       │         ▼
+       │    [Алгоритм галереи]
+       │         │
+       │         ▼
+       │    ┌──────────────────┐
+       │    │ Запрос разрешения│
+       │    │ (READ_MEDIA_IMAGES│
+       │    │  или READ_EXTERNAL│
+       │    │  _STORAGE)       │
+       │    └────────┬─────────┘
+       │             │
+       │             ▼
+       │    ┌──────────────────┐
+       │    │ Запрос к         │
+       │    │ MediaStore       │
+       │    │ (EXTERNAL_CONTENT│
+       │    │  _URI)           │
+       │    └────────┬─────────┘
+       │             │
+       │             ▼
+       │    ┌──────────────────┐
+       │    │ Получение списка │
+       │    │ URI изображений  │
+       │    └────────┬─────────┘
+       │             │
+       │             └───┐
+       │                 │
+       └─────────────────┘
+                 │
+                 ▼
+          ┌──────────────────┐
+          │ Декодирование    │
+          │ изображения      │
+          │ (оптимизация     │
+          │  размера через   │
+          │  Coil)           │
+          └────────┬─────────┘
+                   │
+                   ▼
+          ┌──────────────────┐
+          │ Отображение в    │
+          │ интерфейсе       │
+          │ (GalleryScreen/  │
+          │  EditorScreen)   │
+          └────────┬─────────┘
+                   │
+                   ▼
+            ╭──────────────╮
+            │   ВЫХОД:     │
+            │   ImageData  │
+            │   (URI)      │
+            ╰──────────────╯
+```
+
+### 3.1.2. Реализация классов
+
+#### 3.1.2.1. Класс `GalleryScreen`
+
+**Назначение:** Composable-экран для отображения галереи изображений устройства.
+
+**Параметры:**
+- `images: List<ImageData>` — список изображений для отображения
+- `isLoading: Boolean` — флаг загрузки
+- `isRefreshing: Boolean` — флаг обновления (pull-to-refresh)
+- `error: String?` — сообщение об ошибке
+- `onImageClick: (ImageData, String?) -> Unit` — обработчик клика по изображению
+- `onRefresh: () -> Unit` — обработчик обновления
+- `onPermissionGranted: () -> Unit` — callback после предоставления разрешения
+- `onBackClick: (() -> Unit)?` — обработчик возврата
+- `selectedFilter: String?` — выбранный фильтр (для AI-фильтров)
+
+**Логика работы:**
+- Автоматически запрашивает разрешение при первом открытии через `LaunchedEffect`
+- Использует `rememberLauncherForActivityResult` с `ActivityResultContracts.RequestPermission()` для запроса разрешений
+- Определяет необходимое разрешение в зависимости от версии Android (READ_MEDIA_IMAGES для 13+, READ_EXTERNAL_STORAGE для более ранних версий)
+- Отображает состояние загрузки, ошибки или сетку изображений через `LazyVerticalGrid`
+- Использует `SwipeRefresh` для pull-to-refresh
+- Использует `AsyncImage` (Coil) для оптимизированной загрузки превью
+
+**Зависимости:**
+- `androidx.activity.compose.rememberLauncherForActivityResult`
+- `androidx.activity.result.contract.ActivityResultContracts`
+- `coil.compose.AsyncImage`
+- Material Design 3 компоненты
+
+#### 3.1.2.2. Класс `GalleryViewModel`
+
+**Назначение:** ViewModel для управления состоянием экрана галереи.
+
+**Поля:**
+- `getAllImagesUseCase: GetAllImagesUseCase` — use case для получения изображений (инжектируется через Hilt)
+- `_uiState: MutableStateFlow<GalleryUiState>` — состояние UI
+- `loadJob: Job?` — текущая задача загрузки (для возможности отмены)
+
+**Методы:**
+- `loadImages(): Unit` — загружает изображения из галереи через `getAllImagesUseCase`
+- `refreshImages(): Unit` — обновляет список изображений (инвалидирует кэш и перезагружает)
+- `stopLoading(): Unit` — отменяет текущую загрузку
+
+**Состояние UI (`GalleryUiState`):**
+- `images: List<ImageData>` — список изображений
+- `isLoading: Boolean` — флаг первоначальной загрузки
+- `isRefreshing: Boolean` — флаг обновления (pull-to-refresh)
+- `error: String?` — сообщение об ошибке
+
+**Зависимости:**
+- `com.example.neuralphotoredactor.domain.usecase.GetAllImagesUseCase`
+- Kotlin Coroutines (`viewModelScope`)
+
+#### 3.1.2.3. Класс `GalleryDataSource` и `GalleryDataSourceImpl`
+
+**Назначение:** Источник данных для работы с галереей устройства через MediaStore.
+
+**Интерфейс `GalleryDataSource`:**
+- `getAllImages(): List<ImageData>` — получить все изображения
+- `getImagesPaginated(limit: Int, offset: Int): List<ImageData>` — получить изображения с пагинацией
+- `getImageCount(): Int` — получить количество изображений
+- `invalidateCache(): Unit` — инвалидировать кэш
+
+**Реализация `GalleryDataSourceImpl`:**
+
+**Поля:**
+- `context: Context` — контекст приложения (инжектируется через `@ApplicationContext`)
+- `cachedImages: List<ImageData>?` — кэш изображений
+- `cacheTimestamp: Long` — временная метка кэша
+- `cacheValidityMs = 5 * 60 * 1000L` — валидность кэша (5 минут)
+- `DEFAULT_PAGE_SIZE = 50` — размер страницы по умолчанию
+- `CACHE_SIZE = 200` — размер кэша
+
+**Методы:**
+- `getAllImages(): List<ImageData>` (suspend) — основной метод загрузки:
+  - Проверяет кэш (если актуален, возвращает из кэша)
+  - Выполняет запрос к `MediaStore.Images.Media.EXTERNAL_CONTENT_URI`
+  - Использует оптимизированную projection: `_ID`, `DATE_ADDED`
+  - Сортирует по `DATE_ADDED DESC`
+  - Формирует список `ImageData` с URI через `ContentUris.withAppendedId()`
+  - Кэширует первые `CACHE_SIZE` изображений
+  - Выполняется в `Dispatchers.IO`
+  
+- `invalidateCache(): Unit` — очищает кэш
+
+**Зависимости:**
+- `android.content.ContentResolver`
+- `android.provider.MediaStore`
+- Kotlin Coroutines (`Dispatchers.IO`, `withContext`)
+
+#### 3.1.2.4. Логика работы с камерой в `MainActivity`
+
+**Назначение:** Управление съемкой фотографий через системное приложение камеры.
+
+**Компоненты:**
+
+1. **Создание временного файла:**
+   - `createImageFile(ctx: Context): File` — создает временный файл в `getExternalFilesDir(Environment.DIRECTORY_PICTURES)`
+   - Имя файла: `JPEG_yyyyMMdd_HHmmss_.jpg`
+
+2. **Launcher для съемки:**
+   - `takePictureLauncher: rememberLauncherForActivityResult(ActivityResultContracts.TakePicture())`
+   - Callback: при успешной съемке создает `ImageData`, передает в `EditorViewModel`, выполняет навигацию
+
+3. **Launcher для разрешения:**
+   - `cameraPermissionLauncher: rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission())`
+   - Callback: при предоставлении разрешения создает файл и запускает камеру
+
+4. **Функция обработки клика:**
+   - `handleCameraClick(): Unit` — проверяет разрешение, при наличии — создает файл и запускает камеру, иначе запрашивает разрешение
+
+**Зависимости:**
+- `androidx.activity.compose.rememberLauncherForActivityResult`
+- `androidx.activity.result.contract.ActivityResultContracts`
+- `androidx.core.content.FileProvider`
+- `androidx.core.content.ContextCompat`
+
+### 3.1.3. Описание контрольного примера
+
+**Входные данные:**
+- Действие пользователя: нажатие на кнопку "Галерея" или "Камера" на главном экране
+
+**Ожидаемый результат (галерея):**
+- Система запрашивает разрешение на доступ к медиафайлам (при первом использовании)
+- Отображается сетка изображений из галереи устройства
+- При нажатии на изображение происходит переход к экрану редактора с выбранным изображением
+
+**Ожидаемый результат (камера):**
+- Система запрашивает разрешение на использование камеры (при первом использовании)
+- Открывается системное приложение камеры Android
+- После съемки фотографии происходит переход к экрану редактора с снятой фотографией
+
+**Полученный результат:**
+- Загрузка изображений из галереи работает корректно: разрешения запрашиваются автоматически, список загружается и отображается в сетке
+- Работа с камерой работает корректно: разрешение запрашивается при необходимости, камера запускается, фотография сохраняется и открывается в редакторе
+- Кэширование изображений галереи работает: повторное открытие экрана галереи выполняется быстрее (если кэш актуален)
+- Pull-to-refresh обновляет список изображений
+
+**Примечания:**
+- Разрешения запрашиваются автоматически при первом использовании соответствующей функции
+- Использование Compose Activity Result API обеспечивает type-safe работу с разрешениями и системными компонентами
+- Оптимизация загрузки превью через Coil позволяет эффективно работать с большими галереями изображений
+- Временные файлы камеры хранятся в приватном хранилище приложения (`getExternalFilesDir`)
+
+---
+
 ## 3.8. Увеличение разрешения — ИИ
 
 ### 3.8.1. Математическая постановка
